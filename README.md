@@ -1,6 +1,6 @@
-# CBQA Pro — IT Audit Project Management
+# NEXONE The All About Tool
 
-Full-stack clone of CBQA Pro built with:
+Full-stack clone of NEXONEß built with:
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + Redux Toolkit
 - **Backend**: Golang (Gin) + GORM + PostgreSQL
 - **Auth**: JWT
@@ -8,7 +8,7 @@ Full-stack clone of CBQA Pro built with:
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Structureß
 
 ```
 cbqa/

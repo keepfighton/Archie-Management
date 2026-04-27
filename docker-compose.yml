@@ -4,7 +4,6 @@ services:
   # ─── PostgreSQL ──────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: nexone_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -12,79 +11,58 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # ─── Backend (Golang) ────────────────────────────────
+  # ─── Backend ─────────────────────────────────────────
   backend:
     build:
       context: ./Backend
-      dockerfile: Dockerfile
-    container_name: nexone_backend
     restart: unless-stopped
     environment:
       PORT: 8080
       ENV: ${ENV}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP_HOURS: ${JWT_EXP_HOURS}
       UPLOAD_DIR: /app/uploads
-      APP_URL: ${APP_URL}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM:-noreply@cbqa.com}
+      APP_URL: https://nexone.nexoratech.co
     volumes:
       - uploads_data:/app/uploads
-    ports:
-      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # ─── Frontend (React + Nginx) ────────────────────────
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nexone-api.rule=Host(`nexone.nexoratech.co`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.nexone-api.entrypoints=websecure"
+      - "traefik.http.routers.nexone-api.tls.certresolver=myresolver"
+      - "traefik.http.services.nexone-api.loadbalancer.server.port=8080"
+
+  # ─── Frontend ────────────────────────────────────────
   frontend:
     build:
       context: ./Frontend
-      dockerfile: Dockerfile
-    container_name: nexone_frontend
     restart: unless-stopped
-    ports:
-      - "3000:80"
     depends_on:
       - backend
     environment:
-      VITE_API_URL: http://backend:8080/api/v1
+      VITE_API_URL: https://nexone.nexoratech.co/api/v1
 
-  # ─── pgAdmin (optional, for DB management) ───────────
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: nexone_pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-    profiles:
-      - tools
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nexone.rule=Host(`nexone.nexoratech.co`)"
+      - "traefik.http.routers.nexone.entrypoints=websecure"
+      - "traefik.http.routers.nexone.tls.certresolver=myresolver"
+      - "traefik.http.services.nexone.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:
@@ -92,4 +70,5 @@ volumes:
 
 networks:
   default:
-    name: nexone_network
+    external: true
+    name: web

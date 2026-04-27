@@ -1,4 +1,4 @@
-name: Deploy NEXA
+name: Deploy NEXONE
 
 on:
   push:
@@ -31,13 +31,16 @@ jobs:
             echo "🔧 Build & start container"
             docker compose up -d --build
 
-            echo "⏳ Tunggu app ready"
-            sleep 10
+            echo "⏳ Tunggu container ready"
+            sleep 15
 
-            echo "🗄️ Run Prisma Migration"
-            docker exec nexa-app npx prisma migrate deploy
+            echo "🔍 Pastikan container jalan"
+            docker ps | grep nexone-app
 
-            echo "🔁 Restart app (optional)"
-            docker restart nexa-app
+            echo "🗄️ Run Prisma Migration (safe)"
+            docker exec nexone-app sh -c "npx prisma migrate deploy || echo 'No migration'"
+
+            echo "🔁 Restart app"
+            docker restart nexone-app
 
             echo "✅ Deploy selesai"

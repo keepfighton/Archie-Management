@@ -212,3 +212,58 @@ The app uses **PostgreSQL** with GORM auto-migration. All tables are created aut
 - `tailwindcss` — Styling
 - `lucide-react` — Icons
 - `react-toastify` — Notifications
+
+
+
+### ENVI
+Berikut info environment lengkapnya:
+
+🗄️ Database (PostgreSQL)
+Key	Value
+Host	localhost (manual) / postgres (Docker)
+Port	5432
+Database	cbqa_db
+User	cbqa
+Password	cbqa123
+Connection string:
+
+
+postgresql://cbqa:cbqa123@localhost:5432/cbqa_db
+🔧 Backend API
+Key	Value
+Port	8080
+Base URL (local)	http://localhost:8080
+Base URL (Docker)	http://localhost:8080
+Health check	http://localhost:8080/health
+API prefix	/api/v1
+JWT secret	dev-secret-change-in-production
+JWT expiry	24 jam
+Upload dir	./uploads (manual) / /app/uploads (Docker)
+🌐 Frontend
+Key	Value
+Port (dev)	3000 atau 3001
+Port (Docker)	3000
+API URL	/api/v1 (di-proxy Nginx)
+📧 SMTP (Email)
+Saat ini kosong / tidak dikonfigurasi — fitur Forgot Password tidak kirim email di lokal. Aman, tidak error.
+
+Untuk aktifkan, isi di Backend/.env:
+
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=noreply@cbqa.com
+🐘 pgAdmin (opsional)
+Key	Value
+URL	http://localhost:5050
+Email	admin@cbqa.com
+Password	admin123
+Jalankan dengan: docker-compose --profile tools up
+
+👤 Login Default
+Role	Email	Password
+Admin	admin@cbqa.com	Admin123!
+Member	fauzi@cbqa.com	Member123!
+

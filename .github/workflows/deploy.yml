@@ -1,0 +1,43 @@
+name: Deploy NEXA
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            echo "🚀 Masuk ke folder app"
+            cd ${{ secrets.APP_PATH }}
+
+            echo "📥 Pull latest code"
+            git pull origin main
+
+            echo "🛑 Stop container lama"
+            docker compose down
+
+            echo "🔧 Build & start container"
+            docker compose up -d --build
+
+            echo "⏳ Tunggu app ready"
+            sleep 10
+
+            echo "🗄️ Run Prisma Migration"
+            docker exec nexa-app npx prisma migrate deploy
+
+            echo "🔁 Restart app (optional)"
+            docker restart nexa-app
+
+            echo "✅ Deploy selesai"

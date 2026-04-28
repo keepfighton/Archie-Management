@@ -1,5 +1,8 @@
 .DS_Store
 .env
+Backend/.env
+Backend/.env.local
+Frontend/.env.local
 node_modules/
 Frontend/dist/
 Backend/api

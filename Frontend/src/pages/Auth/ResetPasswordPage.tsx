@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import api from '@/services/api'
+import { authService } from '@/services/api'
 import nexoneLogoUrl from '../../../logo/Logo_Nexone.png'
 
 import { KeyRound, CheckCircle, Eye, EyeOff } from 'lucide-react'
@@ -26,7 +26,7 @@ export default function ResetPasswordPage() {
 
     setLoading(true)
     try {
-      await api.post('/auth/reset-password', { token, new_password: password })
+      await authService.resetPassword(token, password)
       setDone(true)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Token tidak valid atau sudah kadaluarsa')

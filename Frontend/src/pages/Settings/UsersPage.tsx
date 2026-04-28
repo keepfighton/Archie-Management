@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { teamService, roleService } from '@/services/api'
-import api from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, KeyRound, UserX, UserCheck } from 'lucide-react'
 import {
@@ -63,10 +62,15 @@ export default function UsersPage() {
     if (form.password.length < 6) { toast.error('Password min 6 characters'); return }
     setSaving(true)
     try {
-      const res = await api.post('/auth/register', { name: form.name, email: form.email, password: form.password, job_title: form.job_title, phone: form.phone, role: form.role })
-      if (form.app_role_id && form.role === 'member') {
-        await teamService.updateMember(res.data.user.id, { app_role_id: Number(form.app_role_id) })
-      }
+      await teamService.createMember({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        job_title: form.job_title,
+        phone: form.phone,
+        role: form.role,
+        app_role_id: form.role === 'member' && form.app_role_id ? Number(form.app_role_id) : null,
+      })
       toast.success(`User ${form.name} created!`)
       setShowAddModal(false)
       setForm(EMPTY_FORM)
@@ -90,10 +94,11 @@ export default function UsersPage() {
   }
 
   const handleResetPassword = async () => {
+    if (!resetUserId) { toast.error('User not found'); return }
     if (newPassword.length < 6) { toast.error('Password min 6 characters'); return }
     setSaving(true)
     try {
-      await api.post(`/team/members/${resetUserId}/reset-password`, { password: newPassword })
+      await teamService.resetPassword(resetUserId!, { password: newPassword })
       toast.success('Password reset successfully!')
       setShowResetModal(false)
       setNewPassword('')

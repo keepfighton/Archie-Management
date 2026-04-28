@@ -1,9 +1,8 @@
-version: '3.9'
-
 services:
   # ─── PostgreSQL ──────────────────────────────────────
   postgres:
     image: postgres:15-alpine
+    container_name: nexone-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -11,16 +10,19 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - web
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   # ─── Backend ─────────────────────────────────────────
   backend:
     build:
       context: ./Backend
+    container_name: nexone-backend
     restart: unless-stopped
     environment:
       PORT: 8080
@@ -33,15 +35,23 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP_HOURS: ${JWT_EXP_HOURS}
       UPLOAD_DIR: /app/uploads
-      APP_URL: https://nexone.nexoratech.co
+      APP_URL: ${APP_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - web
 
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.nexone-api.rule=Host(`nexone.nexoratech.co`) && PathPrefix(`/api`)"
       - "traefik.http.routers.nexone-api.entrypoints=websecure"
       - "traefik.http.routers.nexone-api.tls.certresolver=myresolver"
@@ -51,14 +61,21 @@ services:
   frontend:
     build:
       context: ./Frontend
+      args:
+        # VITE_ vars are baked into the JS bundle at build time by Vite.
+        # Passing them as runtime `environment:` has no effect on the built
+        # assets.  Use build args here so the Dockerfile ARG picks them up.
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    container_name: nexone-frontend
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: https://nexone.nexoratech.co/api/v1
+    networks:
+      - web
 
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.nexone.rule=Host(`nexone.nexoratech.co`)"
       - "traefik.http.routers.nexone.entrypoints=websecure"
       - "traefik.http.routers.nexone.tls.certresolver=myresolver"
@@ -69,6 +86,6 @@ volumes:
   uploads_data:
 
 networks:
-  default:
+  web:
     external: true
     name: web

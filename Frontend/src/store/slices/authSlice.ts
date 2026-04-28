@@ -12,6 +12,7 @@ interface User {
   name: string
   email: string
   job_title: string
+  phone: string          // present in userPayload — was missing from the type
   role: string
   app_role_id: number | null
   avatar: string
@@ -26,16 +27,31 @@ interface AuthState {
   error: string | null
 }
 
+// Safe JSON.parse — returns null instead of crashing on corrupted storage values.
+function safeParse<T>(raw: string | null): T | null {
+  if (!raw) return null
+  try { return JSON.parse(raw) as T } catch { return null }
+}
+
+function clearSessionStorage() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  localStorage.removeItem('permissions')
+  sessionStorage.removeItem('token')
+  sessionStorage.removeItem('user')
+  sessionStorage.removeItem('permissions')
+}
+
 const storedToken = localStorage.getItem('token') || sessionStorage.getItem('token')
-const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user')
+const storedUser  = localStorage.getItem('user')  || sessionStorage.getItem('user')
 const storedPerms = localStorage.getItem('permissions') || sessionStorage.getItem('permissions')
 
 const initialState: AuthState = {
-  user: JSON.parse(storedUser || 'null'),
-  token: storedToken,
-  permissions: JSON.parse(storedPerms || 'null'),
-  loading: false,
-  error: null,
+  user:        safeParse<User>(storedUser),
+  token:       storedToken || null,
+  permissions: safeParse<Permission[]>(storedPerms),
+  loading:     false,
+  error:       null,
 }
 
 function saveSession(token: string, user: User, permissions: Permission[] | null, remember: boolean) {
@@ -67,11 +83,22 @@ export const login = createAsyncThunk(
 export const fetchMe = createAsyncThunk('auth/me', async (_, { rejectWithValue }) => {
   try {
     const res = await authService.me()
-    return res.data
+    return res.data as { user: User; permissions: Permission[] | null }
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.error || 'Failed to fetch user')
   }
 })
+
+// Calls the API logout endpoint (so the server can blacklist the JTI) then
+// clears local state.  Always falls through to the local clear even if the
+// network request fails (e.g. token already expired).
+export const logoutAsync = createAsyncThunk(
+  'auth/logoutAsync',
+  async (_, { dispatch }) => {
+    try { await authService.logout() } catch { /* ignore — clear locally anyway */ }
+    dispatch(logout())
+  }
+)
 
 const authSlice = createSlice({
   name: 'auth',
@@ -81,12 +108,7 @@ const authSlice = createSlice({
       state.user = null
       state.token = null
       state.permissions = null
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      localStorage.removeItem('permissions')
-      sessionStorage.removeItem('token')
-      sessionStorage.removeItem('user')
-      sessionStorage.removeItem('permissions')
+      clearSessionStorage()
     },
     setUser(state, action: PayloadAction<User>) {
       state.user = action.payload
@@ -110,11 +132,19 @@ const authSlice = createSlice({
         state.error = action.payload as string
       })
       .addCase(fetchMe.fulfilled, (state, action) => {
-        state.user = action.payload
+        // Backend /auth/me now returns {user, permissions} — same envelope as Login.
+        state.user = action.payload.user
         state.permissions = action.payload.permissions ?? null
         const storage = localStorage.getItem('token') ? localStorage : sessionStorage
-        storage.setItem('user', JSON.stringify(action.payload))
+        storage.setItem('user', JSON.stringify(action.payload.user))
         storage.setItem('permissions', JSON.stringify(state.permissions))
+      })
+      .addCase(fetchMe.rejected, (state, action) => {
+        state.user = null
+        state.token = null
+        state.permissions = null
+        state.error = action.payload as string
+        clearSessionStorage()
       })
   },
 })

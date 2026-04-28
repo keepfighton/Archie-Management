@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -27,6 +29,7 @@ type Config struct {
 }
 
 func Load() *Config {
+	_ = godotenv.Load(".env.local", ".env")
 	jwtExp, _ := strconv.Atoi(getEnv("JWT_EXP_HOURS", "24"))
 	return &Config{
 		Port:         getEnv("PORT", "8080"),

@@ -208,9 +208,10 @@ func (s *Server) setupRoutes() {
 		{
 			team.GET("/members", teamH.ListMembers)
 			team.GET("/members/:id", teamH.GetMember)
-			team.PUT("/members/:id", teamH.UpdateMember)
-			team.DELETE("/members/:id", teamH.DeleteMember)
-			team.POST("/members/:id/reset-password", teamH.ResetPassword)
+			team.POST("/members", middleware.AdminRequired(), teamH.CreateMember)
+			team.PUT("/members/:id", middleware.AdminRequired(), teamH.UpdateMember)
+			team.DELETE("/members/:id", middleware.AdminRequired(), teamH.DeleteMember)
+			team.POST("/members/:id/reset-password", middleware.AdminRequired(), teamH.ResetPassword)
 			team.GET("/timecards", teamH.ListTimeCards)
 			team.POST("/timecards/clock-in", teamH.ClockIn)
 			team.POST("/timecards/clock-out", teamH.ClockOut)

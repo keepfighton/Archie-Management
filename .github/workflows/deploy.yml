@@ -32,12 +32,6 @@ jobs:
             sleep 15
 
             echo "🔍 Cek container backend"
-            docker ps | grep nexone-backend-1 || (echo "Backend tidak jalan!" && exit 1)
-
-            echo "🗄️ Run Prisma Migration"
-            docker exec nexone-backend-1 npx prisma migrate deploy || echo "No migration"
-
-            echo "🔁 Restart backend"
-            docker restart nexone-backend-1
+            docker ps | grep nexone-backend || (echo "Backend tidak jalan!" && exit 1)
 
             echo "✅ Deploy selesai"

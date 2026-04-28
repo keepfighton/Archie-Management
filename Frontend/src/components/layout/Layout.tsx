@@ -1,8 +1,8 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { useState } from 'react'
-import { RootState } from '@/store'
-import { logout, canRead } from '@/store/slices/authSlice'
+import { RootState, AppDispatch } from '@/store'
+import { logoutAsync, canRead } from '@/store/slices/authSlice'
 import { toggleSidebar } from '@/store/slices/uiSlice'
 import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
@@ -116,7 +116,7 @@ const navGroups: NavGroupDef[] = [
 ]
 
 export default function Layout() {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, permissions } = useSelector((s: RootState) => s.auth)
@@ -165,8 +165,10 @@ export default function Layout() {
     setExpanded(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
-  const handleLogout = () => {
-    dispatch(logout())
+  // Call the backend logout endpoint so the JWT JTI is added to the
+  // server-side blacklist, then clear local state via the Redux thunk.
+  const handleLogout = async () => {
+    await dispatch(logoutAsync())
     navigate('/login')
   }
 

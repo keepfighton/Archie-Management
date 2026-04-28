@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/smtp"
+	"strings"
 	"time"
 
 	"github.com/cbqa/backend/internal/config"
@@ -45,6 +46,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	var user models.User
 	if err := h.db.Where("email = ? AND is_active = true", req.Email).First(&user).Error; err != nil {
@@ -80,6 +82,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.JobTitle = strings.TrimSpace(req.JobTitle)
+	req.Phone = strings.TrimSpace(req.Phone)
 
 	// Check if email exists
 	var count int64
@@ -95,17 +101,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	role := req.Role
-	if role != "admin" && role != "member" {
-		role = "member"
-	}
 	user := models.User{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: string(hashed),
 		JobTitle: req.JobTitle,
 		Phone:    req.Phone,
-		Role:     role,
+		Role:     "member",
 		IsActive: true,
 	}
 
@@ -114,15 +116,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	token, _ := middleware.GenerateToken(h.cfg, user.ID, user.Email, user.Role)
+	token, err := middleware.GenerateToken(h.cfg, user.ID, user.Email, user.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
 	c.JSON(http.StatusCreated, gin.H{
-		"token": token,
-		"user": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
-		},
+		"token":       token,
+		"user":        userPayload(user),
+		"permissions": nil, // new registrations have no AppRole assigned
 	})
 }
 
@@ -133,9 +135,12 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
-	payload := userPayload(user)
-	payload["permissions"] = resolvePermissions(h.db, user)
-	c.JSON(http.StatusOK, payload)
+	// Return the same {user, permissions} envelope as Login so the frontend
+	// can handle both responses identically.
+	c.JSON(http.StatusOK, gin.H{
+		"user":        userPayload(user),
+		"permissions": resolvePermissions(h.db, user),
+	})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
@@ -155,6 +160,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	var user models.User
 	if err := h.db.Where("email = ? AND is_active = true", req.Email).First(&user).Error; err != nil {
@@ -246,10 +252,10 @@ func sendResetEmail(cfg *config.Config, toEmail, toName, resetURL string) {
 	if cfg.SMTPHost == "" {
 		return
 	}
-	subject := "Reset Password OneTool"
+	subject := "Reset Password NEXONE"
 	body := fmt.Sprintf(`<!DOCTYPE html>
 <html><body style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px">
-<h2 style="color:#2563eb">Reset Password OneTool</h2>
+<h2 style="color:#2563eb">Reset Password NEXONE</h2>
 <p>Halo <strong>%s</strong>,</p>
 <p>Kami menerima permintaan reset password untuk akun Anda.</p>
 <p style="margin:24px 0">
@@ -260,7 +266,7 @@ func sendResetEmail(cfg *config.Config, toEmail, toName, resetURL string) {
 <p style="color:#64748b;font-size:13px">Link ini berlaku selama <strong>1 jam</strong>.<br>
 Jika Anda tidak meminta reset password, abaikan email ini.</p>
 <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
-<p style="color:#94a3b8;font-size:12px">OneTool by CBQA</p>
+<p style="color:#94a3b8;font-size:12px">NEXONE by Nexora</p>
 </body></html>`, toName, resetURL)
 
 	msg := fmt.Sprintf(

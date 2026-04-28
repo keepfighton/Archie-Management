@@ -12,15 +12,19 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 globally
+// Handle 401 globally — but not for the logout endpoint itself (the token may
+// already be gone when the user clicks "Sign out"; no need to double-redirect).
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const url: string = err.config?.url ?? ''
+    if (err.response?.status === 401 && !url.includes('/auth/logout')) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      localStorage.removeItem('permissions')
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('user')
+      sessionStorage.removeItem('permissions')
       window.location.href = '/login'
     }
     return Promise.reject(err)
@@ -38,6 +42,9 @@ export const authService = {
   logout: () => api.post('/auth/logout'),
   changePassword: (data: any) => api.put('/auth/change-password', data),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  // Used by ResetPasswordPage — was calling api.post directly before.
+  resetPassword: (token: string, newPassword: string) =>
+    api.post('/auth/reset-password', { token, new_password: newPassword }),
 }
 
 // ─── Dashboard ───────────────────────────────────────
@@ -143,8 +150,10 @@ export const eventService = {
 export const teamService = {
   listMembers: (params?: any) => api.get('/team/members', { params }),
   getMember: (id: number) => api.get(`/team/members/${id}`),
+  createMember: (data: any) => api.post('/team/members', data),
   updateMember: (id: number, data: any) => api.put(`/team/members/${id}`, data),
-  resetPassword: (id: number) => api.post(`/team/members/${id}/reset-password`),
+  resetPassword: (id: number, data?: { password?: string }) =>
+    api.post(`/team/members/${id}/reset-password`, data ?? {}),
   listTimeCards: () => api.get('/team/timecards'),
   clockIn: () => api.post('/team/timecards/clock-in'),
   clockOut: () => api.post('/team/timecards/clock-out'),

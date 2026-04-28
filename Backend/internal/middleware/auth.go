@@ -141,8 +141,11 @@ func AdminRequired() gin.HandlerFunc {
 
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Allow-Origin wildcard ("*") and Allow-Credentials: true are mutually
+		// exclusive per the Fetch spec — browsers reject that combination.
+		// This API uses Bearer tokens in Authorization headers (not cookies),
+		// so credentials mode is not required.
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		if c.Request.Method == "OPTIONS" {

@@ -1089,6 +1089,65 @@ type TeamHandler struct{ db *gorm.DB }
 
 func NewTeamHandler(db *gorm.DB) *TeamHandler { return &TeamHandler{db: db} }
 
+func (h *TeamHandler) CreateMember(c *gin.Context) {
+	var req struct {
+		Name      string `json:"name" binding:"required"`
+		Email     string `json:"email" binding:"required,email"`
+		Password  string `json:"password" binding:"required,min=6"`
+		JobTitle  string `json:"job_title"`
+		Phone     string `json:"phone"`
+		Role      string `json:"role"`
+		AppRoleID *uint  `json:"app_role_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	req.Name = strings.TrimSpace(req.Name)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.JobTitle = strings.TrimSpace(req.JobTitle)
+	req.Phone = strings.TrimSpace(req.Phone)
+	role := "member"
+	if req.Role == "admin" {
+		role = "admin"
+		req.AppRoleID = nil
+	}
+
+	var count int64
+	h.db.Model(&models.User{}).Where("email = ?", req.Email).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	user := models.User{
+		Name:      req.Name,
+		Email:     req.Email,
+		Password:  string(hashed),
+		JobTitle:  req.JobTitle,
+		Phone:     req.Phone,
+		Role:      role,
+		AppRoleID: req.AppRoleID,
+		IsActive:  true,
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"user":        userPayload(user),
+		"permissions": resolvePermissions(h.db, user),
+	})
+}
+
 func (h *TeamHandler) ListMembers(c *gin.Context) {
 	var members []models.User
 	var total int64

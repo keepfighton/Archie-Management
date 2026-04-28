@@ -34,4 +34,10 @@ jobs:
             echo "🔍 Cek container backend"
             docker ps | grep nexone-backend || (echo "Backend tidak jalan!" && exit 1)
 
+            echo "🌱 Seed initial data jika database kosong"
+            USER_COUNT=$(docker exec nexone-postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT COUNT(*) FROM users;"')
+            if [ "$USER_COUNT" = "0" ]; then
+              docker exec nexone-backend ./seed
+            fi
+
             echo "✅ Deploy selesai"

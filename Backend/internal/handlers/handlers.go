@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -357,10 +358,16 @@ type taskKanbanColumnPayload struct {
 	Status string `json:"status"`
 }
 
+type reorderTaskKanbanColumnsPayload struct {
+	ColumnIDs []uint `json:"column_ids"`
+}
+
 type moveTaskKanbanPayload struct {
 	DestinationColumnID uint `json:"destination_column_id"`
 	DestinationIndex    int  `json:"destination_index"`
 }
+
+var errTaskKanbanColumnHasTasks = errors.New("move tasks to another kanban column first before deleting it")
 
 func taskDefaultColumnTitle(status string) string {
 	switch status {
@@ -507,6 +514,17 @@ func (h *TaskHandler) loadTaskWithRelations(tx *gorm.DB, id uint) (models.Task, 
 	return task, err
 }
 
+func (h *TaskHandler) resequenceKanbanColumns(tx *gorm.DB, orderedIDs []uint) error {
+	for index, id := range orderedIDs {
+		if err := tx.Model(&models.TaskKanbanColumn{}).
+			Where("id = ?", id).
+			Update("position", index+1).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (h *TaskHandler) ListColumns(c *gin.Context) {
 	var columns []models.TaskKanbanColumn
 	if err := h.db.Order("position asc, id asc").Find(&columns).Error; err != nil {
@@ -614,6 +632,120 @@ func (h *TaskHandler) UpdateColumn(c *gin.Context) {
 
 	recordAudit(h.db, c, "update", "task_kanban_column", column.ID, column.Title)
 	c.JSON(http.StatusOK, gin.H{"data": column})
+}
+
+func (h *TaskHandler) ReorderColumns(c *gin.Context) {
+	var req reorderTaskKanbanColumnsPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.ColumnIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Column order is required"})
+		return
+	}
+
+	seen := make(map[uint]struct{}, len(req.ColumnIDs))
+	for _, id := range req.ColumnIDs {
+		if id == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid column id"})
+			return
+		}
+		if _, exists := seen[id]; exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate column id in reorder request"})
+			return
+		}
+		seen[id] = struct{}{}
+	}
+
+	var columns []models.TaskKanbanColumn
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		var total int64
+		if err := tx.Model(&models.TaskKanbanColumn{}).Count(&total).Error; err != nil {
+			return err
+		}
+		if int64(len(req.ColumnIDs)) != total {
+			return fmt.Errorf("all kanban columns must be included in reorder request")
+		}
+		if err := tx.Where("id IN ?", req.ColumnIDs).Find(&columns).Error; err != nil {
+			return err
+		}
+		if len(columns) != len(req.ColumnIDs) {
+			return gorm.ErrRecordNotFound
+		}
+		if err := h.resequenceKanbanColumns(tx, req.ColumnIDs); err != nil {
+			return err
+		}
+		return tx.Order("position asc, id asc").Find(&columns).Error
+	}); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Column not found"})
+			return
+		}
+		if strings.Contains(err.Error(), "all kanban columns must be included") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	recordAudit(h.db, c, "reorder", "task_kanban_column", 0, "Task kanban columns")
+	c.JSON(http.StatusOK, gin.H{"data": columns})
+}
+
+func (h *TaskHandler) DeleteColumn(c *gin.Context) {
+	id, err := getID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid column id"})
+		return
+	}
+
+	var column models.TaskKanbanColumn
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&column, id).Error; err != nil {
+			return err
+		}
+
+		var taskCount int64
+		if err := tx.Model(&models.Task{}).Where("kanban_column_id = ?", column.ID).Count(&taskCount).Error; err != nil {
+			return err
+		}
+		if taskCount > 0 {
+			return errTaskKanbanColumnHasTasks
+		}
+
+		if err := tx.Delete(&models.TaskKanbanColumn{}, column.ID).Error; err != nil {
+			return err
+		}
+
+		var remainingColumns []models.TaskKanbanColumn
+		if err := tx.Order("position asc, id asc").Find(&remainingColumns).Error; err != nil {
+			return err
+		}
+
+		orderedIDs := make([]uint, 0, len(remainingColumns))
+		for _, remainingColumn := range remainingColumns {
+			orderedIDs = append(orderedIDs, remainingColumn.ID)
+		}
+
+		return h.resequenceKanbanColumns(tx, orderedIDs)
+	}); err != nil {
+		switch err {
+		case gorm.ErrRecordNotFound:
+			c.JSON(http.StatusNotFound, gin.H{"error": "Column not found"})
+			return
+		case errTaskKanbanColumnHasTasks:
+			c.JSON(http.StatusConflict, gin.H{"error": "This kanban column still has tasks. Move them to another kanban column first."})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	recordAudit(h.db, c, "delete", "task_kanban_column", column.ID, column.Title)
+	c.JSON(http.StatusOK, gin.H{"message": "Column deleted"})
 }
 
 func (h *TaskHandler) List(c *gin.Context) {

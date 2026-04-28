@@ -665,12 +665,12 @@ export default function Layout() {
         <button
           aria-label="Close navigation"
           className="fixed inset-0 z-40 bg-slate-900/45 lg:hidden"
-          onClick={() => dispatch(toggleSidebar())}
+          onClick={() => dispatch(setSidebar(false))}
         />
       )}
 
       <aside className={clsx(
-        'fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden border-r border-white/10 bg-primary shadow-2xl transition-transform duration-300 ease-in-out lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden border-r border-white/10 bg-primary shadow-2xl transition-transform duration-300 ease-in-out',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-5">
@@ -683,7 +683,7 @@ export default function Layout() {
             </span>
           </button>
           <button
-            onClick={() => dispatch(toggleSidebar())}
+            onClick={() => dispatch(setSidebar(false))}
             className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
           >
             <X size={16} />

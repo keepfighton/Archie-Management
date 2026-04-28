@@ -42,13 +42,16 @@ import UsersPage from '@/pages/Settings/UsersPage'
 import AuditLogPage from '@/pages/Settings/AuditLogPage'
 import RolesPage from '@/pages/Settings/RolesPage'
 import { fetchMe } from '@/store/slices/authSlice'
+import { LocaleProvider } from '@/contexts/LocaleContext'
 
 export default function App() {
   return (
     <Provider store={store}>
-      <BrowserRouter>
-        <AppShell />
-      </BrowserRouter>
+      <LocaleProvider>
+        <BrowserRouter>
+          <AppShell />
+        </BrowserRouter>
+      </LocaleProvider>
       <ToastContainer position="top-right" autoClose={3000} />
     </Provider>
   )

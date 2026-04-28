@@ -49,7 +49,7 @@ export const authService = {
 
 // ─── Dashboard ───────────────────────────────────────
 export const dashboardService = {
-  getStats: () => api.get('/dashboard'),
+  getStats: (params?: any) => api.get('/dashboard', { params }),
 }
 
 // ─── Clients ─────────────────────────────────────────

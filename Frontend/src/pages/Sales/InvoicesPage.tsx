@@ -11,6 +11,11 @@ import {
 
 const STATUSES = ['draft', 'not_paid', 'partially_paid', 'fully_paid', 'overdue']
 
+const getInvoiceSubtotal = (invoice: any) => {
+  const subtotal = Number(invoice?.subtotal_amount ?? (Number(invoice?.total_amount || 0) - Number(invoice?.tax_amount || 0) + Number(invoice?.discount_amount || 0)))
+  return subtotal < 0 ? 0 : subtotal
+}
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
@@ -27,7 +32,7 @@ export default function InvoicesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>({
     invoice_number: '', client_id: '', project_id: '', bill_date: '', due_date: '',
-    status: 'draft', currency: 'IDR', total_amount: '', tax_amount: '', discount_amount: '',
+    status: 'draft', currency: 'IDR', subtotal_amount: '', tax_amount: '', discount_amount: '',
     paid_amount: '0', due_amount: '', notes: '',
   })
 
@@ -62,7 +67,7 @@ export default function InvoicesPage() {
     setEditItem(null)
     setForm({
       invoice_number: genInvoiceNumber(), client_id: '', project_id: '', bill_date: '', due_date: '',
-      status: 'draft', currency: 'IDR', total_amount: '', tax_amount: '0', discount_amount: '0',
+      status: 'draft', currency: 'IDR', subtotal_amount: '', tax_amount: '0', discount_amount: '0',
       paid_amount: '0', due_amount: '', notes: '',
     })
     setShowModal(true)
@@ -78,7 +83,7 @@ export default function InvoicesPage() {
       due_date: inv.due_date?.split('T')[0] || '',
       status: inv.status,
       currency: inv.currency,
-      total_amount: inv.total_amount,
+      subtotal_amount: getInvoiceSubtotal(inv),
       tax_amount: inv.tax_amount,
       discount_amount: inv.discount_amount,
       paid_amount: inv.paid_amount,
@@ -92,15 +97,21 @@ export default function InvoicesPage() {
     if (!form.invoice_number || !form.client_id) { toast.error('Invoice number and client are required'); return }
     setSaving(true)
     try {
+      const subtotalAmount = Number(form.subtotal_amount) || 0
+      const taxAmount = Number(form.tax_amount) || 0
+      const discountAmount = Number(form.discount_amount) || 0
+      const paidAmount = Number(form.paid_amount) || 0
+      const totalAmount = Math.max(subtotalAmount + taxAmount - discountAmount, 0)
       const payload = {
         ...form,
         client_id: Number(form.client_id),
         project_id: form.project_id ? Number(form.project_id) : null,
-        total_amount: Number(form.total_amount),
-        tax_amount: Number(form.tax_amount),
-        discount_amount: Number(form.discount_amount),
-        paid_amount: Number(form.paid_amount),
-        due_amount: Number(form.total_amount) - Number(form.paid_amount),
+        subtotal_amount: subtotalAmount,
+        total_amount: totalAmount,
+        tax_amount: taxAmount,
+        discount_amount: discountAmount,
+        paid_amount: paidAmount,
+        due_amount: Math.max(totalAmount - paidAmount, 0),
         bill_date: toISODate(form.bill_date),
         due_date: toISODate(form.due_date),
       }
@@ -126,7 +137,11 @@ export default function InvoicesPage() {
     } catch { toast.error('Failed to delete') }
   }
 
-  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n).toLocaleString()}`
+  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString()}`
+  const subtotalAmount = Number(form.subtotal_amount) || 0
+  const taxAmount = Number(form.tax_amount) || 0
+  const discountAmount = Number(form.discount_amount) || 0
+  const computedTotal = Math.max(subtotalAmount + taxAmount - discountAmount, 0)
 
   return (
     <div className="p-5">
@@ -238,13 +253,13 @@ export default function InvoicesPage() {
                 setForm((f: any) => ({
                   ...f,
                   project_id: pid,
-                  ...(proj ? {
-                    client_id:    String(proj.client_id || f.client_id),
-                    bill_date:    proj.start_date?.split('T')[0] || f.bill_date,
-                    due_date:     proj.deadline?.split('T')[0]   || f.due_date,
-                    total_amount: proj.price ?? f.total_amount,
-                    currency:     proj.currency || f.currency,
-                  } : {}),
+                    ...(proj ? {
+                      client_id:    String(proj.client_id || f.client_id),
+                      bill_date:    proj.start_date?.split('T')[0] || f.bill_date,
+                      due_date:     proj.deadline?.split('T')[0]   || f.due_date,
+                      subtotal_amount: proj.price ?? f.subtotal_amount,
+                      currency:     proj.currency || f.currency,
+                    } : {}),
                 }))
               }}
             >
@@ -263,8 +278,8 @@ export default function InvoicesPage() {
               <option value="IDR">IDR</option><option value="USD">USD</option><option value="EUR">EUR</option>
             </select>
           </FormField>
-          <FormField label="Total Amount" hint={form.project_id ? 'Auto-filled from project price' : undefined}>
-            <PriceInput value={form.total_amount} onChange={v => setForm({ ...form, total_amount: v })} />
+          <FormField label="Subtotal" hint={form.project_id ? 'Auto-filled from project price' : undefined}>
+            <PriceInput value={form.subtotal_amount} onChange={v => setForm({ ...form, subtotal_amount: v })} />
           </FormField>
           <FormField label="Tax Amount">
             <PriceInput value={form.tax_amount} onChange={v => setForm({ ...form, tax_amount: v })} />
@@ -272,6 +287,10 @@ export default function InvoicesPage() {
           <FormField label="Discount Amount">
             <PriceInput value={form.discount_amount} onChange={v => setForm({ ...form, discount_amount: v })} />
           </FormField>
+          <div className="col-span-2 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+            <span className="text-gray-500">Total: </span>
+            <span className="font-semibold text-gray-900">{fmt(computedTotal, form.currency)}</span>
+          </div>
           <div className="col-span-2">
             <FormField label="Notes">
               <textarea className="input" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Notes..." />

@@ -160,3 +160,7 @@ export function findPermissionEntry<T extends { menu: string }>(
 
   return undefined
 }
+
+export function findNavigationItemByMenu(menu: string) {
+  return permissionItems.find(item => getPermissionLookupKeys(item.menu).includes(menu))
+}

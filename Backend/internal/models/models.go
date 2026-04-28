@@ -222,6 +222,7 @@ type Invoice struct {
 	DueDate        FlexTime      `json:"due_date"`
 	Status         string        `gorm:"default:draft" json:"status"` // draft, not_paid, partially_paid, fully_paid, overdue
 	Currency       string        `gorm:"default:IDR" json:"currency"`
+	SubtotalAmount float64       `gorm:"-" json:"subtotal_amount"`
 	TotalAmount    float64       `json:"total_amount"`
 	TaxAmount      float64       `json:"tax_amount"`
 	DiscountAmount float64       `json:"discount_amount"`

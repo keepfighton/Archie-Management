@@ -64,9 +64,34 @@ type DashboardHandler struct{ db *gorm.DB }
 
 func NewDashboardHandler(db *gorm.DB) *DashboardHandler { return &DashboardHandler{db: db} }
 
+func dashboardRangeStart(now time.Time, rangeKey string) (time.Time, bool) {
+	switch strings.ToLower(strings.TrimSpace(rangeKey)) {
+	case "", "all":
+		return time.Time{}, false
+	case "7d":
+		return now.AddDate(0, 0, -7), true
+	case "30d":
+		return now.AddDate(0, 0, -30), true
+	case "90d":
+		return now.AddDate(0, 0, -90), true
+	case "ytd":
+		return time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, now.Location()), true
+	default:
+		return time.Time{}, false
+	}
+}
+
+func applyDashboardRange(query *gorm.DB, column string, start time.Time, enabled bool) *gorm.DB {
+	if !enabled {
+		return query
+	}
+	return query.Where(column+" >= ?", start)
+}
+
 func (h *DashboardHandler) GetStats(c *gin.Context) {
 	userID := getUserID(c)
 	var stats struct {
+		Range               string  `json:"range"`
 		OpenTasks           int64   `json:"open_tasks"`
 		OpenProjects        int64   `json:"open_projects"`
 		CompletedProjects   int64   `json:"completed_projects"`
@@ -90,27 +115,35 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		ClockedInCount      int64   `json:"clocked_in_count"`
 		OnLeaveToday        int64   `json:"on_leave_today"`
 	}
-	today := time.Now().Format("2006-01-02")
-	h.db.Model(&models.Task{}).Where("assigned_to_id = ? AND status != 'done'", userID).Count(&stats.OpenTasks)
-	h.db.Model(&models.Project{}).Where("status = 'open'").Count(&stats.OpenProjects)
-	h.db.Model(&models.Project{}).Where("status = 'completed'").Count(&stats.CompletedProjects)
-	h.db.Model(&models.Project{}).Where("status = 'hold'").Count(&stats.HoldProjects)
-	h.db.Model(&models.Client{}).Count(&stats.TotalClients)
-	h.db.Model(&models.Lead{}).Count(&stats.TotalLeads)
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	stats.Range = strings.ToLower(strings.TrimSpace(c.DefaultQuery("range", "all")))
+	rangeStart, hasRange := dashboardRangeStart(now, stats.Range)
+
+	applyRange := func(query *gorm.DB) *gorm.DB {
+		return applyDashboardRange(query, "created_at", rangeStart, hasRange)
+	}
+
+	applyRange(h.db.Model(&models.Task{})).Where("assigned_to_id = ? AND status != 'done'", userID).Count(&stats.OpenTasks)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'open'").Count(&stats.OpenProjects)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'completed'").Count(&stats.CompletedProjects)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'hold'").Count(&stats.HoldProjects)
+	applyRange(h.db.Model(&models.Client{})).Count(&stats.TotalClients)
+	applyRange(h.db.Model(&models.Lead{})).Count(&stats.TotalLeads)
 	h.db.Model(&models.User{}).Where("is_active = true").Count(&stats.TotalMembers)
-	h.db.Model(&models.Invoice{}).Select("COALESCE(SUM(due_amount),0)").Scan(&stats.DueAmount)
-	h.db.Model(&models.Payment{}).Select("COALESCE(SUM(amount),0)").Scan(&stats.TotalIncome)
-	h.db.Model(&models.Expense{}).Select("COALESCE(SUM(total),0)").Scan(&stats.TotalExpenses)
-	h.db.Model(&models.Task{}).Where("status = 'todo'").Count(&stats.TasksTodo)
-	h.db.Model(&models.Task{}).Where("status = 'in_progress'").Count(&stats.TasksInProgress)
-	h.db.Model(&models.Task{}).Where("status = 'done'").Count(&stats.TasksDone)
-	h.db.Model(&models.Task{}).Where("status = 'expired'").Count(&stats.TasksExpired)
-	h.db.Model(&models.Invoice{}).Where("status = 'overdue'").Select("COALESCE(SUM(due_amount),0)").Scan(&stats.OverdueAmount)
-	h.db.Model(&models.Invoice{}).Where("status = 'not_paid'").Select("COALESCE(SUM(total_amount),0)").Scan(&stats.NotPaidAmount)
-	h.db.Model(&models.Invoice{}).Where("status = 'partially_paid'").Select("COALESCE(SUM(due_amount),0)").Scan(&stats.PartiallyPaidAmount)
-	h.db.Model(&models.Invoice{}).Where("status = 'fully_paid'").Select("COALESCE(SUM(total_amount),0)").Scan(&stats.FullyPaidAmount)
-	h.db.Model(&models.Invoice{}).Where("status = 'draft'").Select("COALESCE(SUM(total_amount),0)").Scan(&stats.DraftAmount)
-	h.db.Model(&models.Invoice{}).Select("COALESCE(SUM(total_amount),0)").Scan(&stats.TotalInvoiced)
+	applyRange(h.db.Model(&models.Invoice{})).Select("COALESCE(SUM(due_amount),0)").Scan(&stats.DueAmount)
+	applyRange(h.db.Model(&models.Payment{})).Select("COALESCE(SUM(amount),0)").Scan(&stats.TotalIncome)
+	applyRange(h.db.Model(&models.Expense{})).Select("COALESCE(SUM(total),0)").Scan(&stats.TotalExpenses)
+	applyRange(h.db.Model(&models.Task{})).Where("status = 'todo'").Count(&stats.TasksTodo)
+	applyRange(h.db.Model(&models.Task{})).Where("status = 'in_progress'").Count(&stats.TasksInProgress)
+	applyRange(h.db.Model(&models.Task{})).Where("status = 'done'").Count(&stats.TasksDone)
+	applyRange(h.db.Model(&models.Task{})).Where("status = 'expired'").Count(&stats.TasksExpired)
+	applyRange(h.db.Model(&models.Invoice{})).Where("status = 'overdue'").Select("COALESCE(SUM(due_amount),0)").Scan(&stats.OverdueAmount)
+	applyRange(h.db.Model(&models.Invoice{})).Where("status = 'not_paid'").Select("COALESCE(SUM(total_amount),0)").Scan(&stats.NotPaidAmount)
+	applyRange(h.db.Model(&models.Invoice{})).Where("status = 'partially_paid'").Select("COALESCE(SUM(due_amount),0)").Scan(&stats.PartiallyPaidAmount)
+	applyRange(h.db.Model(&models.Invoice{})).Where("status = 'fully_paid'").Select("COALESCE(SUM(total_amount),0)").Scan(&stats.FullyPaidAmount)
+	applyRange(h.db.Model(&models.Invoice{})).Where("status = 'draft'").Select("COALESCE(SUM(total_amount),0)").Scan(&stats.DraftAmount)
+	applyRange(h.db.Model(&models.Invoice{})).Select("COALESCE(SUM(total_amount),0)").Scan(&stats.TotalInvoiced)
 	h.db.Model(&models.User{}).Where("clocked_in = true AND is_active = true").Count(&stats.ClockedInCount)
 	h.db.Model(&models.Leave{}).Where("status = 'approved' AND DATE(start_date) <= ? AND DATE(end_date) >= ?", today, today).Count(&stats.OnLeaveToday)
 	c.JSON(http.StatusOK, stats)
@@ -1261,6 +1294,62 @@ type InvoiceHandler struct{ db *gorm.DB }
 
 func NewInvoiceHandler(db *gorm.DB) *InvoiceHandler { return &InvoiceHandler{db: db} }
 
+func (h *InvoiceHandler) applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
+	if subtotal < 0 {
+		subtotal = 0
+	}
+	if paidAmount < 0 {
+		paidAmount = 0
+	}
+
+	totalAmount := subtotal + invoice.TaxAmount - invoice.DiscountAmount
+	if totalAmount < 0 {
+		totalAmount = 0
+	}
+
+	dueAmount := totalAmount - paidAmount
+	if dueAmount < 0 {
+		dueAmount = 0
+	}
+
+	invoice.SubtotalAmount = subtotal
+	invoice.TotalAmount = totalAmount
+	invoice.PaidAmount = paidAmount
+	invoice.DueAmount = dueAmount
+
+	if invoice.Status == "draft" && paidAmount == 0 {
+		return
+	}
+
+	switch {
+	case paidAmount > 0 && dueAmount == 0:
+		invoice.Status = "fully_paid"
+	case paidAmount > 0:
+		invoice.Status = "partially_paid"
+	case !invoice.DueDate.IsZero() && invoice.DueDate.Time.Before(time.Now()):
+		invoice.Status = "overdue"
+	default:
+		invoice.Status = "not_paid"
+	}
+}
+
+func (h *InvoiceHandler) hydrateInvoiceSubtotal(invoice *models.Invoice) {
+	if len(invoice.Items) > 0 {
+		var subtotal float64
+		for _, item := range invoice.Items {
+			subtotal += item.Total
+		}
+		invoice.SubtotalAmount = subtotal
+		return
+	}
+
+	subtotal := invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
+	if subtotal < 0 {
+		subtotal = 0
+	}
+	invoice.SubtotalAmount = subtotal
+}
+
 func (h *InvoiceHandler) List(c *gin.Context) {
 	var q PaginationQuery
 	c.ShouldBindQuery(&q)
@@ -1276,6 +1365,9 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 	}
 	query.Count(&total)
 	query.Scopes(paginate(q)).Order("invoices.id desc").Find(&invoices)
+	for i := range invoices {
+		h.hydrateInvoiceSubtotal(&invoices[i])
+	}
 	c.JSON(http.StatusOK, gin.H{"data": invoices, "total": total})
 }
 
@@ -1285,6 +1377,11 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	subtotal := invoice.SubtotalAmount
+	if subtotal == 0 {
+		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
+	}
+	h.applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
 	h.db.Create(&invoice)
 	recordAudit(h.db, c, "create", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusCreated, invoice)
@@ -1297,6 +1394,7 @@ func (h *InvoiceHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
+	h.hydrateInvoiceSubtotal(&invoice)
 	c.JSON(http.StatusOK, invoice)
 }
 
@@ -1307,7 +1405,41 @@ func (h *InvoiceHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	c.ShouldBindJSON(&invoice)
+	if err := c.ShouldBindJSON(&invoice); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var itemTotals struct {
+		Count    int64
+		Subtotal float64
+	}
+	h.db.Model(&models.InvoiceItem{}).
+		Where("invoice_id = ?", id).
+		Select("COUNT(*) as count, COALESCE(SUM(total), 0) as subtotal").
+		Scan(&itemTotals)
+
+	var paymentTotals struct {
+		Count int64
+		Total float64
+	}
+	h.db.Model(&models.Payment{}).
+		Where("invoice_id = ?", id).
+		Select("COUNT(*) as count, COALESCE(SUM(amount), 0) as total").
+		Scan(&paymentTotals)
+
+	subtotal := invoice.SubtotalAmount
+	if itemTotals.Count > 0 {
+		subtotal = itemTotals.Subtotal
+	} else if subtotal == 0 {
+		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
+	}
+
+	paidAmount := invoice.PaidAmount
+	if paymentTotals.Count > 0 {
+		paidAmount = paymentTotals.Total
+	}
+
+	h.applyInvoiceTotals(&invoice, subtotal, paidAmount)
 	h.db.Save(&invoice)
 	recordAudit(h.db, c, "update", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusOK, invoice)
@@ -1329,6 +1461,7 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
+	h.hydrateInvoiceSubtotal(&invoice)
 
 	tmpl := template.Must(template.New("invoice").Funcs(template.FuncMap{
 		"formatCurrency": func(amount float64, currency string) string {
@@ -1343,7 +1476,14 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 	}).Parse(invoicePDFTemplate))
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	tmpl.Execute(c.Writer, invoice)
+	data := struct {
+		models.Invoice
+		PrintedAt string
+	}{
+		Invoice:   invoice,
+		PrintedAt: time.Now().Format("02 January 2006 15:04"),
+	}
+	tmpl.Execute(c.Writer, data)
 }
 
 const invoicePDFTemplate = `<!DOCTYPE html>
@@ -1438,7 +1578,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 
 <div class="totals">
   <table>
-    <tr><td class="label">Subtotal</td><td style="text-align:right">{{formatCurrency .TotalAmount .Currency}}</td></tr>
+    <tr><td class="label">Subtotal</td><td style="text-align:right">{{formatCurrency .SubtotalAmount .Currency}}</td></tr>
     {{if .TaxAmount}}<tr><td class="label">Pajak</td><td style="text-align:right">{{formatCurrency .TaxAmount .Currency}}</td></tr>{{end}}
     {{if .DiscountAmount}}<tr><td class="label">Diskon</td><td style="text-align:right">-{{formatCurrency .DiscountAmount .Currency}}</td></tr>{{end}}
     <tr class="total-row"><td>Total</td><td style="text-align:right">{{formatCurrency .TotalAmount .Currency}}</td></tr>
@@ -1469,7 +1609,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 {{if .Notes}}<div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;"><strong>Catatan:</strong> {{.Notes}}</div>{{end}}
 
 <div class="footer">
-  <p>Dokumen ini digenerate otomatis oleh OneTool &bull; Dicetak pada: ` + "`" + `{{.InvoiceNumber}}` + "`" + `</p>
+  <p>Dokumen ini digenerate otomatis oleh OneTool &bull; Dicetak pada: {{.PrintedAt}}</p>
 </div>
 <script>window.onload=function(){window.print()}</script>
 </body>
@@ -1539,26 +1679,13 @@ func (h *InvoiceHandler) DeletePayment(c *gin.Context) {
 }
 
 func (h *InvoiceHandler) recalcInvoice(invoiceID uint) {
-	var items []models.InvoiceItem
-	h.db.Where("invoice_id = ?", invoiceID).Find(&items)
-	var subtotal float64
-	for _, it := range items {
-		subtotal += it.Total
-	}
-	var paidAmount float64
-	h.db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
 	var invoice models.Invoice
 	h.db.First(&invoice, invoiceID)
-	invoice.TotalAmount = subtotal + invoice.TaxAmount - invoice.DiscountAmount
-	invoice.PaidAmount = paidAmount
-	invoice.DueAmount = invoice.TotalAmount - invoice.PaidAmount
-	if invoice.TotalAmount > 0 && invoice.PaidAmount >= invoice.TotalAmount {
-		invoice.Status = "fully_paid"
-	} else if invoice.PaidAmount > 0 {
-		invoice.Status = "partially_paid"
-	} else if invoice.Status != "draft" && !invoice.DueDate.IsZero() && invoice.DueDate.Time.Before(time.Now()) {
-		invoice.Status = "overdue"
-	}
+	var subtotal float64
+	h.db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
+	var paidAmount float64
+	h.db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
+	h.applyInvoiceTotals(&invoice, subtotal, paidAmount)
 	h.db.Save(&invoice)
 }
 

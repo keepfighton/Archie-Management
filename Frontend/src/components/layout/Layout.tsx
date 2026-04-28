@@ -6,6 +6,7 @@ import { fetchMe, logoutAsync, canEdit, canRead } from '@/store/slices/authSlice
 import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import { auditService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
+import { useLocale } from '@/contexts/LocaleContext'
 import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
@@ -21,7 +22,7 @@ type HeaderPanel = 'search' | 'quick-add' | 'locale' | 'activity' | 'notificatio
 
 type RecentVisit = {
   path: string
-  label: string
+  label?: string
   visitedAt: string
 }
 
@@ -55,12 +56,13 @@ type QuickAction = {
 
 type LocaleOption = {
   code: string
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
+  fallbackLabel: string
+  fallbackDescription: string
 }
 
 const RECENT_VISITS_KEY = 'nexone.recent-visits'
-const LOCALE_KEY = 'nexone.locale'
 const ANNOUNCEMENTS_SEEN_KEY = 'nexone.announcements.last-seen'
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -73,9 +75,27 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 const LOCALE_OPTIONS: LocaleOption[] = [
-  { code: 'id-ID', label: 'Bahasa Indonesia', description: 'Default workspace formatting' },
-  { code: 'en-US', label: 'English (US)', description: 'Month/day date format' },
-  { code: 'en-GB', label: 'English (UK)', description: 'Day/month date format' },
+  {
+    code: 'id-ID',
+    labelKey: 'locale.id-id.label',
+    descriptionKey: 'locale.id-id.description',
+    fallbackLabel: 'Bahasa Indonesia',
+    fallbackDescription: 'Default workspace formatting',
+  },
+  {
+    code: 'en-US',
+    labelKey: 'locale.en-us.label',
+    descriptionKey: 'locale.en-us.description',
+    fallbackLabel: 'English (US)',
+    fallbackDescription: 'Month/day date format',
+  },
+  {
+    code: 'en-GB',
+    labelKey: 'locale.en-gb.label',
+    descriptionKey: 'locale.en-gb.description',
+    fallbackLabel: 'English (UK)',
+    fallbackDescription: 'Day/month date format',
+  },
 ]
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
@@ -150,6 +170,7 @@ export default function Layout() {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const location = useLocation()
+  const { locale: selectedLocale, setLocale: setSelectedLocale, t } = useLocale()
   const { user, permissions } = useSelector((s: RootState) => s.auth)
   const { sidebarOpen } = useSelector((s: RootState) => s.ui)
   const [expanded, setExpanded] = useState<string[]>(() => {
@@ -161,7 +182,6 @@ export default function Layout() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<HeaderPanel>(null)
   const [headerSearch, setHeaderSearch] = useState('')
-  const [selectedLocale, setSelectedLocale] = useState(() => readStoredValue(LOCALE_KEY, 'id-ID'))
   const [recentPages, setRecentPages] = useState<RecentVisit[]>(() => readStoredJson<RecentVisit[]>(RECENT_VISITS_KEY, []))
   const [clockLoading, setClockLoading] = useState(false)
   const [activityLoading, setActivityLoading] = useState(false)
@@ -180,48 +200,67 @@ export default function Layout() {
   const desktopSearchInputRef = useRef<HTMLInputElement>(null)
 
   const titleMap = [
-    { key: '/dashboard', label: 'Dashboard' },
-    { key: '/events', label: 'Events' },
-    { key: '/clients', label: 'Clients' },
-    { key: '/projects', label: 'Projects' },
-    { key: '/tasks', label: 'Tasks' },
-    { key: '/leads', label: 'Leads' },
-    { key: '/sales/invoices', label: 'Invoices' },
-    { key: '/sales/orders', label: 'Orders' },
-    { key: '/sales/store', label: 'Store' },
-    { key: '/sales/payments', label: 'Payments' },
-    { key: '/sales/items', label: 'Items' },
-    { key: '/sales/contracts', label: 'Contracts' },
-    { key: '/notes', label: 'Notes' },
-    { key: '/messages', label: 'Messages' },
-    { key: '/team/members', label: 'Team' },
-    { key: '/team/timecards', label: 'Time Cards' },
-    { key: '/team/leave', label: 'Leave' },
-    { key: '/team/announcements', label: 'Announcements' },
-    { key: '/team/help', label: 'Help' },
-    { key: '/files', label: 'Files' },
-    { key: '/expenses', label: 'Expenses' },
-    { key: '/reports', label: 'Reports' },
-    { key: '/todo', label: 'To Do' },
-    { key: '/settings/users', label: 'User Accounts' },
-    { key: '/settings/roles', label: 'Roles' },
-    { key: '/settings/audit-log', label: 'Audit Trail' },
-    { key: '/assets', label: 'Asset Management' },
+    { key: '/dashboard', translationKey: 'page.dashboard', fallback: 'Dashboard' },
+    { key: '/events', translationKey: 'page.events', fallback: 'Events' },
+    { key: '/clients', translationKey: 'page.clients', fallback: 'Clients' },
+    { key: '/projects', translationKey: 'page.projects', fallback: 'Projects' },
+    { key: '/tasks', translationKey: 'page.tasks', fallback: 'Tasks' },
+    { key: '/leads', translationKey: 'page.leads', fallback: 'Leads' },
+    { key: '/sales/invoices', translationKey: 'page.invoices', fallback: 'Invoices' },
+    { key: '/sales/orders', translationKey: 'page.orders', fallback: 'Orders' },
+    { key: '/sales/store', translationKey: 'page.store', fallback: 'Store' },
+    { key: '/sales/payments', translationKey: 'page.payments', fallback: 'Payments' },
+    { key: '/sales/items', translationKey: 'page.items', fallback: 'Items' },
+    { key: '/sales/contracts', translationKey: 'page.contracts', fallback: 'Contracts' },
+    { key: '/notes', translationKey: 'page.notes', fallback: 'Notes' },
+    { key: '/messages', translationKey: 'page.messages', fallback: 'Messages' },
+    { key: '/team/members', translationKey: 'page.team', fallback: 'Team' },
+    { key: '/team/timecards', translationKey: 'page.timecards', fallback: 'Time Cards' },
+    { key: '/team/leave', translationKey: 'page.leave', fallback: 'Leave' },
+    { key: '/team/announcements', translationKey: 'page.announcements', fallback: 'Announcements' },
+    { key: '/team/help', translationKey: 'page.help', fallback: 'Help' },
+    { key: '/files', translationKey: 'page.files', fallback: 'Files' },
+    { key: '/expenses', translationKey: 'page.expenses', fallback: 'Expenses' },
+    { key: '/reports', translationKey: 'page.reports', fallback: 'Reports' },
+    { key: '/todo', translationKey: 'page.todo', fallback: 'To Do' },
+    { key: '/settings/users', translationKey: 'page.userAccounts', fallback: 'User Accounts' },
+    { key: '/settings/roles', translationKey: 'page.roles', fallback: 'Roles' },
+    { key: '/settings/audit-log', translationKey: 'page.auditTrail', fallback: 'Audit Trail' },
+    { key: '/assets', translationKey: 'page.assetManagement', fallback: 'Asset Management' },
   ]
-  const pageTitle =
-    titleMap.find(item => location.pathname.startsWith(item.key))?.label ?? 'Workspace'
+
+  const getNavItemLabel = useCallback((item: { id: string, label: string }) => (
+    t(`nav.${item.id}`, item.label)
+  ), [t])
+
+  const getNavGroupLabel = useCallback((group: { id: string, label: string }) => (
+    t(`nav.group.${group.id}`, group.label)
+  ), [t])
+
+  const getPageTitle = useCallback((pathname: string) => {
+    const match = titleMap.find(item => pathname.startsWith(item.key))
+    return match
+      ? t(match.translationKey, match.fallback)
+      : t('layout.workspace', 'Workspace')
+  }, [t])
+
+  const pageTitle = getPageTitle(location.pathname)
 
   const searchableModules = useMemo(() => {
     const visibleItems = [
       ...(canRead(permissions, user?.role, dashboardItem.menu)
-        ? [{ to: dashboardItem.to, label: dashboardItem.label, group: 'Workspace' }]
+        ? [{
+          to: dashboardItem.to,
+          label: getNavItemLabel(dashboardItem),
+          group: t('layout.workspace', 'Workspace'),
+        }]
         : []),
       ...navGroups.flatMap(group => group.items
         .filter(item => !item.comingSoon && canRead(permissions, user?.role, item.menu))
         .map(item => ({
           to: item.to,
-          label: item.label,
-          group: group.label,
+          label: getNavItemLabel(item),
+          group: getNavGroupLabel(group),
         }))
       ),
     ]
@@ -229,19 +268,30 @@ export default function Layout() {
     return visibleItems.filter((item, index, arr) =>
       arr.findIndex(candidate => candidate.to === item.to) === index
     )
-  }, [permissions, user?.role])
+  }, [getNavGroupLabel, getNavItemLabel, permissions, t, user?.role])
 
-  const quickActions = useMemo(() => QUICK_ACTIONS.filter(action =>
-    canEdit(permissions, user?.role, action.menu)
-  ), [permissions, user?.role])
+  const quickActions = useMemo(() => QUICK_ACTIONS
+    .filter(action => canEdit(permissions, user?.role, action.menu))
+    .map(action => ({
+      ...action,
+      label: t(`layout.quickAction.${action.id}.label`, action.label),
+      description: t(`layout.quickAction.${action.id}.description`, action.description),
+    })), [permissions, t, user?.role])
+
+  const getRecentPageLabel = useCallback((item: RecentVisit) => {
+    const translated = getPageTitle(item.path)
+    return translated === t('layout.workspace', 'Workspace') && item.label
+      ? item.label
+      : translated
+  }, [getPageTitle, t])
 
   const recentPageMatches = useMemo(() => {
     const query = headerSearch.trim().toLowerCase()
-    const filtered = query
-      ? recentPages.filter(item => item.label.toLowerCase().includes(query))
+      const filtered = query
+      ? recentPages.filter(item => getRecentPageLabel(item).toLowerCase().includes(query))
       : recentPages
     return filtered.slice(0, 5)
-  }, [headerSearch, recentPages])
+  }, [getRecentPageLabel, headerSearch, recentPages])
 
   const moduleMatches = useMemo(() => {
     const query = headerSearch.trim().toLowerCase()
@@ -362,12 +412,6 @@ export default function Layout() {
   }, [location.pathname, pageTitle])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem(LOCALE_KEY, selectedLocale)
-    document.documentElement.lang = selectedLocale
-  }, [selectedLocale])
-
-  useEffect(() => {
     if (activePanel === 'search' && isDesktop) {
       desktopSearchInputRef.current?.focus()
     }
@@ -440,25 +484,41 @@ export default function Layout() {
     }
   }, [])
 
-  const handleClockAction = async () => {
+  const handleClockAction = useCallback(async () => {
     if (!user) return
 
     setClockLoading(true)
     try {
       if (user.clocked_in) {
         await teamService.clockOut()
-        toast.success('Clocked out successfully')
+        toast.success(t('layout.clockOutSuccess', 'Clocked out successfully'))
       } else {
         await teamService.clockIn()
-        toast.success('Clocked in successfully')
+        toast.success(t('layout.clockInSuccess', 'Clocked in successfully'))
       }
       await dispatch(fetchMe())
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Unable to update time card status')
+      toast.error(error.response?.data?.error || t('layout.clockActionFailed', 'Unable to update time card status'))
     } finally {
       setClockLoading(false)
     }
-  }
+  }, [dispatch, t, user])
+
+  const formatLocaleLabel = useCallback((option: LocaleOption) => (
+    t(option.labelKey, option.fallbackLabel)
+  ), [t])
+
+  const formatLocaleDescription = useCallback((option: LocaleOption) => (
+    t(option.descriptionKey, option.fallbackDescription)
+  ), [t])
+
+  const getAuditActionLabel = useCallback((action: string) => (
+    t(`audit.action.${action}`, AUDIT_ACTION_LABELS[action] || action)
+  ), [t])
+
+  const getAuditEntityLabel = useCallback((entityType: string) => (
+    t(`audit.entity.${entityType}`, AUDIT_ENTITY_LABELS[entityType] || entityType)
+  ), [t])
 
   useEffect(() => {
     if (activePanel === 'activity' && !activityLoading && activityItems.length === 0 && !activityFailed) {
@@ -486,11 +546,11 @@ export default function Layout() {
   const renderSearchContent = (
     <div className="space-y-4">
       <div>
-        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Modules</p>
+        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{t('layout.modules', 'Modules')}</p>
         <div className="mt-2 space-y-1">
           {moduleMatches.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-              No matching modules found.
+              {t('layout.noMatchingModules', 'No matching modules found.')}
             </div>
           ) : moduleMatches.map(item => (
             <button
@@ -509,11 +569,11 @@ export default function Layout() {
       </div>
 
       <div>
-        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Recent pages</p>
+        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{t('layout.recentPages', 'Recent pages')}</p>
         <div className="mt-2 space-y-1">
           {recentPageMatches.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-              Your recent pages will appear here.
+              {t('layout.recentPagesHint', 'Your recent pages will appear here.')}
             </div>
           ) : recentPageMatches.map(item => (
             <button
@@ -522,7 +582,7 @@ export default function Layout() {
               className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors hover:bg-slate-50"
             >
               <div>
-                <p className="text-sm font-medium text-gray-700">{item.label}</p>
+                <p className="text-sm font-medium text-gray-700">{getRecentPageLabel(item)}</p>
                 <p className="text-xs text-gray-400">{formatRelativeTime(item.visitedAt, selectedLocale)}</p>
               </div>
               <span className="text-[11px] text-gray-300">{item.path}</span>
@@ -563,7 +623,7 @@ export default function Layout() {
     <div className="flex min-h-screen bg-background text-gray-900">
       {sidebarOpen && (
         <button
-          aria-label="Close navigation"
+          aria-label={t('layout.closeNavigation', 'Close navigation')}
           className="fixed inset-0 z-40 bg-slate-900/45 lg:hidden"
           onClick={() => dispatch(setSidebar(false))}
         />
@@ -579,7 +639,7 @@ export default function Layout() {
               nexora
             </span>
             <span className="text-[10px] font-medium tracking-wide text-white/40">
-              Part of CBQA Global Group
+              {t('layout.partOfGroup', 'Part of CBQA Global Group')}
             </span>
           </button>
           <button
@@ -598,7 +658,7 @@ export default function Layout() {
               className={({ isActive }) => clsx('nav-link mb-1', isActive && 'active')}
             >
               <LayoutDashboard size={18} className="flex-shrink-0" />
-              Dashboard
+              {getNavItemLabel(dashboardItem)}
             </NavLink>
           )}
 
@@ -617,7 +677,7 @@ export default function Layout() {
                   className="flex w-full items-center justify-between rounded-md px-3 py-1 transition-colors hover:bg-white/5"
                 >
                   <span className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-white/40">
-                    {group.label}
+                    {getNavGroupLabel(group)}
                   </span>
                   {isExp
                     ? <ChevronDown size={10} className="text-white/25" />
@@ -636,9 +696,9 @@ export default function Layout() {
                             className="nav-link cursor-not-allowed opacity-40"
                           >
                             <Icon size={18} className="flex-shrink-0" />
-                            <span className="flex-1">{item.label}</span>
+                            <span className="flex-1">{getNavItemLabel(item)}</span>
                             <span className="rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/70">
-                              Soon
+                              {t('layout.soon', 'Soon')}
                             </span>
                           </div>
                         )
@@ -650,7 +710,7 @@ export default function Layout() {
                           className={({ isActive }) => clsx('nav-link', isActive && 'active')}
                         >
                           <Icon size={18} className="flex-shrink-0" />
-                          {item.label}
+                          {getNavItemLabel(item)}
                         </NavLink>
                       )
                     })}
@@ -679,7 +739,7 @@ export default function Layout() {
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white/65 transition-colors hover:bg-white/10 hover:text-white"
           >
             <LogOut size={15} />
-            Sign out
+            {t('layout.signOut', 'Sign out')}
           </button>
         </div>
       </aside>
@@ -692,13 +752,15 @@ export default function Layout() {
           <button
             onClick={() => dispatch(toggleSidebar())}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100"
-            aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-label={sidebarOpen
+              ? t('layout.closeNavigationMenu', 'Close navigation menu')
+              : t('layout.openNavigationMenu', 'Open navigation menu')}
           >
             <Menu size={18} />
           </button>
 
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/55">NexOne Workspace</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/55">{t('layout.workspaceHeader', 'NexOne Workspace')}</p>
             <h1 className="truncate text-xl font-semibold text-gray-800">{pageTitle}</h1>
           </div>
 
@@ -720,9 +782,9 @@ export default function Layout() {
                       handleSearchSubmit()
                     }
                   }}
-                  placeholder="Search modules..."
+                  placeholder={t('layout.searchPlaceholder', 'Search modules...')}
                   className="min-w-[180px] bg-transparent text-sm text-gray-600 outline-none placeholder:text-gray-400"
-                  aria-label="Search modules"
+                  aria-label={t('layout.searchModules', 'Search modules')}
                 />
               </div>
 
@@ -733,22 +795,22 @@ export default function Layout() {
               )}
             </div>
 
-            {renderIconButton('search', Search, 'Open module search', 'lg:hidden')}
-            {renderIconButton('quick-add', Plus, 'Open quick add')}
-            {renderIconButton('locale', Globe, 'Open language and region settings')}
-            {renderIconButton('activity', Clock, 'Open activity and time card panel')}
-            {renderIconButton('notifications', Bell, 'Open notifications')}
+            {renderIconButton('search', Search, t('layout.openModuleSearch', 'Open module search'), 'lg:hidden')}
+            {renderIconButton('quick-add', Plus, t('layout.openQuickAdd', 'Open quick add'))}
+            {renderIconButton('locale', Globe, t('layout.openLocaleSettings', 'Open language and region settings'))}
+            {renderIconButton('activity', Clock, t('layout.openActivityPanel', 'Open activity and time card panel'))}
+            {renderIconButton('notifications', Bell, t('layout.openNotifications', 'Open notifications'))}
 
             {activePanel === 'quick-add' && (
               <div className="absolute right-[136px] top-[calc(100%+10px)] z-40 hidden w-[320px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl lg:block">
                 <div className="mb-2 px-2">
-                  <p className="text-sm font-semibold text-gray-800">Quick add</p>
-                  <p className="text-xs text-gray-400">Launch common creation flows from anywhere.</p>
+                  <p className="text-sm font-semibold text-gray-800">{t('layout.quickAdd', 'Quick add')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.quickAddDescription', 'Launch common creation flows from anywhere.')}</p>
                 </div>
                 <div className="space-y-1">
                   {quickActions.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      No creation shortcuts are available for your role.
+                      {t('layout.noCreationShortcuts', 'No creation shortcuts are available for your role.')}
                     </div>
                   ) : quickActions.map(action => {
                     const Icon = action.icon
@@ -775,8 +837,8 @@ export default function Layout() {
             {activePanel === 'locale' && (
               <div className="absolute right-[92px] top-[calc(100%+10px)] z-40 hidden w-[320px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl lg:block">
                 <div className="mb-2 px-2">
-                  <p className="text-sm font-semibold text-gray-800">Language & region</p>
-                  <p className="text-xs text-gray-400">Stored on this device and used for dates and times.</p>
+                  <p className="text-sm font-semibold text-gray-800">{t('layout.languageRegion', 'Language & region')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.languageRegionDescription', 'Stored on this device and used for dates and times.')}</p>
                 </div>
                 <div className="space-y-1">
                   {LOCALE_OPTIONS.map(option => (
@@ -792,15 +854,15 @@ export default function Layout() {
                       )}
                     >
                       <div>
-                        <p className="text-sm font-medium text-gray-700">{option.label}</p>
-                        <p className="text-xs text-gray-400">{option.description}</p>
+                        <p className="text-sm font-medium text-gray-700">{formatLocaleLabel(option)}</p>
+                        <p className="text-xs text-gray-400">{formatLocaleDescription(option)}</p>
                       </div>
                       {selectedLocale === option.code && <Check size={16} className="mt-0.5 text-primary" />}
                     </button>
                   ))}
                 </div>
                 <div className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-xs text-gray-500">
-                  <p className="font-medium text-gray-700">Preview</p>
+                  <p className="font-medium text-gray-700">{t('layout.preview', 'Preview')}</p>
                   <p className="mt-1">{new Intl.DateTimeFormat(selectedLocale, { dateStyle: 'full', timeStyle: 'short' }).format(new Date())}</p>
                 </div>
               </div>
@@ -810,22 +872,26 @@ export default function Layout() {
               <div className="absolute right-[46px] top-[calc(100%+10px)] z-40 hidden w-[360px] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl lg:block">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Activity & time</p>
-                    <p className="text-xs text-gray-400">Quickly manage your time card and review recent changes.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t('layout.activityTime', 'Activity & time')}</p>
+                    <p className="text-xs text-gray-400">{t('layout.activityDescription', 'Quickly manage your time card and review recent changes.')}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('/team/timecards')}
                     className="text-xs font-medium text-primary"
                   >
-                    Time cards
+                    {t('layout.timeCards', 'Time cards')}
                   </button>
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-700">{user?.clocked_in ? 'Currently clocked in' : 'Currently clocked out'}</p>
+                      <p className="text-sm font-medium text-gray-700">
+                        {user?.clocked_in
+                          ? t('layout.currentlyClockedIn', 'Currently clocked in')
+                          : t('layout.currentlyClockedOut', 'Currently clocked out')}
+                      </p>
                       <p className="text-xs text-gray-400">{user?.name}</p>
                     </div>
                     <button
@@ -839,45 +905,51 @@ export default function Layout() {
                       )}
                     >
                       {user?.clocked_in ? <LogOut size={13} /> : <LogIn size={13} />}
-                      {clockLoading ? 'Saving...' : user?.clocked_in ? 'Clock out' : 'Clock in'}
+                      {clockLoading
+                        ? t('layout.saving', 'Saving...')
+                        : user?.clocked_in
+                          ? t('layout.clockOut', 'Clock out')
+                          : t('layout.clockIn', 'Clock in')}
                     </button>
                   </div>
                 </div>
 
                 <div className="mt-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Recent activity</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{t('layout.recentActivity', 'Recent activity')}</p>
                     {canViewAuditTrail && (
                       <button type="button" onClick={() => handleNavigate('/settings/audit-log')} className="text-xs font-medium text-primary">
-                        Audit trail
+                        {t('layout.auditTrail', 'Audit trail')}
                       </button>
                     )}
                   </div>
                   <div className="space-y-2">
                     {activityLoading ? (
                       <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                        Loading recent activity...
+                        {t('layout.loadingRecentActivity', 'Loading recent activity...')}
                       </div>
                     ) : activityItems.length > 0 ? activityItems.map(item => (
                       <div key={item.id} className="rounded-xl border border-gray-100 px-3 py-3">
                         <p className="text-sm font-medium text-gray-700">
-                          {AUDIT_ACTION_LABELS[item.action] || item.action} {AUDIT_ENTITY_LABELS[item.entity_type] || item.entity_type}
+                          {getAuditActionLabel(item.action)} {getAuditEntityLabel(item.entity_type)}
                         </p>
-                        <p className="mt-1 text-xs text-gray-500">{item.entity_name || 'Untitled record'}</p>
+                        <p className="mt-1 text-xs text-gray-500">{item.entity_name || t('layout.untitledRecord', 'Untitled record')}</p>
                         <p className="mt-1 text-[11px] text-gray-400">
                           {item.user?.name ? `${item.user.name} · ` : ''}{formatRelativeTime(item.created_at, selectedLocale)}
                         </p>
                       </div>
                     )) : (
                       <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                        {activityFailed ? 'Audit activity is unavailable right now.' : 'No recent activity yet.'}
+                        {activityFailed
+                          ? t('layout.activityUnavailable', 'Audit activity is unavailable right now.')
+                          : t('layout.noRecentActivity', 'No recent activity yet.')}
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Recent pages</p>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{t('layout.recentPages', 'Recent pages')}</p>
                   <div className="space-y-2">
                     {recentPages.slice(0, 3).map(item => (
                       <button
@@ -886,7 +958,7 @@ export default function Layout() {
                         className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-left transition-colors hover:bg-slate-100"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-700">{item.label}</p>
+                          <p className="text-sm font-medium text-gray-700">{getRecentPageLabel(item)}</p>
                           <p className="text-[11px] text-gray-400">{formatRelativeTime(item.visitedAt, selectedLocale)}</p>
                         </div>
                         <ChevronRight size={14} className="text-gray-300" />
@@ -901,26 +973,26 @@ export default function Layout() {
               <div className="absolute right-0 top-[calc(100%+10px)] z-40 hidden w-[360px] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl lg:block">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Notifications</p>
-                    <p className="text-xs text-gray-400">Latest company announcements.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t('layout.notifications', 'Notifications')}</p>
+                    <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Latest company announcements.')}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('/team/announcements')}
                     className="text-xs font-medium text-primary"
                   >
-                    View all
+                    {t('layout.viewAll', 'View all')}
                   </button>
                 </div>
 
                 <div className="mt-4 space-y-2">
                   {notificationsLoading ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      Loading notifications...
+                      {t('layout.loadingNotifications', 'Loading notifications...')}
                     </div>
                   ) : activeAnnouncements.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      No announcements available.
+                      {t('layout.noAnnouncements', 'No announcements available.')}
                     </div>
                   ) : activeAnnouncements.map(item => (
                     <button
@@ -979,7 +1051,7 @@ export default function Layout() {
                   className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger transition-colors hover:bg-red-50"
                 >
                   <LogOut size={14} />
-                  Sign out
+                  {t('layout.signOut', 'Sign out')}
                 </button>
               </div>
             </div>
@@ -1001,12 +1073,12 @@ export default function Layout() {
                       handleSearchSubmit()
                     }
                   }}
-                  placeholder="Search modules..."
+                  placeholder={t('layout.searchPlaceholder', 'Search modules...')}
                   className="w-full bg-transparent text-sm text-gray-600 outline-none placeholder:text-gray-400"
-                  aria-label="Search modules"
+                  aria-label={t('layout.searchModules', 'Search modules')}
                 />
                 <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">
-                  Close
+                  {t('layout.close', 'Close')}
                 </button>
               </div>
               <div className="mt-4 max-h-[70vh] overflow-y-auto">
@@ -1021,10 +1093,10 @@ export default function Layout() {
             <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Quick add</p>
-                  <p className="text-xs text-gray-400">Create new workspace records.</p>
+                  <p className="text-sm font-semibold text-gray-800">{t('layout.quickAdd', 'Quick add')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.mobileQuickAddDescription', 'Create new workspace records.')}</p>
                 </div>
-                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">{t('layout.close', 'Close')}</button>
               </div>
               <div className="mt-4 space-y-2">
                 {quickActions.map(action => {
@@ -1055,10 +1127,10 @@ export default function Layout() {
             <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Language & region</p>
-                  <p className="text-xs text-gray-400">Choose how dates and times appear.</p>
+                  <p className="text-sm font-semibold text-gray-800">{t('layout.languageRegion', 'Language & region')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.mobileLanguageRegionDescription', 'Choose how dates and times appear.')}</p>
                 </div>
-                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">{t('layout.close', 'Close')}</button>
               </div>
               <div className="mt-4 space-y-2">
                 {LOCALE_OPTIONS.map(option => (
@@ -1074,8 +1146,8 @@ export default function Layout() {
                     )}
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-700">{option.label}</p>
-                      <p className="text-xs text-gray-400">{option.description}</p>
+                      <p className="text-sm font-medium text-gray-700">{formatLocaleLabel(option)}</p>
+                      <p className="text-xs text-gray-400">{formatLocaleDescription(option)}</p>
                     </div>
                     {selectedLocale === option.code && <Check size={16} className="mt-0.5 text-primary" />}
                   </button>
@@ -1090,16 +1162,20 @@ export default function Layout() {
             <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Activity & time</p>
-                  <p className="text-xs text-gray-400">Manage your time card and recent activity.</p>
+                  <p className="text-sm font-semibold text-gray-800">{t('layout.activityTime', 'Activity & time')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.mobileActivityDescription', 'Manage your time card and recent activity.')}</p>
                 </div>
-                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">{t('layout.close', 'Close')}</button>
               </div>
 
               <div className="mt-4 rounded-2xl bg-slate-50 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">{user?.clocked_in ? 'Currently clocked in' : 'Currently clocked out'}</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      {user?.clocked_in
+                        ? t('layout.currentlyClockedIn', 'Currently clocked in')
+                        : t('layout.currentlyClockedOut', 'Currently clocked out')}
+                    </p>
                     <p className="text-xs text-gray-400">{user?.name}</p>
                   </div>
                   <button
@@ -1113,7 +1189,11 @@ export default function Layout() {
                     )}
                   >
                     {user?.clocked_in ? <LogOut size={13} /> : <LogIn size={13} />}
-                    {clockLoading ? 'Saving...' : user?.clocked_in ? 'Clock out' : 'Clock in'}
+                    {clockLoading
+                      ? t('layout.saving', 'Saving...')
+                      : user?.clocked_in
+                        ? t('layout.clockOut', 'Clock out')
+                        : t('layout.clockIn', 'Clock in')}
                   </button>
                 </div>
               </div>
@@ -1122,19 +1202,21 @@ export default function Layout() {
                 <div className="space-y-2">
                   {activityLoading ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      Loading recent activity...
+                      {t('layout.loadingRecentActivity', 'Loading recent activity...')}
                     </div>
                   ) : activityItems.length > 0 ? activityItems.map(item => (
                     <div key={item.id} className="rounded-xl border border-gray-100 px-3 py-3">
                       <p className="text-sm font-medium text-gray-700">
-                        {AUDIT_ACTION_LABELS[item.action] || item.action} {AUDIT_ENTITY_LABELS[item.entity_type] || item.entity_type}
+                        {getAuditActionLabel(item.action)} {getAuditEntityLabel(item.entity_type)}
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">{item.entity_name || 'Untitled record'}</p>
+                      <p className="mt-1 text-xs text-gray-500">{item.entity_name || t('layout.untitledRecord', 'Untitled record')}</p>
                       <p className="mt-1 text-[11px] text-gray-400">{formatRelativeTime(item.created_at, selectedLocale)}</p>
                     </div>
                   )) : (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      {activityFailed ? 'Audit activity is unavailable right now.' : 'No recent activity yet.'}
+                      {activityFailed
+                        ? t('layout.activityUnavailable', 'Audit activity is unavailable right now.')
+                        : t('layout.noRecentActivity', 'No recent activity yet.')}
                     </div>
                   )}
                 </div>
@@ -1148,19 +1230,19 @@ export default function Layout() {
             <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Notifications</p>
-                  <p className="text-xs text-gray-400">Latest company announcements.</p>
+                  <p className="text-sm font-semibold text-gray-800">{t('layout.notifications', 'Notifications')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Latest company announcements.')}</p>
                 </div>
-                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">{t('layout.close', 'Close')}</button>
               </div>
               <div className="mt-4 max-h-[70vh] space-y-2 overflow-y-auto">
                 {notificationsLoading ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                    Loading notifications...
+                    {t('layout.loadingNotifications', 'Loading notifications...')}
                   </div>
                 ) : activeAnnouncements.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                    No announcements available.
+                    {t('layout.noAnnouncements', 'No announcements available.')}
                   </div>
                 ) : activeAnnouncements.map(item => (
                   <button

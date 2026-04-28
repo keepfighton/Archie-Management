@@ -15,6 +15,12 @@ const CURRENCIES = ['IDR', 'USD', 'EUR', 'GBP', 'SGD', 'MYR']
 const fmt = (n: number, cur = 'IDR') =>
   `${cur} ${Number(n || 0).toLocaleString('id-ID')}`
 
+const getInvoiceSubtotal = (invoice: any, items: any[] = []) => {
+  if (typeof invoice?.subtotal_amount === 'number') return Math.max(Number(invoice.subtotal_amount), 0)
+  if (items.length > 0) return items.reduce((sum: number, item: any) => sum + Number(item.total || 0), 0)
+  return Math.max(Number(invoice?.total_amount || 0) - Number(invoice?.tax_amount || 0) + Number(invoice?.discount_amount || 0), 0)
+}
+
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const invoiceId = Number(id)
@@ -63,6 +69,7 @@ export default function InvoiceDetailPage() {
 
   // ── Edit Invoice ──────────────────────────────────────
   const openEdit = () => {
+    const subtotal = getInvoiceSubtotal(invoice, invoice.items || [])
     setEditForm({
       invoice_number: invoice.invoice_number,
       client_id: invoice.client_id,
@@ -71,6 +78,7 @@ export default function InvoiceDetailPage() {
       due_date: invoice.due_date ? invoice.due_date.substring(0, 10) : '',
       status: invoice.status,
       currency: invoice.currency,
+      subtotal_amount: subtotal,
       tax_amount: invoice.tax_amount,
       discount_amount: invoice.discount_amount,
       notes: invoice.notes,
@@ -88,6 +96,7 @@ export default function InvoiceDetailPage() {
         ...editForm,
         client_id: Number(editForm.client_id),
         project_id: editForm.project_id ? Number(editForm.project_id) : null,
+        subtotal_amount: Number(editForm.subtotal_amount) || 0,
         tax_amount: Number(editForm.tax_amount) || 0,
         discount_amount: Number(editForm.discount_amount) || 0,
         bill_date: toISODate(editForm.bill_date),
@@ -188,7 +197,7 @@ export default function InvoiceDetailPage() {
 
   const items: any[] = invoice.items || []
   const payments: any[] = invoice.payments || []
-  const subtotal = items.reduce((s: number, i: any) => s + Number(i.total), 0)
+  const subtotal = getInvoiceSubtotal(invoice, items)
   const dueIsOverdue = invoice.due_date && new Date(invoice.due_date) < new Date() && invoice.status !== 'fully_paid'
 
   return (

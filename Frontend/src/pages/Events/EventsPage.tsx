@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Calendar, momentLocalizer, Views } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -12,6 +13,7 @@ import { PageHeader, Modal, FormField, ConfirmDialog, Loading } from '@/componen
 const localizer = momentLocalizer(moment)
 
 export default function EventsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [events, setEvents] = useState<any[]>([])
   const [calEvents, setCalEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,6 +65,25 @@ export default function EventsPage() {
     })
     setShowModal(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('compose') !== 'new') return
+
+    setForm({
+      title: '',
+      description: '',
+      start_date: '',
+      end_date: '',
+      all_day: false,
+      color: '#3b82f6',
+      type: '',
+    })
+    setShowModal(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('compose')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const handleSave = async () => {
     if (!form.title.trim()) { toast.error('Title is required'); return }

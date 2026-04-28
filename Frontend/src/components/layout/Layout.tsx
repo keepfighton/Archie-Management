@@ -1,9 +1,10 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RootState, AppDispatch } from '@/store'
-import { logoutAsync, canRead } from '@/store/slices/authSlice'
+import { fetchMe, logoutAsync, canEdit, canRead } from '@/store/slices/authSlice'
 import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
+import { auditService, teamService } from '@/services/api'
 import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
@@ -11,10 +12,11 @@ import {
   FolderOpen, Receipt, BarChart2, CheckCircle, Menu, Search,
   Bell, Globe, Clock, Plus, LogOut, ChevronDown, ChevronRight, X,
   ShoppingCart, ShoppingBag, Package, Banknote, CalendarX, Megaphone,
-  Boxes, HelpCircle, Shield, ShieldCheck, UserCog, FileCheck, StickyNote
+  Boxes, HelpCircle, Shield, ShieldCheck, UserCog, FileCheck, StickyNote, LogIn, Check
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
+import { toast } from 'react-toastify'
 
 type NavLeaf = {
   to: string
@@ -28,6 +30,135 @@ type NavGroupDef = {
   id: string
   label: string
   items: NavLeaf[]
+}
+
+type HeaderPanel = 'search' | 'quick-add' | 'locale' | 'activity' | 'notifications' | null
+
+type RecentVisit = {
+  path: string
+  label: string
+  visitedAt: string
+}
+
+type AnnouncementItem = {
+  id: number
+  title: string
+  content?: string
+  created_at: string
+  start_date?: string
+  end_date?: string
+  created_by?: { name?: string }
+}
+
+type AuditItem = {
+  id: number
+  action: string
+  entity_type: string
+  entity_name?: string
+  created_at: string
+  user?: { name?: string }
+}
+
+type QuickAction = {
+  id: string
+  label: string
+  description: string
+  to: string
+  menu: string
+  icon: LucideIcon
+}
+
+type LocaleOption = {
+  code: string
+  label: string
+  description: string
+}
+
+const RECENT_VISITS_KEY = 'nexone.recent-visits'
+const LOCALE_KEY = 'nexone.locale'
+const ANNOUNCEMENTS_SEEN_KEY = 'nexone.announcements.last-seen'
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { id: 'task', label: 'New task', description: 'Create and assign a task', to: '/tasks', menu: 'tasks', icon: CheckSquare },
+  { id: 'event', label: 'New event', description: 'Schedule a calendar entry', to: '/events', menu: 'events', icon: Calendar },
+  { id: 'project', label: 'New project', description: 'Start a project workspace', to: '/projects', menu: 'projects', icon: FolderKanban },
+  { id: 'client', label: 'New client', description: 'Add a relationship record', to: '/clients', menu: 'clients', icon: Users },
+  { id: 'lead', label: 'New lead', description: 'Capture a potential deal', to: '/leads', menu: 'leads', icon: TrendingUp },
+  { id: 'announcement', label: 'New announcement', description: 'Post an internal update', to: '/team/announcements', menu: 'team', icon: Megaphone },
+]
+
+const LOCALE_OPTIONS: LocaleOption[] = [
+  { code: 'id-ID', label: 'Bahasa Indonesia', description: 'Default workspace formatting' },
+  { code: 'en-US', label: 'English (US)', description: 'Month/day date format' },
+  { code: 'en-GB', label: 'English (UK)', description: 'Day/month date format' },
+]
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  create: 'Created',
+  update: 'Updated',
+  delete: 'Deleted',
+  convert: 'Converted',
+}
+
+const AUDIT_ENTITY_LABELS: Record<string, string> = {
+  client: 'client',
+  project: 'project',
+  task: 'task',
+  lead: 'lead',
+  invoice: 'invoice',
+  contract: 'contract',
+}
+
+function readStoredJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  const raw = window.localStorage.getItem(key)
+  if (!raw) return fallback
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
+function readStoredValue(key: string, fallback: string) {
+  if (typeof window === 'undefined') return fallback
+  return window.localStorage.getItem(key) || fallback
+}
+
+function formatDateTime(value: string, locale: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+function formatRelativeTime(value: string, locale: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const diffMinutes = Math.round((date.getTime() - Date.now()) / 60000)
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+
+  if (Math.abs(diffMinutes) < 60) return formatter.format(diffMinutes, 'minute')
+
+  const diffHours = Math.round(diffMinutes / 60)
+  if (Math.abs(diffHours) < 24) return formatter.format(diffHours, 'hour')
+
+  const diffDays = Math.round(diffHours / 24)
+  return formatter.format(diffDays, 'day')
+}
+
+function isActiveAnnouncement(item: AnnouncementItem) {
+  const now = Date.now()
+  const start = item.start_date ? new Date(item.start_date).getTime() : null
+  const end = item.end_date ? new Date(item.end_date).getTime() : null
+
+  if (start && start > now) return false
+  if (end && end < now) return false
+
+  return true
 }
 
 const dashboardItem: NavLeaf = { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', menu: 'dashboard' }
@@ -128,12 +259,25 @@ export default function Layout() {
     return active ? [active.id] : ['business']
   })
   const [profileOpen, setProfileOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<HeaderPanel>(null)
+  const [headerSearch, setHeaderSearch] = useState('')
+  const [selectedLocale, setSelectedLocale] = useState(() => readStoredValue(LOCALE_KEY, 'id-ID'))
+  const [recentPages, setRecentPages] = useState<RecentVisit[]>(() => readStoredJson<RecentVisit[]>(RECENT_VISITS_KEY, []))
+  const [clockLoading, setClockLoading] = useState(false)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [activityItems, setActivityItems] = useState<AuditItem[]>([])
+  const [activityFailed, setActivityFailed] = useState(false)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
+  const [lastAnnouncementsSeenAt, setLastAnnouncementsSeenAt] = useState(() => readStoredValue(ANNOUNCEMENTS_SEEN_KEY, ''))
   const [isDesktop, setIsDesktop] = useState(() => (
     typeof window !== 'undefined'
       ? window.matchMedia('(min-width: 1024px)').matches
       : true
   ))
   const profileRef = useRef<HTMLDivElement>(null)
+  const controlsRef = useRef<HTMLDivElement>(null)
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null)
 
   const titleMap = [
     { key: '/dashboard', label: 'Dashboard' },
@@ -166,6 +310,63 @@ export default function Layout() {
   ]
   const pageTitle =
     titleMap.find(item => location.pathname.startsWith(item.key))?.label ?? 'Workspace'
+
+  const searchableModules = useMemo(() => {
+    const visibleItems = [
+      ...(canRead(permissions, user?.role, dashboardItem.menu)
+        ? [{ to: dashboardItem.to, label: dashboardItem.label, group: 'Workspace' }]
+        : []),
+      ...navGroups.flatMap(group => group.items
+        .filter(item => !item.comingSoon && canRead(permissions, user?.role, item.menu))
+        .map(item => ({
+          to: item.to,
+          label: item.label,
+          group: group.label,
+        }))
+      ),
+    ]
+
+    return visibleItems.filter((item, index, arr) =>
+      arr.findIndex(candidate => candidate.to === item.to) === index
+    )
+  }, [permissions, user?.role])
+
+  const quickActions = useMemo(() => QUICK_ACTIONS.filter(action =>
+    canEdit(permissions, user?.role, action.menu)
+  ), [permissions, user?.role])
+
+  const recentPageMatches = useMemo(() => {
+    const query = headerSearch.trim().toLowerCase()
+    const filtered = query
+      ? recentPages.filter(item => item.label.toLowerCase().includes(query))
+      : recentPages
+    return filtered.slice(0, 5)
+  }, [headerSearch, recentPages])
+
+  const moduleMatches = useMemo(() => {
+    const query = headerSearch.trim().toLowerCase()
+    const filtered = query
+      ? searchableModules.filter(item =>
+        item.label.toLowerCase().includes(query) ||
+        item.group.toLowerCase().includes(query)
+      )
+      : searchableModules
+
+    return filtered.slice(0, 8)
+  }, [headerSearch, searchableModules])
+
+  const activeAnnouncements = useMemo(() => {
+    const items = announcements.filter(isActiveAnnouncement)
+    return (items.length > 0 ? items : announcements).slice(0, 5)
+  }, [announcements])
+
+  const unreadAnnouncements = useMemo(() => {
+    const seenAt = lastAnnouncementsSeenAt ? new Date(lastAnnouncementsSeenAt).getTime() : 0
+    return activeAnnouncements.filter(item => {
+      const createdAt = new Date(item.created_at).getTime()
+      return !Number.isNaN(createdAt) && createdAt > seenAt
+    }).length
+  }, [activeAnnouncements, lastAnnouncementsSeenAt])
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
@@ -213,16 +414,23 @@ export default function Layout() {
   }, [dispatch, isDesktop, location.pathname])
 
   useEffect(() => {
-    if (!profileOpen) return
+    if (!profileOpen && !activePanel) return
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (profileRef.current && !profileRef.current.contains(target)) {
         setProfileOpen(false)
+      }
+      if (controlsRef.current && !controlsRef.current.contains(target)) {
+        setActivePanel(null)
       }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setProfileOpen(false)
+      if (event.key === 'Escape') {
+        setProfileOpen(false)
+        setActivePanel(null)
+      }
     }
 
     document.addEventListener('mousedown', handlePointerDown)
@@ -232,7 +440,38 @@ export default function Layout() {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [profileOpen])
+  }, [activePanel, profileOpen])
+
+  useEffect(() => {
+    setActivePanel(null)
+    setHeaderSearch('')
+    setProfileOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setRecentPages(previous => {
+      const nextVisits = [
+        { path: location.pathname, label: pageTitle, visitedAt: new Date().toISOString() },
+        ...previous.filter(item => item.path !== location.pathname),
+      ].slice(0, 6)
+
+      window.localStorage.setItem(RECENT_VISITS_KEY, JSON.stringify(nextVisits))
+      return nextVisits
+    })
+  }, [location.pathname, pageTitle])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(LOCALE_KEY, selectedLocale)
+    document.documentElement.lang = selectedLocale
+  }, [selectedLocale])
+
+  useEffect(() => {
+    if (activePanel === 'search' && isDesktop) {
+      desktopSearchInputRef.current?.focus()
+    }
+  }, [activePanel, isDesktop])
 
   // Call the backend logout endpoint so the JWT JTI is added to the
   // server-side blacklist, then clear local state via the Redux thunk.
@@ -244,6 +483,181 @@ export default function Layout() {
   const userInitials = user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
   const isDashVisible = canRead(permissions, user?.role, dashboardItem.menu)
+  const canViewAuditTrail = canRead(permissions, user?.role, 'settings')
+
+  const closePanels = () => {
+    setActivePanel(null)
+    setHeaderSearch('')
+  }
+
+  const handleNavigate = (to: string) => {
+    navigate(to)
+    closePanels()
+  }
+
+  const handleQuickCreate = (to: string) => {
+    navigate(`${to}${to.includes('?') ? '&' : '?'}compose=new`)
+    closePanels()
+  }
+
+  const loadActivity = useCallback(async () => {
+    setActivityLoading(true)
+    try {
+      const response = await auditService.list({ page: 1, limit: 6 })
+      setActivityItems(response.data.data || [])
+      setActivityFailed(false)
+    } catch {
+      setActivityItems([])
+      setActivityFailed(true)
+    } finally {
+      setActivityLoading(false)
+    }
+  }, [])
+
+  const loadAnnouncements = useCallback(async (markAsSeen = false) => {
+    setNotificationsLoading(true)
+    try {
+      const response = await teamService.listAnnouncements()
+      const items = (response.data.data || [])
+        .slice()
+        .sort((left: AnnouncementItem, right: AnnouncementItem) =>
+          new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+        )
+
+      setAnnouncements(items)
+
+      if (markAsSeen) {
+        const latestSeenAt = items[0]?.created_at || new Date().toISOString()
+        setLastAnnouncementsSeenAt(latestSeenAt)
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(ANNOUNCEMENTS_SEEN_KEY, latestSeenAt)
+        }
+      }
+    } catch {
+      setAnnouncements([])
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }, [])
+
+  const handleClockAction = async () => {
+    if (!user) return
+
+    setClockLoading(true)
+    try {
+      if (user.clocked_in) {
+        await teamService.clockOut()
+        toast.success('Clocked out successfully')
+      } else {
+        await teamService.clockIn()
+        toast.success('Clocked in successfully')
+      }
+      await dispatch(fetchMe())
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Unable to update time card status')
+    } finally {
+      setClockLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activePanel === 'activity' && !activityLoading && activityItems.length === 0 && !activityFailed) {
+      void loadActivity()
+    }
+    if (activePanel === 'notifications') {
+      void loadAnnouncements(true)
+    }
+  }, [activePanel, activityFailed, activityItems.length, activityLoading, loadActivity, loadAnnouncements])
+
+  useEffect(() => {
+    void loadAnnouncements()
+  }, [loadAnnouncements])
+
+  const handleSearchSubmit = () => {
+    if (moduleMatches[0]) {
+      handleNavigate(moduleMatches[0].to)
+      return
+    }
+    if (recentPageMatches[0]) {
+      handleNavigate(recentPageMatches[0].path)
+    }
+  }
+
+  const renderSearchContent = (
+    <div className="space-y-4">
+      <div>
+        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Modules</p>
+        <div className="mt-2 space-y-1">
+          {moduleMatches.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+              No matching modules found.
+            </div>
+          ) : moduleMatches.map(item => (
+            <button
+              key={item.to}
+              onClick={() => handleNavigate(item.to)}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors hover:bg-slate-50"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-700">{item.label}</p>
+                <p className="text-xs text-gray-400">{item.group}</p>
+              </div>
+              <ChevronRight size={14} className="text-gray-300" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Recent pages</p>
+        <div className="mt-2 space-y-1">
+          {recentPageMatches.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+              Your recent pages will appear here.
+            </div>
+          ) : recentPageMatches.map(item => (
+            <button
+              key={`${item.path}-${item.visitedAt}`}
+              onClick={() => handleNavigate(item.path)}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors hover:bg-slate-50"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-700">{item.label}</p>
+                <p className="text-xs text-gray-400">{formatRelativeTime(item.visitedAt, selectedLocale)}</p>
+              </div>
+              <span className="text-[11px] text-gray-300">{item.path}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderIconButton = (panel: Exclude<HeaderPanel, null>, icon: LucideIcon, label: string, className?: string) => {
+    const Icon = icon
+    const isActive = activePanel === panel
+
+    return (
+      <button
+        type="button"
+        onClick={() => setActivePanel(current => current === panel ? null : panel)}
+        className={clsx(
+          'relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600',
+          isActive && 'bg-gray-100 text-gray-700',
+          className
+        )}
+        aria-label={label}
+        aria-expanded={isActive}
+      >
+        <Icon size={16} />
+        {panel === 'notifications' && unreadAnnouncements > 0 && (
+          <span className="absolute right-1.5 top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+            {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+          </span>
+        )}
+      </button>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-gray-900">
@@ -388,36 +802,252 @@ export default function Layout() {
             <h1 className="truncate text-xl font-semibold text-gray-800">{pageTitle}</h1>
           </div>
 
-          <div className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-400 lg:flex">
-            <Search size={16} />
-            <span className="min-w-[120px]">Search modules...</span>
-          </div>
+          <div ref={controlsRef} className="relative ml-auto flex items-center gap-2">
+            <div className="relative hidden lg:block">
+              <div className={clsx(
+                'flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 transition-colors',
+                activePanel === 'search' && 'border-primary/30 bg-white shadow-sm'
+              )}>
+                <Search size={16} className="text-gray-400" />
+                <input
+                  ref={desktopSearchInputRef}
+                  value={headerSearch}
+                  onFocus={() => setActivePanel('search')}
+                  onChange={(event) => setHeaderSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      handleSearchSubmit()
+                    }
+                  }}
+                  placeholder="Search modules..."
+                  className="min-w-[180px] bg-transparent text-sm text-gray-600 outline-none placeholder:text-gray-400"
+                  aria-label="Search modules"
+                />
+              </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {[Search, Plus, Globe, Clock, Bell].map((Icon, i) => (
-              <button
-                key={i}
-                className="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 lg:hidden"
-                aria-label={`Open ${['search', 'quick add', 'language', 'time', 'notifications'][i]} panel`}
-              >
-                <Icon size={16} />
-                {i === 4 && (
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
-                )}
-              </button>
-            ))}
-            {[Plus, Globe, Clock, Bell].map((Icon, i) => (
-              <button
-                key={i}
-                className="relative hidden h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 lg:flex"
-                aria-label={`Open ${['quick add', 'language', 'time', 'notifications'][i]} panel`}
-              >
-                <Icon size={16} />
-                {i === 3 && (
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
-                )}
-              </button>
-            ))}
+              {activePanel === 'search' && isDesktop && (
+                <div className="absolute right-0 top-[calc(100%+10px)] z-40 w-[360px] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+                  {renderSearchContent}
+                </div>
+              )}
+            </div>
+
+            {renderIconButton('search', Search, 'Open module search', 'lg:hidden')}
+            {renderIconButton('quick-add', Plus, 'Open quick add')}
+            {renderIconButton('locale', Globe, 'Open language and region settings')}
+            {renderIconButton('activity', Clock, 'Open activity and time card panel')}
+            {renderIconButton('notifications', Bell, 'Open notifications')}
+
+            {activePanel === 'quick-add' && (
+              <div className="absolute right-[136px] top-[calc(100%+10px)] z-40 hidden w-[320px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl lg:block">
+                <div className="mb-2 px-2">
+                  <p className="text-sm font-semibold text-gray-800">Quick add</p>
+                  <p className="text-xs text-gray-400">Launch common creation flows from anywhere.</p>
+                </div>
+                <div className="space-y-1">
+                  {quickActions.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                      No creation shortcuts are available for your role.
+                    </div>
+                  ) : quickActions.map(action => {
+                    const Icon = action.icon
+                    return (
+                      <button
+                        key={action.id}
+                        onClick={() => handleQuickCreate(action.to)}
+                        className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                      >
+                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Icon size={16} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">{action.label}</p>
+                          <p className="text-xs text-gray-400">{action.description}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'locale' && (
+              <div className="absolute right-[92px] top-[calc(100%+10px)] z-40 hidden w-[320px] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl lg:block">
+                <div className="mb-2 px-2">
+                  <p className="text-sm font-semibold text-gray-800">Language & region</p>
+                  <p className="text-xs text-gray-400">Stored on this device and used for dates and times.</p>
+                </div>
+                <div className="space-y-1">
+                  {LOCALE_OPTIONS.map(option => (
+                    <button
+                      key={option.code}
+                      onClick={() => {
+                        setSelectedLocale(option.code)
+                        setActivePanel(null)
+                      }}
+                      className={clsx(
+                        'flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50',
+                        selectedLocale === option.code && 'bg-slate-50'
+                      )}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{option.label}</p>
+                        <p className="text-xs text-gray-400">{option.description}</p>
+                      </div>
+                      {selectedLocale === option.code && <Check size={16} className="mt-0.5 text-primary" />}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-xs text-gray-500">
+                  <p className="font-medium text-gray-700">Preview</p>
+                  <p className="mt-1">{new Intl.DateTimeFormat(selectedLocale, { dateStyle: 'full', timeStyle: 'short' }).format(new Date())}</p>
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'activity' && (
+              <div className="absolute right-[46px] top-[calc(100%+10px)] z-40 hidden w-[360px] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl lg:block">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Activity & time</p>
+                    <p className="text-xs text-gray-400">Quickly manage your time card and review recent changes.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('/team/timecards')}
+                    className="text-xs font-medium text-primary"
+                  >
+                    Time cards
+                  </button>
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{user?.clocked_in ? 'Currently clocked in' : 'Currently clocked out'}</p>
+                      <p className="text-xs text-gray-400">{user?.name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleClockAction()}
+                      disabled={clockLoading}
+                      className={clsx(
+                        'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium',
+                        user?.clocked_in ? 'bg-white text-gray-700' : 'bg-primary text-white',
+                        clockLoading && 'cursor-not-allowed opacity-60'
+                      )}
+                    >
+                      {user?.clocked_in ? <LogOut size={13} /> : <LogIn size={13} />}
+                      {clockLoading ? 'Saving...' : user?.clocked_in ? 'Clock out' : 'Clock in'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Recent activity</p>
+                    {canViewAuditTrail && (
+                      <button type="button" onClick={() => handleNavigate('/settings/audit-log')} className="text-xs font-medium text-primary">
+                        Audit trail
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {activityLoading ? (
+                      <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                        Loading recent activity...
+                      </div>
+                    ) : activityItems.length > 0 ? activityItems.map(item => (
+                      <div key={item.id} className="rounded-xl border border-gray-100 px-3 py-3">
+                        <p className="text-sm font-medium text-gray-700">
+                          {AUDIT_ACTION_LABELS[item.action] || item.action} {AUDIT_ENTITY_LABELS[item.entity_type] || item.entity_type}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">{item.entity_name || 'Untitled record'}</p>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          {item.user?.name ? `${item.user.name} · ` : ''}{formatRelativeTime(item.created_at, selectedLocale)}
+                        </p>
+                      </div>
+                    )) : (
+                      <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                        {activityFailed ? 'Audit activity is unavailable right now.' : 'No recent activity yet.'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Recent pages</p>
+                  <div className="space-y-2">
+                    {recentPages.slice(0, 3).map(item => (
+                      <button
+                        key={`${item.path}-${item.visitedAt}`}
+                        onClick={() => handleNavigate(item.path)}
+                        className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-left transition-colors hover:bg-slate-100"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">{item.label}</p>
+                          <p className="text-[11px] text-gray-400">{formatRelativeTime(item.visitedAt, selectedLocale)}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-300" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'notifications' && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-40 hidden w-[360px] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl lg:block">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Notifications</p>
+                    <p className="text-xs text-gray-400">Latest company announcements.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('/team/announcements')}
+                    className="text-xs font-medium text-primary"
+                  >
+                    View all
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {notificationsLoading ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                      Loading notifications...
+                    </div>
+                  ) : activeAnnouncements.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                      No announcements available.
+                    </div>
+                  ) : activeAnnouncements.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate('/team/announcements')}
+                      className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">{item.title}</p>
+                          {item.content && (
+                            <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>
+                          )}
+                        </div>
+                        {lastAnnouncementsSeenAt && new Date(item.created_at) > new Date(lastAnnouncementsSeenAt) && (
+                          <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+                        )}
+                      </div>
+                      <p className="mt-2 text-[11px] text-gray-400">
+                        {formatDateTime(item.created_at, selectedLocale)}
+                        {item.created_by?.name ? ` · ${item.created_by.name}` : ''}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div ref={profileRef} className="relative ml-1">
               <button
@@ -455,6 +1085,198 @@ export default function Layout() {
             </div>
           </div>
         </header>
+
+        {activePanel === 'search' && !isDesktop && (
+          <div className="fixed inset-0 z-50 bg-slate-900/45 p-4 lg:hidden">
+            <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <Search size={16} className="text-gray-400" />
+                <input
+                  autoFocus
+                  value={headerSearch}
+                  onChange={(event) => setHeaderSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      handleSearchSubmit()
+                    }
+                  }}
+                  placeholder="Search modules..."
+                  className="w-full bg-transparent text-sm text-gray-600 outline-none placeholder:text-gray-400"
+                  aria-label="Search modules"
+                />
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">
+                  Close
+                </button>
+              </div>
+              <div className="mt-4 max-h-[70vh] overflow-y-auto">
+                {renderSearchContent}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activePanel === 'quick-add' && !isDesktop && (
+          <div className="fixed inset-0 z-50 bg-slate-900/45 p-4 lg:hidden">
+            <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Quick add</p>
+                  <p className="text-xs text-gray-400">Create new workspace records.</p>
+                </div>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+              </div>
+              <div className="mt-4 space-y-2">
+                {quickActions.map(action => {
+                  const Icon = action.icon
+                  return (
+                    <button
+                      key={action.id}
+                      onClick={() => handleQuickCreate(action.to)}
+                      className="flex w-full items-start gap-3 rounded-xl border border-gray-100 px-3 py-3 text-left"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Icon size={16} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{action.label}</p>
+                        <p className="text-xs text-gray-400">{action.description}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activePanel === 'locale' && !isDesktop && (
+          <div className="fixed inset-0 z-50 bg-slate-900/45 p-4 lg:hidden">
+            <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Language & region</p>
+                  <p className="text-xs text-gray-400">Choose how dates and times appear.</p>
+                </div>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+              </div>
+              <div className="mt-4 space-y-2">
+                {LOCALE_OPTIONS.map(option => (
+                  <button
+                    key={option.code}
+                    onClick={() => {
+                      setSelectedLocale(option.code)
+                      setActivePanel(null)
+                    }}
+                    className={clsx(
+                      'flex w-full items-start justify-between rounded-xl border border-gray-100 px-3 py-3 text-left',
+                      selectedLocale === option.code && 'bg-slate-50'
+                    )}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{option.label}</p>
+                      <p className="text-xs text-gray-400">{option.description}</p>
+                    </div>
+                    {selectedLocale === option.code && <Check size={16} className="mt-0.5 text-primary" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activePanel === 'activity' && !isDesktop && (
+          <div className="fixed inset-0 z-50 bg-slate-900/45 p-4 lg:hidden">
+            <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Activity & time</p>
+                  <p className="text-xs text-gray-400">Manage your time card and recent activity.</p>
+                </div>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">{user?.clocked_in ? 'Currently clocked in' : 'Currently clocked out'}</p>
+                    <p className="text-xs text-gray-400">{user?.name}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleClockAction()}
+                    disabled={clockLoading}
+                    className={clsx(
+                      'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium',
+                      user?.clocked_in ? 'bg-white text-gray-700' : 'bg-primary text-white',
+                      clockLoading && 'cursor-not-allowed opacity-60'
+                    )}
+                  >
+                    {user?.clocked_in ? <LogOut size={13} /> : <LogIn size={13} />}
+                    {clockLoading ? 'Saving...' : user?.clocked_in ? 'Clock out' : 'Clock in'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 max-h-[60vh] overflow-y-auto">
+                <div className="space-y-2">
+                  {activityLoading ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                      Loading recent activity...
+                    </div>
+                  ) : activityItems.length > 0 ? activityItems.map(item => (
+                    <div key={item.id} className="rounded-xl border border-gray-100 px-3 py-3">
+                      <p className="text-sm font-medium text-gray-700">
+                        {AUDIT_ACTION_LABELS[item.action] || item.action} {AUDIT_ENTITY_LABELS[item.entity_type] || item.entity_type}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">{item.entity_name || 'Untitled record'}</p>
+                      <p className="mt-1 text-[11px] text-gray-400">{formatRelativeTime(item.created_at, selectedLocale)}</p>
+                    </div>
+                  )) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                      {activityFailed ? 'Audit activity is unavailable right now.' : 'No recent activity yet.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activePanel === 'notifications' && !isDesktop && (
+          <div className="fixed inset-0 z-50 bg-slate-900/45 p-4 lg:hidden">
+            <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Notifications</p>
+                  <p className="text-xs text-gray-400">Latest company announcements.</p>
+                </div>
+                <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">Close</button>
+              </div>
+              <div className="mt-4 max-h-[70vh] space-y-2 overflow-y-auto">
+                {notificationsLoading ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                    Loading notifications...
+                  </div>
+                ) : activeAnnouncements.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
+                    No announcements available.
+                  </div>
+                ) : activeAnnouncements.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavigate('/team/announcements')}
+                    className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left"
+                  >
+                    <p className="text-sm font-medium text-gray-700">{item.title}</p>
+                    {item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>}
+                    <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />

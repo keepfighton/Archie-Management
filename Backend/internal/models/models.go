@@ -111,31 +111,31 @@ type RolePermission struct {
 // ─── CLIENT ─────────────────────────────────────────
 type Client struct {
 	Base
-	Name         string    `gorm:"not null" json:"name"`
-	Type         string    `gorm:"default:company" json:"type"` // company, person
-	Email        string    `json:"email"`
-	Phone        string    `json:"phone"`
-	Website      string    `json:"website"`
-	Address      string    `json:"address"`
-	City         string    `json:"city"`
-	State        string    `json:"state"`
-	Zip          string    `json:"zip"`
-	Country      string    `json:"country"`
-	VATNumber             string  `json:"vat_number"`
-	GSTNumber             string  `json:"gst_number"`
-	Managers              string  `json:"managers"`
-	ClientGroups          string  `json:"client_groups"`
-	Currency              string  `gorm:"default:IDR" json:"currency"`
-	CurrencySymbol        string  `json:"currency_symbol"`
-	LabelID               *uint   `json:"label_id"`
-	Label                 *Label  `gorm:"foreignKey:LabelID" json:"label,omitempty"`
-	Needs                 string  `json:"needs"`
-	DisableOnlinePayment  bool    `gorm:"default:false" json:"disable_online_payment"`
-	OwnerID               uint    `json:"owner_id"`
-	Owner        *User     `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
-	Contacts     []Contact `json:"contacts,omitempty"`
-	Projects     []Project `json:"projects,omitempty"`
-	Labels       []Label   `gorm:"many2many:client_labels;" json:"labels,omitempty"`
+	Name                 string    `gorm:"not null" json:"name"`
+	Type                 string    `gorm:"default:company" json:"type"` // company, person
+	Email                string    `json:"email"`
+	Phone                string    `json:"phone"`
+	Website              string    `json:"website"`
+	Address              string    `json:"address"`
+	City                 string    `json:"city"`
+	State                string    `json:"state"`
+	Zip                  string    `json:"zip"`
+	Country              string    `json:"country"`
+	VATNumber            string    `json:"vat_number"`
+	GSTNumber            string    `json:"gst_number"`
+	Managers             string    `json:"managers"`
+	ClientGroups         string    `json:"client_groups"`
+	Currency             string    `gorm:"default:IDR" json:"currency"`
+	CurrencySymbol       string    `json:"currency_symbol"`
+	LabelID              *uint     `json:"label_id"`
+	Label                *Label    `gorm:"foreignKey:LabelID" json:"label,omitempty"`
+	Needs                string    `json:"needs"`
+	DisableOnlinePayment bool      `gorm:"default:false" json:"disable_online_payment"`
+	OwnerID              uint      `json:"owner_id"`
+	Owner                *User     `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Contacts             []Contact `json:"contacts,omitempty"`
+	Projects             []Project `json:"projects,omitempty"`
+	Labels               []Label   `gorm:"many2many:client_labels;" json:"labels,omitempty"`
 }
 
 type Contact struct {
@@ -151,51 +151,62 @@ type Contact struct {
 // ─── PROJECT ────────────────────────────────────────
 type Project struct {
 	Base
-	Title       string    `gorm:"not null" json:"title"`
-	ClientID    uint      `json:"client_id"`
-	Client      *Client   `gorm:"foreignKey:ClientID" json:"client,omitempty"`
-	Price       float64   `json:"price"`
-	Currency    string    `gorm:"default:IDR" json:"currency"`
+	Title       string   `gorm:"not null" json:"title"`
+	ClientID    uint     `json:"client_id"`
+	Client      *Client  `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	Price       float64  `json:"price"`
+	Currency    string   `gorm:"default:IDR" json:"currency"`
 	StartDate   FlexTime `json:"start_date"`
 	Deadline    FlexTime `json:"deadline"`
 	Status      string   `gorm:"default:open" json:"status"` // open, completed, hold, cancelled
-	Progress    int       `gorm:"default:0" json:"progress"`
-	Description string    `json:"description"`
-	Tasks       []Task    `json:"tasks,omitempty"`
-	Labels      []Label   `gorm:"many2many:project_labels;" json:"labels,omitempty"`
-	Members     []User    `gorm:"many2many:project_members;" json:"members,omitempty"`
+	Progress    int      `gorm:"default:0" json:"progress"`
+	Description string   `json:"description"`
+	Tasks       []Task   `json:"tasks,omitempty"`
+	Labels      []Label  `gorm:"many2many:project_labels;" json:"labels,omitempty"`
+	Members     []User   `gorm:"many2many:project_members;" json:"members,omitempty"`
 }
 
 // ─── TASK ────────────────────────────────────────────
+type TaskKanbanColumn struct {
+	Base
+	Title    string `gorm:"not null" json:"title"`
+	Status   string `gorm:"not null;index" json:"status"` // todo, in_progress, done, expired
+	Position int    `gorm:"default:0;index" json:"position"`
+	Tasks    []Task `json:"tasks,omitempty"`
+}
+
 type Task struct {
 	Base
-	Title         string    `gorm:"not null" json:"title"`
-	ProjectID     *uint     `json:"project_id"`
-	Project       *Project  `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
-	AssignedToID  *uint     `json:"assigned_to_id"`
-	AssignedTo    *User     `gorm:"foreignKey:AssignedToID" json:"assigned_to,omitempty"`
-	StartDate     FlexTime `json:"start_date"`
-	Deadline      FlexTime `json:"deadline"`
-	Status        string   `gorm:"default:todo" json:"status"` // todo, in_progress, done, expired
-	Milestone     string    `json:"milestone"`
-	Description   string    `json:"description"`
-	Priority      string    `gorm:"default:medium" json:"priority"`
-	Collaborators []User    `gorm:"many2many:task_collaborators;" json:"collaborators,omitempty"`
-	Labels        []Label   `gorm:"many2many:task_labels;" json:"labels,omitempty"`
+	Title          string            `gorm:"not null" json:"title"`
+	ProjectID      *uint             `json:"project_id"`
+	Project        *Project          `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+	AssignedToID   *uint             `json:"assigned_to_id"`
+	AssignedTo     *User             `gorm:"foreignKey:AssignedToID" json:"assigned_to,omitempty"`
+	KanbanColumnID *uint             `json:"kanban_column_id"`
+	KanbanColumn   *TaskKanbanColumn `gorm:"foreignKey:KanbanColumnID" json:"kanban_column,omitempty"`
+	KanbanPosition int               `gorm:"default:0;index" json:"kanban_position"`
+	StartDate      FlexTime          `json:"start_date"`
+	Deadline       FlexTime          `json:"deadline"`
+	Status         string            `gorm:"default:todo" json:"status"` // todo, in_progress, done, expired
+	Milestone      string            `json:"milestone"`
+	Description    string            `json:"description"`
+	Priority       string            `gorm:"default:medium" json:"priority"`
+	Collaborators  []User            `gorm:"many2many:task_collaborators;" json:"collaborators,omitempty"`
+	Labels         []Label           `gorm:"many2many:task_labels;" json:"labels,omitempty"`
 }
 
 // ─── LEAD ────────────────────────────────────────────
 type Lead struct {
 	Base
-	Name           string `gorm:"not null" json:"name"`
-	PrimaryContact string `json:"primary_contact"`
-	Phone          string `json:"phone"`
-	Email          string `json:"email"`
-	Source         string `json:"source"`
-	Status         string `gorm:"default:new" json:"status"` // new, qualified, discussion, negotiation, won, lost
-	OwnerID        uint   `json:"owner_id"`
-	Owner          *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
-	Notes          string `json:"notes"`
+	Name           string  `gorm:"not null" json:"name"`
+	PrimaryContact string  `json:"primary_contact"`
+	Phone          string  `json:"phone"`
+	Email          string  `json:"email"`
+	Source         string  `json:"source"`
+	Status         string  `gorm:"default:new" json:"status"` // new, qualified, discussion, negotiation, won, lost
+	OwnerID        uint    `json:"owner_id"`
+	Owner          *User   `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Notes          string  `json:"notes"`
 	Labels         []Label `gorm:"many2many:lead_labels;" json:"labels,omitempty"`
 }
 
@@ -234,30 +245,30 @@ type InvoiceItem struct {
 // ─── PAYMENT ─────────────────────────────────────────
 type Payment struct {
 	Base
-	InvoiceID     uint      `json:"invoice_id"`
-	Invoice       *Invoice  `gorm:"foreignKey:InvoiceID" json:"invoice,omitempty"`
-	Amount        float64   `json:"amount"`
-	Currency      string    `gorm:"default:IDR" json:"currency"`
-	PaymentDate   FlexTime  `json:"payment_date"`
-	PaymentMethod string    `json:"payment_method"`
-	Note          string    `json:"note"`
+	InvoiceID     uint     `json:"invoice_id"`
+	Invoice       *Invoice `gorm:"foreignKey:InvoiceID" json:"invoice,omitempty"`
+	Amount        float64  `json:"amount"`
+	Currency      string   `gorm:"default:IDR" json:"currency"`
+	PaymentDate   FlexTime `json:"payment_date"`
+	PaymentMethod string   `json:"payment_method"`
+	Note          string   `json:"note"`
 }
 
 // ─── CONTRACT ────────────────────────────────────────
 type Contract struct {
 	Base
-	ContractNumber string    `gorm:"uniqueIndex" json:"contract_number"`
-	Title          string    `gorm:"not null" json:"title"`
-	ClientID       uint      `json:"client_id"`
-	Client         *Client   `gorm:"foreignKey:ClientID" json:"client,omitempty"`
-	ProjectID      *uint     `json:"project_id"`
-	Project        *Project  `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+	ContractNumber string   `gorm:"uniqueIndex" json:"contract_number"`
+	Title          string   `gorm:"not null" json:"title"`
+	ClientID       uint     `json:"client_id"`
+	Client         *Client  `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	ProjectID      *uint    `json:"project_id"`
+	Project        *Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 	ContractDate   FlexTime `json:"contract_date"`
 	ValidUntil     FlexTime `json:"valid_until"`
-	Amount         float64   `json:"amount"`
-	Currency       string    `gorm:"default:IDR" json:"currency"`
-	Status         string    `gorm:"default:draft" json:"status"`
-	FileURL        string    `json:"file_url"`
+	Amount         float64  `json:"amount"`
+	Currency       string   `gorm:"default:IDR" json:"currency"`
+	Status         string   `gorm:"default:draft" json:"status"`
+	FileURL        string   `json:"file_url"`
 }
 
 // ─── ITEM (Product/Service) ───────────────────────────
@@ -287,16 +298,16 @@ type Order struct {
 // ─── EVENT ───────────────────────────────────────────
 type Event struct {
 	Base
-	Title       string    `gorm:"not null" json:"title"`
-	Description string    `json:"description"`
+	Title       string   `gorm:"not null" json:"title"`
+	Description string   `json:"description"`
 	StartDate   FlexTime `json:"start_date"`
 	EndDate     FlexTime `json:"end_date"`
 	AllDay      bool     `json:"all_day"`
-	Color       string    `gorm:"default:#3b82f6" json:"color"`
-	Type        string    `json:"type"`
-	CreatedByID uint      `json:"created_by_id"`
-	CreatedBy   *User     `gorm:"foreignKey:CreatedByID" json:"created_by,omitempty"`
-	Labels      []Label   `gorm:"many2many:event_labels;" json:"labels,omitempty"`
+	Color       string   `gorm:"default:#3b82f6" json:"color"`
+	Type        string   `json:"type"`
+	CreatedByID uint     `json:"created_by_id"`
+	CreatedBy   *User    `gorm:"foreignKey:CreatedByID" json:"created_by,omitempty"`
+	Labels      []Label  `gorm:"many2many:event_labels;" json:"labels,omitempty"`
 }
 
 // ─── NOTE ────────────────────────────────────────────
@@ -312,82 +323,82 @@ type Note struct {
 // ─── EXPENSE ─────────────────────────────────────────
 type Expense struct {
 	Base
-	Date        FlexTime  `json:"date"`
-	Category    string    `json:"category"`
-	Title       string    `gorm:"not null" json:"title"`
-	Description string    `json:"description"`
-	Amount      float64   `json:"amount"`
-	Tax         float64   `json:"tax"`
-	SecondTax   float64   `json:"second_tax"`
-	Total       float64   `json:"total"`
-	FileURL     string    `json:"file_url"`
-	UserID      uint      `json:"user_id"`
-	User        *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	IsRecurring bool      `gorm:"default:false" json:"is_recurring"`
+	Date        FlexTime `json:"date"`
+	Category    string   `json:"category"`
+	Title       string   `gorm:"not null" json:"title"`
+	Description string   `json:"description"`
+	Amount      float64  `json:"amount"`
+	Tax         float64  `json:"tax"`
+	SecondTax   float64  `json:"second_tax"`
+	Total       float64  `json:"total"`
+	FileURL     string   `json:"file_url"`
+	UserID      uint     `json:"user_id"`
+	User        *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	IsRecurring bool     `gorm:"default:false" json:"is_recurring"`
 }
 
 // ─── LEAVE ───────────────────────────────────────────
 type Leave struct {
 	Base
-	UserID    uint      `json:"user_id"`
-	User      *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	LeaveType string    `json:"leave_type"`
+	UserID    uint     `json:"user_id"`
+	User      *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	LeaveType string   `json:"leave_type"`
 	StartDate FlexTime `json:"start_date"`
 	EndDate   FlexTime `json:"end_date"`
 	Duration  int      `json:"duration"`
-	Reason    string    `json:"reason"`
-	Status    string    `gorm:"default:pending" json:"status"` // pending, approved, rejected
+	Reason    string   `json:"reason"`
+	Status    string   `gorm:"default:pending" json:"status"` // pending, approved, rejected
 }
 
 // ─── ANNOUNCEMENT ────────────────────────────────────
 type Announcement struct {
 	Base
-	Title       string    `gorm:"not null" json:"title"`
-	Content     string    `json:"content"`
+	Title       string   `gorm:"not null" json:"title"`
+	Content     string   `json:"content"`
 	StartDate   FlexTime `json:"start_date"`
 	EndDate     FlexTime `json:"end_date"`
 	CreatedByID uint     `json:"created_by_id"`
-	CreatedBy   *User     `gorm:"foreignKey:CreatedByID" json:"created_by,omitempty"`
+	CreatedBy   *User    `gorm:"foreignKey:CreatedByID" json:"created_by,omitempty"`
 }
 
 // ─── TIME CARD ───────────────────────────────────────
 type TimeCard struct {
 	Base
-	UserID   uint      `json:"user_id"`
-	User     *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	InDate   time.Time `json:"in_date"`
-	InTime   time.Time `json:"in_time"`
+	UserID   uint       `json:"user_id"`
+	User     *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	InDate   time.Time  `json:"in_date"`
+	InTime   time.Time  `json:"in_time"`
 	OutDate  *time.Time `json:"out_date"`
 	OutTime  *time.Time `json:"out_time"`
-	Duration float64   `json:"duration"` // in hours
-	Note     string    `json:"note"`
+	Duration float64    `json:"duration"` // in hours
+	Note     string     `json:"note"`
 }
 
 // ─── FILE ────────────────────────────────────────────
 type File struct {
 	Base
-	Name        string `gorm:"not null" json:"name"`
-	Path        string `json:"path"`
-	URL         string `json:"url"`
-	Size        int64  `json:"size"`
-	MimeType    string `json:"mime_type"`
-	FolderID    *uint  `json:"folder_id"`
-	Folder      *File  `gorm:"foreignKey:FolderID" json:"folder,omitempty"`
-	IsFolder    bool   `gorm:"default:false" json:"is_folder"`
-	IsFavorite  bool   `gorm:"default:false" json:"is_favorite"`
-	OwnerID     uint   `json:"owner_id"`
-	Owner       *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Name       string `gorm:"not null" json:"name"`
+	Path       string `json:"path"`
+	URL        string `json:"url"`
+	Size       int64  `json:"size"`
+	MimeType   string `json:"mime_type"`
+	FolderID   *uint  `json:"folder_id"`
+	Folder     *File  `gorm:"foreignKey:FolderID" json:"folder,omitempty"`
+	IsFolder   bool   `gorm:"default:false" json:"is_folder"`
+	IsFavorite bool   `gorm:"default:false" json:"is_favorite"`
+	OwnerID    uint   `json:"owner_id"`
+	Owner      *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 }
 
 // ─── TODO ────────────────────────────────────────────
 type Todo struct {
 	Base
-	Title    string     `gorm:"not null" json:"title"`
-	Done     bool       `gorm:"default:false" json:"done"`
-	DoneAt   *time.Time `json:"done_at"`
-	UserID   uint       `json:"user_id"`
-	User     *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Labels   []Label    `gorm:"many2many:todo_labels;" json:"labels,omitempty"`
+	Title  string     `gorm:"not null" json:"title"`
+	Done   bool       `gorm:"default:false" json:"done"`
+	DoneAt *time.Time `json:"done_at"`
+	UserID uint       `json:"user_id"`
+	User   *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Labels []Label    `gorm:"many2many:todo_labels;" json:"labels,omitempty"`
 }
 
 // ─── LABEL ───────────────────────────────────────────

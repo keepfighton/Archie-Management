@@ -339,12 +339,293 @@ func isValidTaskStatus(status string) bool {
 	}
 }
 
+type taskPayload struct {
+	Title          string          `json:"title"`
+	ProjectID      *uint           `json:"project_id"`
+	AssignedToID   *uint           `json:"assigned_to_id"`
+	KanbanColumnID *uint           `json:"kanban_column_id"`
+	StartDate      models.FlexTime `json:"start_date"`
+	Deadline       models.FlexTime `json:"deadline"`
+	Status         string          `json:"status"`
+	Milestone      string          `json:"milestone"`
+	Description    string          `json:"description"`
+	Priority       string          `json:"priority"`
+}
+
+type taskKanbanColumnPayload struct {
+	Title  string `json:"title"`
+	Status string `json:"status"`
+}
+
+type moveTaskKanbanPayload struct {
+	DestinationColumnID uint `json:"destination_column_id"`
+	DestinationIndex    int  `json:"destination_index"`
+}
+
+func taskDefaultColumnTitle(status string) string {
+	switch status {
+	case "in_progress":
+		return "In Progress"
+	case "done":
+		return "Done"
+	case "expired":
+		return "Expired"
+	default:
+		return "To Do"
+	}
+}
+
+func normalizeTaskStatus(status string) string {
+	if status == "" {
+		return "todo"
+	}
+	if isValidTaskStatus(status) {
+		return status
+	}
+	return ""
+}
+
+func clampIndex(index, length int) int {
+	if index < 0 {
+		return 0
+	}
+	if index > length {
+		return length
+	}
+	return index
+}
+
+func (h *TaskHandler) getDefaultTaskKanbanColumn(tx *gorm.DB, status string) (*models.TaskKanbanColumn, error) {
+	var column models.TaskKanbanColumn
+	err := tx.Where("status = ?", status).Order("position asc, id asc").First(&column).Error
+	if err == nil {
+		return &column, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	var maxPosition int
+	if err := tx.Model(&models.TaskKanbanColumn{}).Select("COALESCE(MAX(position), 0)").Scan(&maxPosition).Error; err != nil {
+		return nil, err
+	}
+
+	column = models.TaskKanbanColumn{
+		Title:    taskDefaultColumnTitle(status),
+		Status:   status,
+		Position: maxPosition + 1,
+	}
+	if err := tx.Create(&column).Error; err != nil {
+		return nil, err
+	}
+	return &column, nil
+}
+
+func (h *TaskHandler) resolveTaskKanbanColumn(tx *gorm.DB, status string, columnID *uint) (*models.TaskKanbanColumn, error) {
+	normalizedStatus := normalizeTaskStatus(status)
+	if normalizedStatus == "" {
+		return nil, fmt.Errorf("invalid task status")
+	}
+
+	if columnID != nil && *columnID > 0 {
+		var column models.TaskKanbanColumn
+		if err := tx.First(&column, *columnID).Error; err != nil {
+			return nil, err
+		}
+		if column.Status != normalizedStatus {
+			return nil, fmt.Errorf("kanban column status mismatch")
+		}
+		return &column, nil
+	}
+
+	return h.getDefaultTaskKanbanColumn(tx, normalizedStatus)
+}
+
+func (h *TaskHandler) nextTaskKanbanPosition(tx *gorm.DB, columnID uint) (int, error) {
+	var maxPosition int
+	if err := tx.Model(&models.Task{}).
+		Where("kanban_column_id = ?", columnID).
+		Select("COALESCE(MAX(kanban_position), 0)").
+		Scan(&maxPosition).Error; err != nil {
+		return 0, err
+	}
+	return maxPosition + 1, nil
+}
+
+func (h *TaskHandler) fetchColumnTasks(tx *gorm.DB, columnID uint) ([]models.Task, error) {
+	var tasks []models.Task
+	err := tx.
+		Where("kanban_column_id = ?", columnID).
+		Order("kanban_position asc, updated_at desc, id asc").
+		Find(&tasks).Error
+	return tasks, err
+}
+
+func removeTaskFromColumn(tasks []models.Task, taskID uint) ([]models.Task, *models.Task) {
+	next := make([]models.Task, 0, len(tasks))
+	var moved *models.Task
+
+	for _, task := range tasks {
+		if task.ID == taskID {
+			taskCopy := task
+			moved = &taskCopy
+			continue
+		}
+		next = append(next, task)
+	}
+
+	return next, moved
+}
+
+func insertTaskIntoColumn(tasks []models.Task, index int, task models.Task) []models.Task {
+	clampedIndex := clampIndex(index, len(tasks))
+	next := make([]models.Task, 0, len(tasks)+1)
+	next = append(next, tasks[:clampedIndex]...)
+	next = append(next, task)
+	next = append(next, tasks[clampedIndex:]...)
+	return next
+}
+
+func (h *TaskHandler) resequenceTaskColumn(tx *gorm.DB, column models.TaskKanbanColumn, tasks []models.Task) error {
+	for index, task := range tasks {
+		if err := tx.Model(&models.Task{}).
+			Where("id = ?", task.ID).
+			Updates(map[string]interface{}{
+				"kanban_column_id": column.ID,
+				"kanban_position":  index + 1,
+				"status":           column.Status,
+			}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *TaskHandler) loadTaskWithRelations(tx *gorm.DB, id uint) (models.Task, error) {
+	var task models.Task
+	err := tx.Preload("AssignedTo").Preload("Project").Preload("Labels").Preload("KanbanColumn").First(&task, id).Error
+	return task, err
+}
+
+func (h *TaskHandler) ListColumns(c *gin.Context) {
+	var columns []models.TaskKanbanColumn
+	if err := h.db.Order("position asc, id asc").Find(&columns).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": columns})
+}
+
+func (h *TaskHandler) CreateColumn(c *gin.Context) {
+	var req taskKanbanColumnPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
+		return
+	}
+	if !isValidTaskStatus(req.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
+		return
+	}
+
+	var column models.TaskKanbanColumn
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		var maxPosition int
+		if err := tx.Model(&models.TaskKanbanColumn{}).Select("COALESCE(MAX(position), 0)").Scan(&maxPosition).Error; err != nil {
+			return err
+		}
+
+		column = models.TaskKanbanColumn{
+			Title:    req.Title,
+			Status:   req.Status,
+			Position: maxPosition + 1,
+		}
+		return tx.Create(&column).Error
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	recordAudit(h.db, c, "create", "task_kanban_column", column.ID, column.Title)
+	c.JSON(http.StatusCreated, gin.H{"data": column})
+}
+
+func (h *TaskHandler) UpdateColumn(c *gin.Context) {
+	id, err := getID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid column id"})
+		return
+	}
+
+	var req taskKanbanColumnPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
+		return
+	}
+	if req.Status != "" && !isValidTaskStatus(req.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
+		return
+	}
+
+	var column models.TaskKanbanColumn
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&column, id).Error; err != nil {
+			return err
+		}
+
+		previousStatus := column.Status
+		column.Title = req.Title
+		if req.Status != "" {
+			column.Status = req.Status
+		}
+
+		if err := tx.Save(&column).Error; err != nil {
+			return err
+		}
+
+		if previousStatus != column.Status {
+			if err := tx.Model(&models.Task{}).
+				Where("kanban_column_id = ?", column.ID).
+				Update("status", column.Status).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Column not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	recordAudit(h.db, c, "update", "task_kanban_column", column.ID, column.Title)
+	c.JSON(http.StatusOK, gin.H{"data": column})
+}
+
 func (h *TaskHandler) List(c *gin.Context) {
 	var q PaginationQuery
 	c.ShouldBindQuery(&q)
 	var tasks []models.Task
 	var total int64
-	query := h.db.Model(&models.Task{}).Preload("AssignedTo").Preload("Project").Preload("Labels")
+	query := h.db.Model(&models.Task{}).
+		Preload("AssignedTo").
+		Preload("Project").
+		Preload("Labels").
+		Preload("KanbanColumn")
 	if q.Q != "" {
 		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
 	}
@@ -358,8 +639,11 @@ func (h *TaskHandler) List(c *gin.Context) {
 		query = query.Where("assigned_to_id = ?", assignedTo)
 	}
 	query.Count(&total)
-	result := query.Order("updated_at desc, id desc")
-	if !strings.EqualFold(c.Query("fetch_all"), "true") {
+	result := query
+	if strings.EqualFold(c.Query("fetch_all"), "true") {
+		result = result.Order("kanban_column_id asc nulls last, kanban_position asc, updated_at desc, id desc")
+	} else {
+		result = result.Order("updated_at desc, id desc")
 		result = result.Scopes(paginate(q))
 	}
 	result.Find(&tasks)
@@ -367,19 +651,68 @@ func (h *TaskHandler) List(c *gin.Context) {
 }
 
 func (h *TaskHandler) Create(c *gin.Context) {
-	var task models.Task
-	if err := c.ShouldBindJSON(&task); err != nil {
+	var req taskPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if task.Status == "" {
-		task.Status = "todo"
+
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
+		return
 	}
-	if !isValidTaskStatus(task.Status) {
+
+	status := normalizeTaskStatus(req.Status)
+	if status == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
 		return
 	}
-	if err := h.db.Create(&task).Error; err != nil {
+
+	if req.Priority == "" {
+		req.Priority = "medium"
+	}
+
+	var task models.Task
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		column, err := h.resolveTaskKanbanColumn(tx, status, req.KanbanColumnID)
+		if err != nil {
+			return err
+		}
+
+		position, err := h.nextTaskKanbanPosition(tx, column.ID)
+		if err != nil {
+			return err
+		}
+
+		task = models.Task{
+			Title:          req.Title,
+			ProjectID:      req.ProjectID,
+			AssignedToID:   req.AssignedToID,
+			KanbanColumnID: &column.ID,
+			KanbanPosition: position,
+			StartDate:      req.StartDate,
+			Deadline:       req.Deadline,
+			Status:         column.Status,
+			Milestone:      req.Milestone,
+			Description:    req.Description,
+			Priority:       req.Priority,
+		}
+		if err := tx.Create(&task).Error; err != nil {
+			return err
+		}
+
+		task, err = h.loadTaskWithRelations(tx, task.ID)
+		return err
+	}); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid kanban column"})
+			return
+		}
+		if strings.Contains(err.Error(), "invalid task status") || strings.Contains(err.Error(), "mismatch") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -390,7 +723,7 @@ func (h *TaskHandler) Create(c *gin.Context) {
 func (h *TaskHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var task models.Task
-	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Collaborators").First(&task, id).Error; err != nil {
+	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Collaborators").Preload("KanbanColumn").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -399,23 +732,93 @@ func (h *TaskHandler) Get(c *gin.Context) {
 
 func (h *TaskHandler) Update(c *gin.Context) {
 	id, _ := getID(c)
-	var task models.Task
-	if err := h.db.First(&task, id).Error; err != nil {
+	if err := h.db.First(&models.Task{}, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	if err := c.ShouldBindJSON(&task); err != nil {
+
+	var req taskPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if task.Status == "" {
-		task.Status = "todo"
+
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
+		return
 	}
-	if !isValidTaskStatus(task.Status) {
+
+	status := normalizeTaskStatus(req.Status)
+	if status == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
 		return
 	}
-	if err := h.db.Save(&task).Error; err != nil {
+
+	if req.Priority == "" {
+		req.Priority = "medium"
+	}
+
+	var task models.Task
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&task, id).Error; err != nil {
+			return err
+		}
+
+		previousColumnID := task.KanbanColumnID
+		column, err := h.resolveTaskKanbanColumn(tx, status, req.KanbanColumnID)
+		if err != nil {
+			return err
+		}
+
+		task.Title = req.Title
+		task.ProjectID = req.ProjectID
+		task.AssignedToID = req.AssignedToID
+		task.StartDate = req.StartDate
+		task.Deadline = req.Deadline
+		task.Milestone = req.Milestone
+		task.Description = req.Description
+		task.Priority = req.Priority
+		task.Status = column.Status
+
+		if previousColumnID == nil || *previousColumnID != column.ID {
+			position, err := h.nextTaskKanbanPosition(tx, column.ID)
+			if err != nil {
+				return err
+			}
+			task.KanbanColumnID = &column.ID
+			task.KanbanPosition = position
+		}
+
+		if err := tx.Save(&task).Error; err != nil {
+			return err
+		}
+
+		if previousColumnID != nil && (task.KanbanColumnID == nil || *previousColumnID != *task.KanbanColumnID) {
+			previousColumnTasks, err := h.fetchColumnTasks(tx, *previousColumnID)
+			if err != nil {
+				return err
+			}
+			var previousColumn models.TaskKanbanColumn
+			if err := tx.First(&previousColumn, *previousColumnID).Error; err != nil {
+				return err
+			}
+			if err := h.resequenceTaskColumn(tx, previousColumn, previousColumnTasks); err != nil {
+				return err
+			}
+		}
+
+		task, err = h.loadTaskWithRelations(tx, task.ID)
+		return err
+	}); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid kanban column"})
+			return
+		}
+		if strings.Contains(err.Error(), "invalid task status") || strings.Contains(err.Error(), "mismatch") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -447,23 +850,176 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task status"})
 		return
 	}
-	if err := h.db.Model(&task).Update("status", req.Status).Error; err != nil {
+
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		previousColumnID := task.KanbanColumnID
+		targetColumn, err := h.getDefaultTaskKanbanColumn(tx, req.Status)
+		if err != nil {
+			return err
+		}
+
+		if previousColumnID == nil || *previousColumnID != targetColumn.ID {
+			position, err := h.nextTaskKanbanPosition(tx, targetColumn.ID)
+			if err != nil {
+				return err
+			}
+			task.KanbanColumnID = &targetColumn.ID
+			task.KanbanPosition = position
+		}
+
+		task.Status = targetColumn.Status
+		if err := tx.Save(&task).Error; err != nil {
+			return err
+		}
+
+		if previousColumnID != nil && *previousColumnID != targetColumn.ID {
+			var previousColumn models.TaskKanbanColumn
+			if err := tx.First(&previousColumn, *previousColumnID).Error; err != nil {
+				return err
+			}
+			previousTasks, err := h.fetchColumnTasks(tx, *previousColumnID)
+			if err != nil {
+				return err
+			}
+			if err := h.resequenceTaskColumn(tx, previousColumn, previousTasks); err != nil {
+				return err
+			}
+		}
+
+		task, err = h.loadTaskWithRelations(tx, id)
+		return err
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Labels").First(&task, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+
 	recordAudit(h.db, c, "update_status", "task", task.ID, task.Title)
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated", "data": task})
+}
+
+func (h *TaskHandler) MoveKanbanTask(c *gin.Context) {
+	id, err := getID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task id"})
+		return
+	}
+
+	var req moveTaskKanbanPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.DestinationColumnID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Destination column is required"})
+		return
+	}
+
+	var task models.Task
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&task, id).Error; err != nil {
+			return err
+		}
+
+		var destinationColumn models.TaskKanbanColumn
+		if err := tx.First(&destinationColumn, req.DestinationColumnID).Error; err != nil {
+			return err
+		}
+
+		var sourceColumn *models.TaskKanbanColumn
+		if task.KanbanColumnID != nil {
+			var existingSource models.TaskKanbanColumn
+			if err := tx.First(&existingSource, *task.KanbanColumnID).Error; err == nil {
+				sourceColumn = &existingSource
+			}
+		}
+		if sourceColumn == nil {
+			sourceColumn, err = h.getDefaultTaskKanbanColumn(tx, task.Status)
+			if err != nil {
+				return err
+			}
+		}
+
+		sourceTasks, err := h.fetchColumnTasks(tx, sourceColumn.ID)
+		if err != nil {
+			return err
+		}
+		sourceTasks, movedTask := removeTaskFromColumn(sourceTasks, task.ID)
+		if movedTask == nil {
+			taskCopy := task
+			movedTask = &taskCopy
+		}
+
+		if sourceColumn.ID == destinationColumn.ID {
+			nextTasks := insertTaskIntoColumn(sourceTasks, req.DestinationIndex, *movedTask)
+			if err := h.resequenceTaskColumn(tx, destinationColumn, nextTasks); err != nil {
+				return err
+			}
+		} else {
+			destinationTasks, err := h.fetchColumnTasks(tx, destinationColumn.ID)
+			if err != nil {
+				return err
+			}
+			destinationTasks, _ = removeTaskFromColumn(destinationTasks, task.ID)
+			nextDestinationTasks := insertTaskIntoColumn(destinationTasks, req.DestinationIndex, *movedTask)
+
+			if err := h.resequenceTaskColumn(tx, *sourceColumn, sourceTasks); err != nil {
+				return err
+			}
+			if err := h.resequenceTaskColumn(tx, destinationColumn, nextDestinationTasks); err != nil {
+				return err
+			}
+		}
+
+		task, err = h.loadTaskWithRelations(tx, id)
+		return err
+	}); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task or column not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	recordAudit(h.db, c, "move", "task", task.ID, task.Title)
+	c.JSON(http.StatusOK, gin.H{"message": "Task moved", "data": task})
 }
 
 func (h *TaskHandler) Delete(c *gin.Context) {
 	id, _ := getID(c)
 	var task models.Task
-	h.db.First(&task, id)
-	h.db.Delete(&models.Task{}, id)
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&task, id).Error; err != nil {
+			return err
+		}
+
+		previousColumnID := task.KanbanColumnID
+		if err := tx.Delete(&models.Task{}, id).Error; err != nil {
+			return err
+		}
+
+		if previousColumnID != nil {
+			var column models.TaskKanbanColumn
+			if err := tx.First(&column, *previousColumnID).Error; err == nil {
+				tasks, err := h.fetchColumnTasks(tx, *previousColumnID)
+				if err != nil {
+					return err
+				}
+				if err := h.resequenceTaskColumn(tx, column, tasks); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	}); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "delete", "task", id, task.Title)
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }

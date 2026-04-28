@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { teamService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
@@ -6,6 +7,7 @@ import { Plus, Megaphone } from 'lucide-react'
 import { PageHeader, Loading, EmptyState, Modal, FormField } from '@/components/common'
 
 export default function AnnouncementsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -21,6 +23,16 @@ export default function AnnouncementsPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (searchParams.get('compose') !== 'new') return
+
+    setShowModal(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('compose')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const handleSave = async () => {
     if (!form.title.trim()) { toast.error('Title is required'); return }

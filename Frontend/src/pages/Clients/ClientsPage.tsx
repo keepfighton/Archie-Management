@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { clientService, teamService, invoiceService, projectService, orderService, labelService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown, Printer, Briefcase, Users, ClipboardCheck, Clock, FolderKanban, CheckCircle2, PauseCircle, XCircle } from 'lucide-react'
@@ -24,6 +24,7 @@ const EMPTY_FORM = {
 type Tab = 'overview' | 'clients' | 'contacts'
 
 export default function ClientsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState<Tab>('overview')
 
   // Overview state
@@ -179,6 +180,19 @@ export default function ClientsPage() {
   const openAdd = () => {
     setEditItem(null); setForm(EMPTY_FORM); setShowModal(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('compose') !== 'new') return
+
+    setTab('clients')
+    setEditItem(null)
+    setForm(EMPTY_FORM)
+    setShowModal(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('compose')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
   const openEdit = (c: any) => {
     setEditItem(c)
     setForm({

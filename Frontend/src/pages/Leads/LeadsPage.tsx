@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { leadService } from '@/services/api'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { isValidEmail } from '@/utils/format'
@@ -24,6 +24,7 @@ const PIPELINE_COLORS: Record<string, string> = {
 
 export default function LeadsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [view, setView] = useState('list')
   const [leads, setLeads] = useState<any[]>([])
   const [allLeads, setAllLeads] = useState<any[]>([])
@@ -63,6 +64,18 @@ export default function LeadsPage() {
     setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '' })
     setShowModal(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('compose') !== 'new') return
+
+    setEditItem(null)
+    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '' })
+    setShowModal(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('compose')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const openEdit = (l: any) => {
     setEditItem(l)

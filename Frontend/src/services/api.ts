@@ -82,11 +82,16 @@ export const projectService = {
 // ─── Tasks ───────────────────────────────────────────
 export const taskService = {
   list: (params?: any) => api.get('/tasks', { params }),
+  listKanbanColumns: () => api.get('/tasks/columns'),
+  createKanbanColumn: (data: any) => api.post('/tasks/columns', data),
+  updateKanbanColumn: (id: number, data: any) => api.put(`/tasks/columns/${id}`, data),
   get: (id: number) => api.get(`/tasks/${id}`),
   create: (data: any) => api.post('/tasks', data),
   update: (id: number, data: any) => api.put(`/tasks/${id}`, data),
   updateStatus: (id: number, status: string) =>
     api.patch(`/tasks/${id}/status`, { status }),
+  moveKanbanTask: (id: number, data: { destination_column_id: number; destination_index: number }) =>
+    api.patch(`/tasks/${id}/kanban`, data),
   delete: (id: number) => api.delete(`/tasks/${id}`),
 }
 

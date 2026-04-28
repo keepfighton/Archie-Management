@@ -39,11 +39,12 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&models.User{},
 		&models.Client{},
 		&models.Contact{},
 		&models.Project{},
+		&models.TaskKanbanColumn{},
 		&models.Task{},
 		&models.Lead{},
 		&models.Invoice{},
@@ -64,5 +65,66 @@ func Migrate(db *gorm.DB) error {
 		&models.AuditLog{},
 		&models.AppRole{},
 		&models.RolePermission{},
-	)
+	); err != nil {
+		return err
+	}
+
+	return seedTaskKanbanColumns(db)
+}
+
+func seedTaskKanbanColumns(db *gorm.DB) error {
+	defaultColumns := []models.TaskKanbanColumn{
+		{Title: "To Do", Status: "todo", Position: 1},
+		{Title: "In Progress", Status: "in_progress", Position: 2},
+		{Title: "Done", Status: "done", Position: 3},
+		{Title: "Expired", Status: "expired", Position: 4},
+	}
+
+	for _, column := range defaultColumns {
+		var existing models.TaskKanbanColumn
+		err := db.Where("status = ?", column.Status).Order("position asc, id asc").First(&existing).Error
+		if err == nil {
+			continue
+		}
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+		if err := db.Create(&column).Error; err != nil {
+			return err
+		}
+	}
+
+	for _, status := range []string{"todo", "in_progress", "done", "expired"} {
+		var column models.TaskKanbanColumn
+		if err := db.Where("status = ?", status).Order("position asc, id asc").First(&column).Error; err != nil {
+			return err
+		}
+
+		var maxPosition int
+		db.Model(&models.Task{}).
+			Where("kanban_column_id = ?", column.ID).
+			Select("COALESCE(MAX(kanban_position), 0)").
+			Scan(&maxPosition)
+
+		var tasks []models.Task
+		if err := db.
+			Where("status = ? AND kanban_column_id IS NULL", status).
+			Order("updated_at asc, id asc").
+			Find(&tasks).Error; err != nil {
+			return err
+		}
+
+		for index, task := range tasks {
+			if err := db.Model(&models.Task{}).
+				Where("id = ?", task.ID).
+				Updates(map[string]interface{}{
+					"kanban_column_id": column.ID,
+					"kanban_position":  maxPosition + index + 1,
+				}).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

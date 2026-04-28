@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { projectService, clientService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
@@ -11,6 +11,7 @@ import {
 } from '@/components/common'
 
 export default function ProjectsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [projects, setProjects] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [total, setTotal] = useState(0)
@@ -42,6 +43,18 @@ export default function ProjectsPage() {
     setForm({ title: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
     setShowModal(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('compose') !== 'new') return
+
+    setEditItem(null)
+    setForm({ title: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
+    setShowModal(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('compose')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const openEdit = (p: any) => {
     setEditItem(p)

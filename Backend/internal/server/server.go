@@ -97,10 +97,14 @@ func (s *Server) setupRoutes() {
 		tasks := protected.Group("/tasks")
 		{
 			tasks.GET("", taskH.List)
+			tasks.GET("/columns", taskH.ListColumns)
+			tasks.POST("/columns", taskH.CreateColumn)
+			tasks.PUT("/columns/:id", taskH.UpdateColumn)
 			tasks.POST("", taskH.Create)
 			tasks.GET("/:id", taskH.Get)
 			tasks.PUT("/:id", taskH.Update)
 			tasks.PATCH("/:id/status", taskH.UpdateStatus)
+			tasks.PATCH("/:id/kanban", taskH.MoveKanbanTask)
 			tasks.DELETE("/:id", taskH.Delete)
 		}
 

@@ -76,7 +76,7 @@ export default function QuotationsPage() {
     if (q) params.q = q
     quotationService
       .list(params)
-      .then((r) => {
+      .then((r: any) => {
         setQuotations(r.data.data || [])
         setTotal(r.data.total || 0)
       })

@@ -62,6 +62,8 @@ func Migrate(db *gorm.DB) error {
 		&models.File{},
 		&models.Todo{},
 		&models.Label{},
+		&models.Quotation{},
+		&models.QuotationItem{},
 		&models.AuditLog{},
 		&models.AppRole{},
 		&models.RolePermission{},

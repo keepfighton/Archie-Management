@@ -281,3 +281,44 @@ export const labelService = {
   create: (data: any) => api.post('/labels', data),
   delete: (id: number) => api.delete(`/labels/${id}`),
 }
+
+// ─── Quotations ──────────────────────────────────────
+export const quotationService = {
+  list: (params?: any) => api.get('/quotations', { params }),
+  get: (id: number) => api.get(`/quotations/${id}`),
+  create: (data: any) => api.post('/quotations', data),
+  update: (id: number, data: any) => api.put(`/quotations/${id}`, data),
+  delete: (id: number) => api.delete(`/quotations/${id}`),
+  addItem: (id: number, data: any) => api.post(`/quotations/${id}/items`, data),
+  updateItem: (id: number, itemId: number, data: any) => api.put(`/quotations/${id}/items/${itemId}`, data),
+  deleteItem: (id: number, itemId: number) => api.delete(`/quotations/${id}/items/${itemId}`),
+  convertToInvoice: (id: number) => api.post(`/quotations/${id}/convert-to-invoice`),
+  convertToOrder: (id: number) => api.post(`/quotations/${id}/convert-to-order`),
+  convertToContract: (id: number) => api.post(`/quotations/${id}/convert-to-contract`),
+}
+
+// ─── Quotation PDF ───────────────────────────────────
+export const quotationPrintService = {
+  openPDF: (id: number) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+    fetch(`${baseURL}/quotations/${id}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (res) => {
+      const html = await res.text()
+      const win = window.open('', '_blank')
+      if (win) { win.document.write(html); win.document.close() }
+    })
+  },
+  openPrint: (id: number) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+    return fetch(`${baseURL}/quotations/${id}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (res) => {
+      const html = await res.text()
+      const win = window.open('', '_blank')
+      if (win) { win.document.write(html); win.document.close() }
+    })
+  },
+}

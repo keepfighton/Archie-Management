@@ -40,6 +40,15 @@ func getID(c *gin.Context) (uint, error) {
 	return uint(id), err
 }
 
+func mustGetID(c *gin.Context) (uint, bool) {
+	id, err := getID(c)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid id"})
+		return 0, false
+	}
+	return id, true
+}
+
 func getUserID(c *gin.Context) uint {
 	id, _ := c.Get("user_id")
 	return id.(uint)

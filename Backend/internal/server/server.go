@@ -157,6 +157,24 @@ func (s *Server) setupRoutes() {
 			contracts.DELETE("/:id", contractH.Delete)
 		}
 
+		// Quotations
+		quotationH := handlers.NewQuotationHandler(s.db)
+		quotations := protected.Group("/quotations")
+		{
+			quotations.GET("", quotationH.List)
+			quotations.POST("", quotationH.Create)
+			quotations.GET("/:id", quotationH.Get)
+			quotations.PUT("/:id", quotationH.Update)
+			quotations.DELETE("/:id", quotationH.Delete)
+			quotations.GET("/:id/pdf", quotationH.Print)
+			quotations.POST("/:id/items", quotationH.AddItem)
+			quotations.PUT("/:id/items/:itemId", quotationH.UpdateItem)
+			quotations.DELETE("/:id/items/:itemId", quotationH.DeleteItem)
+			quotations.POST("/:id/convert-to-invoice", quotationH.ConvertToInvoice)
+			quotations.POST("/:id/convert-to-order", quotationH.ConvertToOrder)
+			quotations.POST("/:id/convert-to-contract", quotationH.ConvertToContract)
+		}
+
 		// Items
 		itemH := handlers.NewItemHandler(s.db)
 		items := protected.Group("/items")

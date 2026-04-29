@@ -443,9 +443,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5 p-5 md:p-6">
-      <section className={clsx('grid gap-4', showAttendanceCard ? 'xl:grid-cols-[1.55fr_0.95fr]' : 'xl:grid-cols-1')}>
+      <section className={clsx('grid gap-4', showAttendanceCard ? 'lg:grid-cols-[2fr_1fr]' : 'lg:grid-cols-1')}>
         <div className="overflow-hidden rounded-[22px] bg-gradient-to-br from-primary via-primary to-[#236fa0] text-white shadow-[0_24px_70px_rgba(20,64,94,0.28)]">
-          <div className="flex h-full flex-col justify-between gap-6 p-6 md:p-7">
+          <div className="flex h-full flex-col justify-between gap-6 p-5 md:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="max-w-2xl">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">{t('dashboard.dailyOverview', 'Daily overview')}</p>
@@ -505,55 +505,50 @@ export default function DashboardPage() {
 
         {showAttendanceCard ? (
           <div className="card border-primary/10 bg-white">
-            <div className="card-header border-b-primary/10">
+            <div className="card-header border-b-primary/10 py-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/55">{t('dashboard.attendance', 'Attendance')}</p>
-                <h3 className="mt-1 text-sm font-semibold text-gray-900">{t('dashboard.todayStatus', 'Today status')}</h3>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/55">{t('dashboard.attendance', 'Attendance')}</p>
+                <h3 className="mt-0.5 text-xs font-semibold text-gray-900">{t('dashboard.todayStatus', 'Today status')}</h3>
               </div>
               <div className={clsx(
-                'rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
                 user?.clocked_in ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
               )}>
                 {user?.clocked_in ? 'Clocked In' : 'Clocked Out'}
               </div>
             </div>
-            <div className="card-body space-y-4">
-              <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="card-body space-y-2 py-3">
+              <div className="rounded-xl bg-slate-50 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500">Your session</p>
-                    <div className="mt-1 text-xl font-semibold text-gray-900">
+                    <div className="mt-0.5 text-sm font-semibold text-gray-900">
                       {user?.clocked_in ? 'Active now' : 'Not started'}
                     </div>
                   </div>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
-                    <Clock size={18} />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-primary shadow-sm">
+                    <Clock size={16} />
                   </div>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-gray-500">
-                  {user?.clocked_in
-                    ? 'Anda sedang tercatat aktif. Gunakan tombol clock out setelah pekerjaan selesai.'
-                    : 'Mulai hari kerja dari sini agar timesheet dan kehadiran tim tetap sinkron.'}
-                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-gray-200 bg-white p-2">
                   <p className="text-xs text-gray-500">Clocked in</p>
-                  <div className="mt-1 text-lg font-semibold text-primary">{stats.clocked_in_count ?? 0}</div>
+                  <div className="mt-0.5 text-base font-semibold text-primary">{stats.clocked_in_count ?? 0}</div>
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="rounded-lg border border-gray-200 bg-white p-2">
                   <p className="text-xs text-gray-500">Clocked out</p>
-                  <div className="mt-1 text-lg font-semibold text-gray-800">{clockedOut}</div>
+                  <div className="mt-0.5 text-base font-semibold text-gray-800">{clockedOut}</div>
                 </div>
               </div>
 
               <Link
                 to={timecardsRoute}
-                className="inline-flex items-center gap-2 text-xs font-medium text-primary transition hover:text-primary/80"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary transition hover:text-primary/80"
               >
                 Open time cards
-                <ArrowRight size={13} />
+                <ArrowRight size={12} />
               </Link>
             </div>
           </div>

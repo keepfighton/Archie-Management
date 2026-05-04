@@ -174,7 +174,7 @@ export default function LoginPage() {
 
         {/* Copyright — bottom fixed */}
         <div className="px-6 pb-8 sm:px-10 lg:px-16">
-          <p className="text-[11px] text-gray-300">© 2026 PUSINTEK. All rights reserved.</p>
+          <p className="text-[11px] text-gray-300">© 2026 PUSTEKINFO. All rights reserved.</p>
         </div>
 
       </div>

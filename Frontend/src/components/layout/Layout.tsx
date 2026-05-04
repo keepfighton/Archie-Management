@@ -1022,7 +1022,7 @@ export default function Layout() {
                 aria-haspopup="menu"
               >
                 <div className="flex h-9 items-center rounded-lg bg-white px-1">
-                  <img src={pusintekLogoUrl} alt="PUSINTEK" className="h-9 w-auto object-contain" />
+                  <img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-9 w-auto object-contain" />
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="max-w-[160px] truncate text-sm font-semibold text-gray-700">{user?.name}</p>

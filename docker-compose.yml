@@ -52,10 +52,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.nexone-api.rule=Host(`nexone.nexoratech.co`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.nexone-api.entrypoints=websecure"
-      - "traefik.http.routers.nexone-api.tls.certresolver=myresolver"
-      - "traefik.http.services.nexone-api.loadbalancer.server.port=8080"
+      - "traefik.http.routers.sambernyawa-api.rule=Host(`sambernyawa.nexoratech.co`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.sambernyawa-api.entrypoints=websecure"
+      - "traefik.http.routers.sambernyawa-api.tls.certresolver=myresolver"
+      - "traefik.http.services.sambernyawa-api.loadbalancer.server.port=8080"
 
   # ─── Frontend ────────────────────────────────────────
   frontend:
@@ -76,10 +76,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.nexone.rule=Host(`nexone.nexoratech.co`)"
-      - "traefik.http.routers.nexone.entrypoints=websecure"
-      - "traefik.http.routers.nexone.tls.certresolver=myresolver"
-      - "traefik.http.services.nexone.loadbalancer.server.port=80"
+      - "traefik.http.routers.sambernyawa.rule=Host(`sambernyawa.nexoratech.co`)"
+      - "traefik.http.routers.sambernyawa.entrypoints=websecure"
+      - "traefik.http.routers.sambernyawa.tls.certresolver=myresolver"
+      - "traefik.http.services.sambernyawa.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:

@@ -5,39 +5,31 @@ on:
     branches:
       - main
 
+concurrency:
+  group: nexone-production-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          command_timeout: 20m
           script: |
             set -e
-
-            echo "🚀 Masuk ke folder app"
-            cd ${{ secrets.APP_PATH }}
-
-            echo "📥 Pull latest code"
-            git pull origin main
-
-            echo "🔧 Build & start container"
-            docker compose up -d --build --remove-orphans
-
-            echo "⏳ Tunggu container ready"
-            sleep 15
-
-            echo "🔍 Cek container backend"
-            docker ps | grep nexone-backend || (echo "Backend tidak jalan!" && exit 1)
-
-            echo "🌱 Seed initial data jika database kosong"
-            USER_COUNT=$(docker exec nexone-postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT COUNT(*) FROM users;"')
-            if [ "$USER_COUNT" = "0" ]; then
-              docker exec nexone-backend ./seed
-            fi
-
-            echo "✅ Deploy selesai"
+            cd ~/nexora-node/apps/nexone
+            git branch -D deploy-tmp >/dev/null 2>&1 || true
+            git fetch origin main:deploy-tmp
+            git checkout main
+            git reset --hard deploy-tmp
+            git branch -D deploy-tmp
+            docker compose up -d --build frontend backend
+            docker ps --format '{{.Names}}' | grep '^nexone-backend$'
+            docker ps --format '{{.Names}}' | grep '^nexone-frontend$'

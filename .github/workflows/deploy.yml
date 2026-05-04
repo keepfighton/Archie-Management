@@ -1,43 +1,43 @@
-name: Deploy NEXONE
+name: Deploy PUSINTEK-NEXONE (sambernyawa)
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pusintek-nexone
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
           script: |
             set -e
+            cd ~/nexora-node/apps/pusintek-nexone
 
-            echo "🚀 Masuk ke folder app"
-            cd ${{ secrets.APP_PATH }}
-
-            echo "📥 Pull latest code"
+            echo "==> Pull latest code"
             git pull origin main
 
-            echo "🔧 Build & start container"
-            docker compose up -d --build --remove-orphans
+            echo "==> Re-protect docker-compose.yml (VPS-specific routing)"
+            git update-index --skip-worktree docker-compose.yml
 
-            echo "⏳ Tunggu container ready"
-            sleep 15
+            echo "==> Build & start containers"
+            docker compose up -d --build --no-deps frontend backend
 
-            echo "🔍 Cek container backend"
-            docker ps | grep nexone-backend || (echo "Backend tidak jalan!" && exit 1)
+            echo "==> Wait for containers"
+            sleep 10
 
-            echo "🌱 Seed initial data jika database kosong"
-            USER_COUNT=$(docker exec nexone-postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT COUNT(*) FROM users;"')
-            if [ "$USER_COUNT" = "0" ]; then
-              docker exec nexone-backend ./seed
-            fi
+            echo "==> Health check"
+            curl -sf https://sambernyawa.nexoratech.co > /dev/null && echo "OK sambernyawa.nexoratech.co" || (echo "FAILED" && exit 1)
 
-            echo "✅ Deploy selesai"
+            echo "==> Deploy complete"
+

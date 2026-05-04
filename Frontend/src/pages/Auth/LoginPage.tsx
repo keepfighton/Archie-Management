@@ -6,7 +6,7 @@ import { RootState, AppDispatch } from '@/store'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 import frameKananUrl from '../../../logo/FrameKanan.png'
-import pusintekLogoUrl from "../../../logo/Logo_Pusintek.jpeg"
+import nexoraPartUrl from '../../../logo/Logo_Nexora_Part.png'
 
 export default function LoginPage() {
   const dispatch  = useDispatch<AppDispatch>()
@@ -33,31 +33,13 @@ export default function LoginPage() {
       {/* ── Left panel ─────────────────────────────── */}
       <div className="relative flex min-h-screen w-full flex-col bg-white lg:w-[30%]">
 
-        {/* ── Mobile hero header (hidden on lg) ─────── */}
-        <div className="lg:hidden relative overflow-hidden bg-gradient-to-br from-[#0d2d5a] via-[#0e4272] to-[#0a7a8f] px-8 pt-14 pb-20 flex flex-col items-center">
-          {/* decorative blobs */}
-          <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full bg-white/5" />
-          <div className="absolute top-6 -left-8 w-32 h-32 rounded-full bg-white/5" />
-          <div className="absolute bottom-6 right-10 w-20 h-20 rounded-full bg-teal-400/20" />
-          <div className="absolute bottom-0 left-0 w-full h-12 bg-white rounded-t-[2rem]" />
-          <img src={pusintekLogoUrl} alt="PUSTEKINFO"
-            className="relative z-10 h-28 w-auto object-contain rounded-2xl"
-            style={{ filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.35))' }} />
-          <p className="relative z-10 mt-4 text-white/75 text-sm text-center font-medium tracking-wide">
-            Sistem Manajemen Terintegrasi
-          </p>
-          <p className="relative z-10 mt-1 text-white/50 text-xs text-center">
-            Sekretariat Jenderal DPR RI
-          </p>
+        {/* Logo Nexora Part — center top, overlapping */}
+        <div className="z-20 flex items-center justify-center px-6 pt-8 lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2 lg:px-0 lg:pt-0">
+          <img src={nexoraPartUrl} alt="Nexora" className="h-28 w-auto object-contain sm:h-36 lg:h-[288px]" />
         </div>
 
-        {/* ── Desktop logo (hidden on mobile) ──────── */}
-        <div className="hidden lg:flex z-20 items-center justify-center px-10 pt-8">
-          <img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-32 w-auto object-contain" />
-        </div>
-
-        {/* Form — rounded top on mobile, normal on desktop */}
-        <div className="flex flex-1 flex-col justify-center px-6 pb-10 pt-8 sm:px-10 lg:px-16 lg:py-12 bg-white relative z-10 -mt-6 rounded-t-3xl lg:mt-0 lg:rounded-none">
+        {/* Form — vertically centered */}
+        <div className="flex flex-1 flex-col justify-center px-6 pb-10 pt-6 sm:px-10 lg:px-16 lg:py-12">
           <div className="w-full max-w-[420px]">
 
             {/* Heading */}
@@ -174,7 +156,7 @@ export default function LoginPage() {
 
         {/* Copyright — bottom fixed */}
         <div className="px-6 pb-8 sm:px-10 lg:px-16">
-          <p className="text-[11px] text-gray-300">© 2026 PUSINTEK. All rights reserved.</p>
+          <p className="text-[11px] text-gray-300">© 2026 NEXORA. All rights reserved.</p>
         </div>
 
       </div>

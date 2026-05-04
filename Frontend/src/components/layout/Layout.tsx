@@ -7,7 +7,7 @@ import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import { auditService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
 import { useLocale } from '@/contexts/LocaleContext'
-import pusintekLogoUrl from "../../../logo/Logo_Pusintek.jpeg"
+import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
   TrendingUp, Menu, Search,
@@ -62,8 +62,8 @@ type LocaleOption = {
   fallbackDescription: string
 }
 
-const RECENT_VISITS_KEY = 'pusintek-nexone.recent-visits'
-const ANNOUNCEMENTS_SEEN_KEY = 'pusintek-nexone.announcements.last-seen'
+const RECENT_VISITS_KEY = 'nexone.recent-visits'
+const ANNOUNCEMENTS_SEEN_KEY = 'nexone.announcements.last-seen'
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'task', label: 'New task', description: 'Create and assign a task', to: '/tasks', menu: 'tasks', icon: CheckSquare },
@@ -634,7 +634,14 @@ export default function Layout() {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-5">
-          <button onClick={() => navigate('/dashboard')} className="flex items-center"><div className="flex items-center gap-2 rounded-xl bg-white px-3 py-1.5"><img src={pusintekLogoUrl} alt="PUSTEKINFO" className="h-8 w-auto object-contain" /></div></button>
+          <button onClick={() => navigate('/dashboard')} className="flex flex-col items-start gap-0.5">
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-yellow-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+              nexora
+            </span>
+            <span className="text-[10px] font-medium tracking-wide text-white/40">
+              {t('layout.partOfGroup', 'Part of CBQA Global Group')}
+            </span>
+          </button>
           <button
             onClick={() => dispatch(setSidebar(false))}
             className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
@@ -1022,7 +1029,7 @@ export default function Layout() {
                 aria-haspopup="menu"
               >
                 <div className="flex h-9 items-center rounded-lg bg-white px-1">
-                  <img src={pusintekLogoUrl} alt="PUSINTEK" className="h-9 w-auto object-contain" />
+                  <img src={nexoraLogoUrl} alt="Nexora" className="h-7 w-auto object-contain" />
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="max-w-[160px] truncate text-sm font-semibold text-gray-700">{user?.name}</p>

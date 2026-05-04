@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { authService } from '@/services/api'
-import pusintekLogoUrl from '../../../logo/Logo_Pusintek.jpeg'
+import nexoneLogoUrl from '../../../logo/Logo_Nexone.png'
 
 import { KeyRound, CheckCircle, Eye, EyeOff } from 'lucide-react'
 
@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
       <div className="w-full lg:w-[40%] xl:w-[38%] flex flex-col justify-center">
         <div className="w-full px-10 xl:px-16 py-12">
           <div className="mb-10">
-            <img src={pusintekLogoUrl} alt="PUSINTEK" className="h-24 w-auto object-contain" />
+            <img src={nexoneLogoUrl} alt="NEXONE by NEXORA" className="h-[280px] w-auto object-contain" />
           </div>
 
           <div className="flex justify-center mb-5">

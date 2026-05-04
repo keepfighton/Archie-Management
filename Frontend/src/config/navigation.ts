@@ -60,9 +60,9 @@ export const navGroups: NavGroupDef[] = [
     items: [
       { id: 'clients', to: '/clients', icon: Users, label: 'Clients', menu: 'clients' },
       { id: 'leads', to: '/leads', icon: TrendingUp, label: 'Leads', menu: 'leads' },
-      { id: 'sales-orders', to: '/sales/orders', icon: ShoppingCart, label: 'Orders', menu: 'sales.orders', legacyMenus: ['sales'] },
-      { id: 'sales-contracts', to: '/sales/contracts', icon: FileCheck, label: 'Contracts', menu: 'sales.contracts', legacyMenus: ['sales'] },
       { id: 'sales-quotations', to: '/sales/quotations', icon: FileText, label: 'Quotations', menu: 'sales.quotations', legacyMenus: ['sales'] },
+      { id: 'sales-contracts', to: '/sales/contracts', icon: FileCheck, label: 'Contracts', menu: 'sales.contracts', legacyMenus: ['sales'] },
+      { id: 'sales-orders', to: '/sales/orders', icon: ShoppingCart, label: 'Orders', menu: 'sales.orders', legacyMenus: ['sales'] },
       { id: 'sales-store', to: '/sales/store', icon: ShoppingBag, label: 'Store', menu: 'sales.store', legacyMenus: ['sales'] },
       { id: 'sales-items', to: '/sales/items', icon: Package, label: 'Items', menu: 'sales.items', legacyMenus: ['sales'] },
     ],

@@ -407,6 +407,17 @@ func (h *ProjectHandler) GetTimeline(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": tasks})
 }
 
+func (h *ProjectHandler) PatchStatus(c *gin.Context) {
+	id, _ := getID(c)
+	var req struct {
+		Status string `json:"status"`
+	}
+	c.ShouldBindJSON(&req)
+	h.db.Model(&models.Project{}).Where("id = ?", id).Update("status", req.Status)
+	recordAudit(h.db, c, "update", "project", id, "status→"+req.Status)
+	c.JSON(http.StatusOK, gin.H{"message": "Status updated"})
+}
+
 // ─── TASK ────────────────────────────────────────────
 
 type TaskHandler struct{ db *gorm.DB }

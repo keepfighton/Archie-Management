@@ -71,6 +71,13 @@ func Migrate(db *gorm.DB) error {
 		return err
 	}
 
+	// Sync all table sequences to prevent ID gaps
+	tables := []string{"projects", "tasks", "clients", "leads", "invoices", "team_members", "leave_requests"}
+	for _, table := range tables {
+		s := fmt.Sprintf(`DO $$ BEGIN PERFORM setval(pg_get_serial_sequence('%s', 'id'), COALESCE((SELECT MAX(id) FROM %s), 0) + 1, false); END $$;`, table, table)
+		db.Exec(s)
+	}
+
 	return seedTaskKanbanColumns(db)
 }
 

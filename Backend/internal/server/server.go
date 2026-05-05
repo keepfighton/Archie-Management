@@ -90,6 +90,7 @@ func (s *Server) setupRoutes() {
 			projects.DELETE("/:id", projectH.Delete)
 			projects.GET("/:id/tasks", projectH.GetTasks)
 			projects.GET("/:id/timeline", projectH.GetTimeline)
+			projects.PATCH("/:id/status", projectH.PatchStatus)
 		}
 
 		// Tasks

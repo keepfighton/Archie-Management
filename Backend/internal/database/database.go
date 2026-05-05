@@ -78,6 +78,18 @@ func Migrate(db *gorm.DB) error {
 		db.Exec(s)
 	}
 
+	// Recalculate progress for all projects based on their tasks
+	db.Exec(`
+		UPDATE projects p
+		SET progress = COALESCE((
+			SELECT CASE WHEN COUNT(*) = 0 THEN 0
+			            ELSE ROUND(COUNT(*) FILTER (WHERE status = 'done') * 100.0 / COUNT(*))
+			       END
+			FROM tasks t
+			WHERE t.project_id = p.id AND t.deleted_at IS NULL
+		), 0)
+	`)
+
 	return seedTaskKanbanColumns(db)
 }
 

@@ -75,6 +75,7 @@ export const projectService = {
   create: (data: any) => api.post('/projects', data),
   update: (id: number, data: any) => api.put(`/projects/${id}`, data),
   delete: (id: number) => api.delete(`/projects/${id}`),
+  patchStatus: (id: number, status: string) => api.patch(`/projects/${id}/status`, { status }),
   getTasks: (id: number) => api.get(`/projects/${id}/tasks`),
   getTimeline: (id: number) => api.get(`/projects/${id}/timeline`),
 }

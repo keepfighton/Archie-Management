@@ -157,7 +157,22 @@ export default function ProjectsPage() {
                         {p.deadline ? new Date(p.deadline).toLocaleDateString('id') : '-'}
                       </td>
                       <td><ProgressBar value={p.progress} className="w-20" /></td>
-                      <td><StatusBadge status={p.status} /></td>
+                      <td>
+                        <select
+                          value={p.status}
+                          onChange={async (e) => {
+                            await projectService.patchStatus(p.id, e.target.value);
+                            fetch();
+                          }}
+                          className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="open">Open</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="hold">On Hold</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </td>
                       <td>
                         <div className="flex gap-1">
                           <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={() => openEdit(p)}>Edit</button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { leadService } from '@/services/api'
+import { leadService, clientService } from '@/services/api'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { isValidEmail } from '@/utils/format'
 import { toast } from 'react-toastify'
@@ -42,6 +42,14 @@ export default function LeadsPage() {
     name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '',
   })
 
+  // Client combobox state
+  const [clients, setClients] = useState<any[]>([])
+  const [clientSearch, setClientSearch] = useState('')
+  const [showClientDrop, setShowClientDrop] = useState(false)
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
+  const [clientContacts, setClientContacts] = useState<any[]>([])
+  const [contactIsCustom, setContactIsCustom] = useState(false)
+
   const load = () => {
     setLoading(true)
     const params: any = { page, limit: 10, q: search }
@@ -58,10 +66,19 @@ export default function LeadsPage() {
 
   useEffect(() => { load() }, [page, search, statusFilter])
   useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    clientService.list({ limit: 500 })
+      .then(r => setClients(r.data.data || []))
+      .catch(() => {})
+  }, [])
 
   const openAdd = () => {
     setEditItem(null)
     setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '' })
+    setClientSearch('')
+    setSelectedClientId(null)
+    setClientContacts([])
+    setContactIsCustom(false)
     setShowModal(true)
   }
 
@@ -70,6 +87,10 @@ export default function LeadsPage() {
 
     setEditItem(null)
     setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '' })
+    setClientSearch('')
+    setSelectedClientId(null)
+    setClientContacts([])
+    setContactIsCustom(false)
     setShowModal(true)
 
     const nextParams = new URLSearchParams(searchParams)
@@ -80,6 +101,10 @@ export default function LeadsPage() {
   const openEdit = (l: any) => {
     setEditItem(l)
     setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, notes: l.notes || '' })
+    setClientSearch(l.name)
+    setSelectedClientId(null)
+    setClientContacts([])
+    setContactIsCustom(false)
     setShowModal(true)
   }
 
@@ -269,11 +294,80 @@ export default function LeadsPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <FormField label="Name" required>
-              <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Company / lead name" />
+              <div className="relative">
+                <input
+                  className="input"
+                  value={clientSearch}
+                  onChange={e => {
+                    setClientSearch(e.target.value)
+                    setForm({ ...form, name: e.target.value })
+                    setShowClientDrop(true)
+                  }}
+                  onFocus={() => setShowClientDrop(true)}
+                  onBlur={() => setTimeout(() => setShowClientDrop(false), 150)}
+                  placeholder="Company / lead name"
+                />
+                {showClientDrop && clientSearch.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1">
+                    {clients
+                      .filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()))
+                      .slice(0, 8)
+                      .map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2 border-b border-gray-100 last:border-0"
+                          onMouseDown={() => {
+                            setClientSearch(c.name)
+                            setForm((f: any) => ({
+                              ...f,
+                              name: c.name,
+                              email: f.email || c.email || '',
+                              phone: f.phone || c.phone || '',
+                            }))
+                            setSelectedClientId(c.id)
+                            setShowClientDrop(false)
+                            clientService.getContacts(c.id)
+                              .then(r => {
+                                setClientContacts(r.data.data || [])
+                                setContactIsCustom(false)
+                              })
+                              .catch(() => setClientContacts([]))
+                          }}
+                        >
+                          <span className="font-medium">{c.name}</span>
+                          {c.email && <span className="text-xs text-gray-400">{c.email}</span>}
+                        </button>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
             </FormField>
           </div>
           <FormField label="Primary Contact">
-            <input className="input" value={form.primary_contact} onChange={e => setForm({ ...form, primary_contact: e.target.value })} placeholder="Contact person" />
+            {clientContacts.length > 0 && !contactIsCustom ? (
+              <select
+                className="input"
+                value={form.primary_contact}
+                onChange={e => {
+                  if (e.target.value === '__other__') {
+                    setContactIsCustom(true)
+                    setForm({ ...form, primary_contact: '' })
+                  } else {
+                    setForm({ ...form, primary_contact: e.target.value })
+                  }
+                }}
+              >
+                <option value="">— Select contact —</option>
+                {clientContacts.map(ct => (
+                  <option key={ct.id} value={ct.name}>{ct.name}{ct.position ? ` (${ct.position})` : ''}</option>
+                ))}
+                <option value="__other__">Other...</option>
+              </select>
+            ) : (
+              <input className="input" value={form.primary_contact} onChange={e => setForm({ ...form, primary_contact: e.target.value })} placeholder="Contact person" />
+            )}
           </FormField>
           <FormField label="Source">
             <input className="input" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} placeholder="Website, referral..." />

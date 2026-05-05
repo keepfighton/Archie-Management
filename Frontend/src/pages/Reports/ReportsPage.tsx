@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { reportService, invoiceService, paymentService, expenseService, teamService, taskService, projectService, clientService } from '@/services/api'
 import { FileDown } from 'lucide-react'
 import { toast } from 'react-toastify'
@@ -66,6 +67,7 @@ function SubTabs({ tabs, active, onChange }: { tabs: { key: string; label: strin
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate()
   const [view, setView] = useState('sales')
   const [salesView, setSalesView] = useState('summary')
   const [financeView, setFinanceView] = useState('income_vs_expenses')
@@ -776,7 +778,7 @@ export default function ReportsPage() {
                                     <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                                       {c.name.charAt(0).toUpperCase()}
                                     </div>
-                                    <span className="text-sm font-medium text-blue-600 hover:underline cursor-pointer">{c.name}</span>
+                                    <span className="text-sm font-medium text-blue-600 hover:underline cursor-pointer" onClick={() => navigate('/clients/' + c.id)}>{c.name}</span>
                                   </div>
                                 </td>
                                 <td className="text-center font-semibold text-blue-600">{c.open_projects}</td>

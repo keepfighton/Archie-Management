@@ -67,6 +67,31 @@ func paginate(q PaginationQuery) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+// recalcProjectProgress recalculates and stores project.progress based on done tasks ratio.
+func recalcProjectProgress(db *gorm.DB, projectID uint) {
+	if projectID == 0 {
+		return
+	}
+	var total, done int64
+	db.Model(&models.Task{}).Where("project_id = ? AND deleted_at IS NULL", projectID).Count(&total)
+	db.Model(&models.Task{}).Where("project_id = ? AND status = 'done' AND deleted_at IS NULL", projectID).Count(&done)
+	var progress int
+	if total > 0 {
+		progress = int(done * 100 / total)
+	}
+	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
+}
+
+// resetSequenceIfEmpty resets the PostgreSQL id sequence to 1 when the table is empty,
+// so the first record after a full delete gets ID 1.
+func resetSequenceIfEmpty(db *gorm.DB, tableName string) {
+	var count int64
+	db.Table(tableName).Where("deleted_at IS NULL").Count(&count)
+	if count == 0 {
+		db.Exec(fmt.Sprintf("SELECT setval(pg_get_serial_sequence('%s', 'id'), 1, false)", tableName))
+	}
+}
+
 // ─── DASHBOARD ───────────────────────────────────────
 
 type DashboardHandler struct{ db *gorm.DB }
@@ -185,6 +210,7 @@ func (h *ClientHandler) List(c *gin.Context) {
 }
 
 func (h *ClientHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "clients")
 	var client models.Client
 	if err := c.ShouldBindJSON(&client); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -311,6 +337,7 @@ func (h *ProjectHandler) List(c *gin.Context) {
 }
 
 func (h *ProjectHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "projects")
 	var project models.Project
 	if err := c.ShouldBindJSON(&project); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -825,6 +852,7 @@ func (h *TaskHandler) List(c *gin.Context) {
 }
 
 func (h *TaskHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "tasks")
 	var req taskPayload
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -891,6 +919,9 @@ func (h *TaskHandler) Create(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "create", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusCreated, task)
 }
 
@@ -997,6 +1028,9 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "update", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, task)
 }
 
@@ -1068,6 +1102,9 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	recordAudit(h.db, c, "update_status", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated", "data": task})
 }
 
@@ -1156,6 +1193,9 @@ func (h *TaskHandler) MoveKanbanTask(c *gin.Context) {
 	}
 
 	recordAudit(h.db, c, "move", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Task moved", "data": task})
 }
 
@@ -1195,6 +1235,9 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "delete", "task", id, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
@@ -1222,6 +1265,7 @@ func (h *LeadHandler) List(c *gin.Context) {
 }
 
 func (h *LeadHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "leads")
 	var lead models.Lead
 	if err := c.ShouldBindJSON(&lead); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1381,6 +1425,7 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 }
 
 func (h *InvoiceHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "invoices")
 	var invoice models.Invoice
 	if err := c.ShouldBindJSON(&invoice); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1625,6 +1670,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 </html>`
 
 func (h *InvoiceHandler) AddPayment(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "payments")
 	id, _ := getID(c)
 	var payment models.Payment
 	if err := c.ShouldBindJSON(&payment); err != nil {
@@ -1790,6 +1836,7 @@ func (h *ContractHandler) List(c *gin.Context) {
 }
 
 func (h *ContractHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "contracts")
 	var contract models.Contract
 	if err := c.ShouldBindJSON(&contract); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1844,6 +1891,7 @@ func (h *ItemHandler) List(c *gin.Context) {
 }
 
 func (h *ItemHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "items")
 	var item models.Item
 	if err := c.ShouldBindJSON(&item); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1887,6 +1935,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 }
 
 func (h *OrderHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "orders")
 	var order models.Order
 	if err := c.ShouldBindJSON(&order); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1943,6 +1992,7 @@ func (h *EventHandler) List(c *gin.Context) {
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "events")
 	var event models.Event
 	if err := c.ShouldBindJSON(&event); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1989,6 +2039,7 @@ func (h *NoteHandler) List(c *gin.Context) {
 }
 
 func (h *NoteHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "notes")
 	var note models.Note
 	if err := c.ShouldBindJSON(&note); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2031,6 +2082,7 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 }
 
 func (h *ExpenseHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "expenses")
 	var expense models.Expense
 	if err := c.ShouldBindJSON(&expense); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2433,6 +2485,7 @@ func (h *TeamHandler) ListTimeCards(c *gin.Context) {
 }
 
 func (h *TeamHandler) ClockIn(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "time_cards")
 	userID := getUserID(c)
 	var existing models.TimeCard
 	// Check if already clocked in
@@ -2473,6 +2526,7 @@ func (h *TeamHandler) ListLeaves(c *gin.Context) {
 }
 
 func (h *TeamHandler) ApplyLeave(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "leaves")
 	var leave models.Leave
 	if err := c.ShouldBindJSON(&leave); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2501,6 +2555,7 @@ func (h *TeamHandler) ListAnnouncements(c *gin.Context) {
 }
 
 func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "announcements")
 	var ann models.Announcement
 	if err := c.ShouldBindJSON(&ann); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2538,6 +2593,7 @@ func (h *FileHandler) List(c *gin.Context) {
 }
 
 func (h *FileHandler) Upload(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "files")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
@@ -2611,6 +2667,7 @@ func (h *FileHandler) Download(c *gin.Context) {
 }
 
 func (h *FileHandler) CreateFolder(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "files")
 	var folder models.File
 	if err := c.ShouldBindJSON(&folder); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2651,6 +2708,7 @@ func (h *TodoHandler) List(c *gin.Context) {
 }
 
 func (h *TodoHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "todos")
 	var todo models.Todo
 	if err := c.ShouldBindJSON(&todo); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2742,6 +2800,7 @@ func (h *LabelHandler) List(c *gin.Context) {
 }
 
 func (h *LabelHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "labels")
 	var label models.Label
 	if err := c.ShouldBindJSON(&label); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

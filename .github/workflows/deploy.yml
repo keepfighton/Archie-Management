@@ -30,6 +30,6 @@ jobs:
             git checkout main
             git reset --hard deploy-tmp
             git branch -D deploy-tmp
-            docker compose up -d --build frontend backend
+            docker compose up -d --build --no-deps backend frontend
             docker ps --format '{{.Names}}' | grep '^nexone-backend$'
             docker ps --format '{{.Names}}' | grep '^nexone-frontend$'

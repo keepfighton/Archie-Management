@@ -1,9 +1,9 @@
-# OneTool - Project Context for Claude
+# CBQA IT Portfolio Assessment Tool - Project Context for Claude
 
 ## Overview
-OneTool adalah aplikasi bisnis all-in-one yang mencakup manajemen klien, sales, proyek, keuangan, dan komunikasi. Dibangun untuk kebutuhan tim IT Audit.
+Aplikasi bisnis all-in-one untuk CBQA (IT Audit & Advisory Indonesia) yang mencakup manajemen klien, sales, proyek, keuangan, dan komunikasi. Dibangun untuk kebutuhan tim IT Audit PUSINTEK.
 
-**Versi saat ini: v1.0.3**
+**Versi saat ini: v1.0.4**
 
 ## Tech Stack
 
@@ -40,7 +40,7 @@ root/
 │   │   │   ├── Dashboard/    # DashboardPage
 │   │   │   ├── Clients/      # ClientsPage, ClientDetailPage
 │   │   │   ├── Sales/        # StorePage, ItemsPage, OrdersPage,
-│   │   │   │                 # ContractsPage, PaymentsPage,
+│   │   │   │                 # ContractsPage, ContractDetailPage, PaymentsPage,
 │   │   │   │                 # InvoicesPage, InvoiceDetailPage
 │   │   │   ├── Projects/     # ProjectsPage, ProjectDetailPage
 │   │   │   ├── Tasks/        # TasksPage (List/Kanban/Gantt)
@@ -364,11 +364,15 @@ Version app ada di dua tempat (update keduanya saat bump versi):
 - `Frontend/src/components/layout/Layout.tsx` — teks versi di sidebar footer
 
 ### Login Page (LoginPage.tsx)
-Halaman login dua-panel (split screen):
-- **Left panel** (38% lebar, putih): Logo "NEX**ONE** by NEXORA" (inline SVG + teks), form dengan field labels proper, Remember me + Forgot password, Sign in button. Tanpa social login buttons, tanpa background overlay image.
-- **Right panel** (62% lebar, dark navy `#0c1f40`): Headline "Smarter operations / unified control", dot-grid overlay, Globe decoration (CSS/SVG), feature list 2-kolom (6 fitur, deskripsi singkat), Dashboard mockup CSS (fixed, bottom-right).
-- Logo `NexoneLogo()` dibuat inline SVG — tidak bergantung pada file PNG.
-- `DashboardMockup()` adalah komponen CSS murni, bukan gambar — menampilkan sidebar mockup, stat cards, donut chart, progress bar, team overview.
+Diambil dari project NEXONE (`/Users/harmanto/Documents/Code/PROD/NEXONE`). Halaman login dua-panel (split screen):
+- **Mobile**: dark navy background dengan animated orbs, logo Nexora dengan glow, SVG network diagram, form card di bawah
+- **Desktop**: left panel putih (form login), right panel pakai `FrameKanan.png` sebagai background
+- Asset PNG: `Frontend/logo/Logo_Nexora_Part.png` dan `Frontend/logo/FrameKanan.png` (di-copy dari NEXONE)
+- Import path: `'../../../logo/FrameKanan.png'` dan `'../../../logo/Logo_Nexora_Part.png'`
+
+### Sidebar (Layout.tsx)
+Diambil dari project NEXONE. Logo sidebar: gradient text "nexora" + subtitle "Bagian dari CBQA Global Group".
+Nav config di `src/config/navigation.ts` — urutan Business & Sales: **Leads** → Clients (bukan Clients → Leads).
 
 ## Cara Jalankan Manual (tanpa Docker)
 
@@ -425,11 +429,9 @@ Volume yang digunakan:
 - `uploads_data` — file yang diupload user (mount ke `/app/uploads` di container backend)
 
 ## GitHub
-- Remote: https://github.com/Nexora-Tech-Team/ONETOOL
-- Branch utama: `main`
+- Remote PUSINTEK: https://github.com/Nexora-Tech-Team/PUSINTEK-NEXONE (branch: main)
+- Remote NEXONE: https://github.com/Nexora-Tech-Team/NEXONE (branch: Dev_Har)
 - Struktur root: `Backend/`, `Frontend/`, `docker-compose.yml`
-- Deploy otomatis via GitHub Actions saat push ke `main`
-- Script deploy di server: `~/deploy-onetool.sh`
 
 ## Changelog
 

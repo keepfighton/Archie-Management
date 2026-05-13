@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { fileService } from '@/services/api'
+import { API_BASE_URL, fileService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Folder, File, Star, Upload, FolderPlus, Trash2, ChevronRight, Download } from 'lucide-react'
 import { Loading, EmptyState, Modal, FormField, ConfirmDialog } from '@/components/common'
@@ -184,8 +184,7 @@ export default function FilesPage() {
                                     onClick={e => {
                                       e.preventDefault()
                                       const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
-                                      const base = import.meta.env.VITE_API_URL || '/api/v1'
-                                      fetch(`${base}/files/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } })
+                                      fetch(`${API_BASE_URL}/files/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } })
                                         .then(r => r.blob()).then(blob => {
                                           const a = document.createElement('a')
                                           a.href = URL.createObjectURL(blob)

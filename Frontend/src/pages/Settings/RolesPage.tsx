@@ -104,7 +104,7 @@ export default function RolesPage() {
       toast.success('Role updated!')
       setShowEditModal(false)
       load()
-    } catch { toast.error('Failed to update role') }
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to update role') }
     finally { setSaving(false) }
   }
 
@@ -157,7 +157,7 @@ export default function RolesPage() {
       toast.success('Permissions saved!')
       setShowPermModal(false)
       load()
-    } catch { toast.error('Failed to save permissions') }
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to save permissions') }
     finally { setSaving(false) }
   }
 

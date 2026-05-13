@@ -203,6 +203,7 @@ export default function Layout() {
     { key: '/dashboard', translationKey: 'page.dashboard', fallback: 'Dashboard' },
     { key: '/events', translationKey: 'page.events', fallback: 'Events' },
     { key: '/clients', translationKey: 'page.clients', fallback: 'Clients' },
+    { key: '/clusters', translationKey: 'page.clusters', fallback: 'Cluster' },
     { key: '/projects', translationKey: 'page.projects', fallback: 'Projects' },
     { key: '/tasks', translationKey: 'page.tasks', fallback: 'Tasks' },
     { key: '/leads', translationKey: 'page.leads', fallback: 'Leads' },

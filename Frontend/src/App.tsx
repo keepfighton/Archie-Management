@@ -17,6 +17,7 @@ import DashboardPage from '@/pages/Dashboard/DashboardPage'
 import EventsPage from '@/pages/Events/EventsPage'
 import ClientsPage from '@/pages/Clients/ClientsPage'
 import ClientDetailPage from '@/pages/Clients/ClientDetailPage'
+import ClustersPage from '@/pages/Projects/ClustersPage'
 import ProjectsPage from '@/pages/Projects/ProjectsPage'
 import ProjectDetailPage from '@/pages/Projects/ProjectDetailPage'
 import TasksPage from '@/pages/Tasks/TasksPage'
@@ -27,6 +28,7 @@ import StorePage from '@/pages/Sales/StorePage'
 import PaymentsPage from '@/pages/Sales/PaymentsPage'
 import ItemsPage from '@/pages/Sales/ItemsPage'
 import ContractsPage from '@/pages/Sales/ContractsPage'
+import ContractDetailPage from '@/pages/Sales/ContractDetailPage'
 import QuotationsPage from '@/pages/Sales/QuotationsPage'
 import NotesPage from '@/pages/Notes/NotesPage'
 import MessagesPage from '@/pages/Messages/MessagesPage'
@@ -79,6 +81,7 @@ function AppShell() {
         <Route path="events" element={<EventsPage />} />
         <Route path="clients" element={<ClientsPage />} />
         <Route path="clients/:id" element={<ClientDetailPage />} />
+        <Route path="clusters" element={<ClustersPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="tasks" element={<TasksPage />} />
@@ -89,6 +92,7 @@ function AppShell() {
         <Route path="sales/payments" element={<PaymentsPage />} />
         <Route path="sales/items" element={<ItemsPage />} />
         <Route path="sales/contracts" element={<ContractsPage />} />
+        <Route path="sales/contracts/:id" element={<ContractDetailPage />} />
         <Route path="sales/quotations" element={<QuotationsPage />} />
         <Route path="notes" element={<NotesPage />} />
         <Route path="messages" element={<MessagesPage />} />

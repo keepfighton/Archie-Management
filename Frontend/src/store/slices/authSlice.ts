@@ -66,6 +66,12 @@ function saveSession(token: string, user: User, permissions: Permission[] | null
   other.removeItem('permissions')
 }
 
+function isLoginResponse(data: unknown): data is { token: string; user: User; permissions?: Permission[] | null } {
+  if (!data || typeof data !== 'object') return false
+  const value = data as { token?: unknown; user?: unknown }
+  return typeof value.token === 'string' && !!value.token && !!value.user && typeof value.user === 'object'
+}
+
 export const login = createAsyncThunk(
   'auth/login',
   async (
@@ -74,6 +80,9 @@ export const login = createAsyncThunk(
   ) => {
     try {
       const res = await authService.login(email, password)
+      if (!isLoginResponse(res.data)) {
+        return rejectWithValue('Login response tidak valid. Pastikan request mengarah ke /api/v1/auth/login, bukan frontend HTML.')
+      }
       return { ...res.data, remember }
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.error || 'Login failed')

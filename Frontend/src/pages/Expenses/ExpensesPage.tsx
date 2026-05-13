@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { expenseService } from '@/services/api'
+import { expenseService, contractService, projectService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown } from 'lucide-react'
 import {
@@ -21,10 +21,22 @@ export default function ExpensesPage() {
   const [editItem, setEditItem] = useState<any>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [contracts, setContracts] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   const [form, setForm] = useState<any>({
     date: new Date().toISOString().split('T')[0], category: '', title: '',
     description: '', amount: '', tax: '0', second_tax: '0', is_recurring: false,
+    contract_id: '', client_id: '', project_id: '',
   })
+
+  useEffect(() => {
+    contractService.list({ per_page: 999 })
+      .then(r => setContracts(r.data.data || r.data || []))
+      .catch(() => {})
+    projectService.list({ limit: 999 })
+      .then(r => setProjects(r.data.data || []))
+      .catch(() => {})
+  }, [])
 
   const load = () => {
     setLoading(true)
@@ -45,21 +57,45 @@ export default function ExpensesPage() {
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ date: new Date().toISOString().split('T')[0], category: '', title: '', description: '', amount: '', tax: '0', second_tax: '0', is_recurring: view === 'recurring' })
+    setForm({ date: new Date().toISOString().split('T')[0], category: '', title: '', description: '', amount: '', tax: '0', second_tax: '0', is_recurring: view === 'recurring', contract_id: '', client_id: '', project_id: '' })
     setShowModal(true)
   }
 
   const openEdit = (e: any) => {
     setEditItem(e)
-    setForm({ date: e.date?.split('T')[0] || '', category: e.category || '', title: e.title, description: e.description || '', amount: e.amount, tax: e.tax, second_tax: e.second_tax, is_recurring: e.is_recurring })
+    const taxPct = e.amount > 0 ? Math.round((e.tax / e.amount) * 10000) / 100 : 0
+    const secondTaxPct = e.amount > 0 ? Math.round((e.second_tax / e.amount) * 10000) / 100 : 0
+    setForm({ date: e.date?.split('T')[0] || '', category: e.category || '', title: e.title, description: e.description || '', amount: e.amount, tax: taxPct, second_tax: secondTaxPct, is_recurring: e.is_recurring, contract_id: e.contract_id || '', client_id: e.client_id || '', project_id: e.project_id || '' })
     setShowModal(true)
   }
 
+  const handleContractChange = (contractId: string) => {
+    const contract = contracts.find(c => String(c.id) === contractId)
+    setForm((f: any) => ({
+      ...f,
+      contract_id: contractId,
+      client_id: contract?.client_id ? String(contract.client_id) : f.client_id,
+      project_id: contract?.project_id ? String(contract.project_id) : f.project_id,
+    }))
+  }
+
   const handleSave = async () => {
+    if (!form.contract_id) { toast.error('Contract is required'); return }
     if (!form.title.trim()) { toast.error('Title is required'); return }
     setSaving(true)
     try {
-      const payload = { ...form, amount: Number(form.amount), tax: Number(form.tax), second_tax: Number(form.second_tax) }
+      const amt = Number(form.amount)
+      const taxNominal = Math.round(amt * Number(form.tax) / 100)
+      const secondTaxNominal = Math.round(amt * Number(form.second_tax) / 100)
+      const payload = {
+        ...form,
+        amount: amt,
+        tax: taxNominal,
+        second_tax: secondTaxNominal,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
+        client_id: form.client_id ? Number(form.client_id) : null,
+        project_id: form.project_id ? Number(form.project_id) : null,
+      }
       if (editItem) { await expenseService.update(editItem.id, payload); toast.success('Expense updated!') }
       else { await expenseService.create(payload); toast.success('Expense added!') }
       setShowModal(false)
@@ -114,7 +150,7 @@ export default function ExpensesPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Date</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
+              <tr><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
@@ -122,6 +158,8 @@ export default function ExpensesPage() {
                 : filtered.map(e => (
                   <tr key={e.id}>
                     <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
+                    <td className="text-sm">{e.contract ? `${e.contract.contract_number}` : '-'}</td>
+                    <td className="text-sm text-gray-500">{e.client?.name || '-'}</td>
                     <td>
                       <span className="badge badge-blue">{e.category || 'Other'}</span>
                     </td>
@@ -157,6 +195,37 @@ export default function ExpensesPage() {
         }
       >
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <FormField label="Contract" required>
+              <select className="input" value={form.contract_id} onChange={e => handleContractChange(e.target.value)}>
+                <option value="">Select contract...</option>
+                {contracts.map(c => (
+                  <option key={c.id} value={c.id}>{c.contract_number} — {c.title}</option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+          {form.client_id && (
+            <div className="col-span-2">
+              <FormField label="Client">
+                <input className="input bg-blue-50 text-blue-700" readOnly
+                  value={contracts.find(c => String(c.id) === String(form.contract_id))?.client?.name || `Client #${form.client_id}`} />
+              </FormField>
+            </div>
+          )}
+          <div className="col-span-2">
+            <FormField label="Project">
+              <select className="input" value={form.project_id} onChange={e => setForm((f: any) => ({ ...f, project_id: e.target.value }))}>
+                <option value="">No project</option>
+                {projects.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.title}</option>
+                ))}
+              </select>
+              {form.project_id && contracts.find(c => String(c.id) === String(form.contract_id))?.project_id === Number(form.project_id) && (
+                <p className="text-xs text-blue-500 mt-1">Auto-filled from contract</p>
+              )}
+            </FormField>
+          </div>
           <FormField label="Date">
             <input className="input" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
           </FormField>
@@ -174,11 +243,36 @@ export default function ExpensesPage() {
           <FormField label="Amount">
             <PriceInput value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
           </FormField>
-          <FormField label="Tax">
-            <PriceInput value={form.tax} onChange={v => setForm({ ...form, tax: v })} />
+          <FormField label="Tax (%)">
+            <div className="relative">
+              <input className="input pr-8" type="number" min="0" max="100" step="0.01"
+                value={form.tax} onChange={e => setForm({ ...form, tax: e.target.value })}
+                placeholder="0" />
+              <span className="absolute inset-y-0 right-3 flex items-center text-gray-400 text-sm">%</span>
+            </div>
+            {Number(form.amount) > 0 && Number(form.tax) > 0 && (
+              <p className="text-xs text-blue-500 mt-1">= {Math.round(Number(form.amount) * Number(form.tax) / 100).toLocaleString('id')}</p>
+            )}
           </FormField>
-          <FormField label="Second Tax">
-            <PriceInput value={form.second_tax} onChange={v => setForm({ ...form, second_tax: v })} />
+          <FormField label="Second Tax (%)">
+            <div className="relative">
+              <input className="input pr-8" type="number" min="0" max="100" step="0.01"
+                value={form.second_tax} onChange={e => setForm({ ...form, second_tax: e.target.value })}
+                placeholder="0" />
+              <span className="absolute inset-y-0 right-3 flex items-center text-gray-400 text-sm">%</span>
+            </div>
+            {Number(form.amount) > 0 && Number(form.second_tax) > 0 && (
+              <p className="text-xs text-blue-500 mt-1">= {Math.round(Number(form.amount) * Number(form.second_tax) / 100).toLocaleString('id')}</p>
+            )}
+          </FormField>
+          <FormField label="Total Amount">
+            <input className="input bg-gray-50 font-semibold text-gray-700" readOnly
+              value={(() => {
+                const amt = Number(form.amount) || 0
+                const tax = Math.round(amt * (Number(form.tax) || 0) / 100)
+                const tax2 = Math.round(amt * (Number(form.second_tax) || 0) / 100)
+                return (amt + tax + tax2).toLocaleString('id')
+              })()} />
           </FormField>
           <div className="flex items-center gap-2 pt-5">
             <input type="checkbox" id="recurring" checked={form.is_recurring} onChange={e => setForm({ ...form, is_recurring: e.target.checked })} />

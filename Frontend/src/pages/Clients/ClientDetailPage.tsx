@@ -147,8 +147,15 @@ export default function ClientDetailPage() {
       }
       if (key === 'expenses') {
         const r = await expenseService.list({ client_id: clientId })
-        const rows = r.data?.data ?? r.data ?? []
-        setExpenses(Array.isArray(rows) ? rows.filter((e: any) => !e.client_id || e.client_id === clientId) : [])
+        setExpenses(r.data?.data ?? [])
+      }
+      if (key === 'projects') {
+        const [cRes, eRes] = await Promise.all([
+          contractService.list({ client_id: clientId }),
+          expenseService.list({ client_id: clientId }),
+        ])
+        setContracts(cRes.data.data || [])
+        setExpenses(eRes.data?.data ?? [])
       }
     } catch { /* silent */ }
     finally { setTabLoading(false) }
@@ -448,26 +455,45 @@ export default function ClientDetailPage() {
       {/* ══ PROJECTS TAB ══ */}
       {tab === 'projects' && (
         <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr><th>Title</th><th>Status</th><th>Progress</th><th>Deadline</th></tr>
-            </thead>
-            <tbody>
-              {projects.length === 0
-                ? <tr><td colSpan={4}><EmptyState /></td></tr>
-                : projects.map(p => (
-                  <tr key={p.id}>
-                    <td>
-                      <Link to={`/projects/${p.id}`} className="hover:underline" style={{ color: '#2aacb8' }}>{p.title}</Link>
-                    </td>
-                    <td><StatusBadge status={p.status} /></td>
-                    <td><ProgressBar value={p.progress} className="w-20" /></td>
-                    <td className="text-gray-400">{p.deadline ? new Date(p.deadline).toLocaleDateString('id') : '-'}</td>
-                  </tr>
-                ))
-              }
-            </tbody>
-          </table>
+          {tabLoading ? <Loading /> : (
+            <table className="table">
+              <thead>
+                <tr><th>Title</th><th>Status</th><th>Contract</th><th>Budget</th><th>Total Expenses</th><th>% Used</th><th>Progress</th><th>Deadline</th></tr>
+              </thead>
+              <tbody>
+                {projects.length === 0
+                  ? <tr><td colSpan={8}><EmptyState /></td></tr>
+                  : projects.map(p => {
+                      const contract = contracts.find(c => c.project_id === p.id)
+                      const budget = contract ? Number(contract.amount) : 0
+                      const totalExp = expenses.filter(e => e.project_id === p.id).reduce((s, e) => s + (e.total || 0), 0)
+                      const pct = budget > 0 ? Math.round((totalExp / budget) * 100) : null
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <Link to={`/projects/${p.id}`} className="hover:underline" style={{ color: '#2aacb8' }}>{p.title}</Link>
+                          </td>
+                          <td><StatusBadge status={p.status} /></td>
+                          <td className="text-sm text-gray-500">{contract ? contract.contract_number : '-'}</td>
+                          <td className="whitespace-nowrap text-sm">{budget > 0 ? `IDR ${budget.toLocaleString('id')}` : '-'}</td>
+                          <td className={`whitespace-nowrap text-sm font-medium ${totalExp > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                            {totalExp > 0 ? `IDR ${totalExp.toLocaleString('id')}` : '-'}
+                          </td>
+                          <td>
+                            {pct !== null
+                              ? <span className={`text-sm font-semibold ${pct >= 90 ? 'text-red-500' : pct >= 70 ? 'text-yellow-500' : 'text-green-500'}`}>{pct}%</span>
+                              : <span className="text-gray-300 text-sm">-</span>
+                            }
+                          </td>
+                          <td><ProgressBar value={p.progress} className="w-20" /></td>
+                          <td className="text-gray-400">{p.deadline ? new Date(p.deadline).toLocaleDateString('id') : '-'}</td>
+                        </tr>
+                      )
+                    })
+                }
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
@@ -688,60 +714,46 @@ export default function ClientDetailPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-800">Expenses</h2>
-            <button className="text-xs flex items-center gap-1 px-2 py-1.5 rounded text-white" style={{ backgroundColor: '#2aacb8' }}>
-              <Plus size={11} /> Add expense
-            </button>
+            {expenses.length > 0 && (
+              <p className="text-sm font-semibold text-red-500">
+                Total: IDR {expenses.reduce((s, e) => s + (e.total || 0), 0).toLocaleString('id')}
+              </p>
+            )}
           </div>
           <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Title</th>
-                  <th>Description</th>
-                  <th>Files</th>
-                  <th className="text-right">Amount</th>
-                  <th className="text-right">TAX</th>
-                  <th className="text-right">Second TAX</th>
-                  <th className="text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tabLoading
-                  ? <tr><td colSpan={9} className="text-center py-6 text-gray-400 text-xs">Loading...</td></tr>
-                  : expenses.length === 0
-                    ? <tr><td colSpan={9} className="text-center py-6 text-gray-400 text-xs">No record found.</td></tr>
-                    : expenses.map(e => {
-                        const amount = Number(e.amount || 0)
-                        const tax1   = Number(e.tax || 0)
-                        const tax2   = Number(e.tax2 || 0)
-                        const total  = amount + tax1 + tax2
-                        return (
-                          <tr key={e.id}>
-                            <td className="text-gray-500 whitespace-nowrap">{e.expense_date ? new Date(e.expense_date).toLocaleDateString('id') : '-'}</td>
-                            <td className="text-gray-500">{e.category || '-'}</td>
-                            <td className="font-medium">{e.title || '-'}</td>
-                            <td className="text-gray-400">{e.description || '-'}</td>
-                            <td className="text-gray-400">{e.file_count || '-'}</td>
-                            <td className="text-right whitespace-nowrap">{cur} {amount.toLocaleString('id-ID')}</td>
-                            <td className="text-right whitespace-nowrap text-gray-400">{tax1 ? `${cur} ${tax1.toLocaleString('id-ID')}` : '-'}</td>
-                            <td className="text-right whitespace-nowrap text-gray-400">{tax2 ? `${cur} ${tax2.toLocaleString('id-ID')}` : '-'}</td>
-                            <td className="text-right whitespace-nowrap font-medium">{cur} {total.toLocaleString('id-ID')}</td>
-                          </tr>
-                        )
-                      })
-                }
-              </tbody>
-            </table>
-            <div className="pagination">
-              <span>{expenses.length > 0 ? `1-${expenses.length} / ${expenses.length}` : '0-0 / 0'}</span>
-              <div className="flex gap-1">
-                <button className="page-btn"><ChevronLeft size={12} /></button>
-                <button className="page-btn active">1</button>
-                <button className="page-btn"><ChevronRight size={12} /></button>
-              </div>
-            </div>
+            {tabLoading ? <Loading /> : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Contract</th>
+                    <th>Project</th>
+                    <th>Category</th>
+                    <th>Title</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-right">Tax</th>
+                    <th className="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.length === 0
+                    ? <tr><td colSpan={8}><EmptyState /></td></tr>
+                    : expenses.map(e => (
+                        <tr key={e.id}>
+                          <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
+                          <td className="text-sm text-gray-500">{e.contract?.contract_number || '-'}</td>
+                          <td className="text-sm text-gray-500">{e.project?.title || '-'}</td>
+                          <td><span className="badge badge-blue">{e.category || 'Other'}</span></td>
+                          <td className="font-medium">{e.title}</td>
+                          <td className="text-right whitespace-nowrap">{Number(e.amount).toLocaleString('id')}</td>
+                          <td className="text-right whitespace-nowrap text-gray-400">{Number(e.tax + e.second_tax).toLocaleString('id')}</td>
+                          <td className="text-right whitespace-nowrap font-medium text-red-500">{Number(e.total).toLocaleString('id')}</td>
+                        </tr>
+                      ))
+                  }
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

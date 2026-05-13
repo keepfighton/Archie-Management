@@ -19,7 +19,7 @@ export default function LeavePage() {
     leave_type: 'annual', start_date: '', end_date: '', duration: '', reason: '',
   })
 
-  const load = () => {
+  const load = (overridePage?: number) => {
     setLoading(true)
     teamService.listLeaves()
       .then(r => setLeaves(r.data.data || []))

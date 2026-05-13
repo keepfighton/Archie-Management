@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { reportService, invoiceService, paymentService, expenseService, teamService, taskService, projectService, clientService } from '@/services/api'
 import { FileDown } from 'lucide-react'
 import { toast } from 'react-toastify'
@@ -28,6 +29,7 @@ const FINANCE_VIEWS = [
 
 const PROJECTS_VIEWS = [
   { key: 'overview', label: 'Overview' },
+  { key: 'health', label: 'Project Health' },
   { key: 'team_summary', label: 'Team Members Summary' },
   { key: 'clients_summary', label: 'Clients Summary' },
 ]
@@ -66,6 +68,7 @@ function SubTabs({ tabs, active, onChange }: { tabs: { key: string; label: strin
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate()
   const [view, setView] = useState('sales')
   const [salesView, setSalesView] = useState('summary')
   const [financeView, setFinanceView] = useState('income_vs_expenses')
@@ -81,6 +84,7 @@ export default function ReportsPage() {
 
   // Projects data
   const [projectsData, setProjectsData] = useState<any>(null)
+  const [healthData, setHealthData] = useState<any[]>([])
   const [teamSummaryData, setTeamSummaryData] = useState<any[]>([])
   const [clientSummaryData, setClientSummaryData] = useState<any[]>([])
 
@@ -111,6 +115,25 @@ export default function ReportsPage() {
         if (projectsView === 'overview') {
           const r = await reportService.projectsSummary()
           setProjectsData(r.data)
+        } else if (projectsView === 'health') {
+          const r = await projectService.list({ limit: 500 })
+          const projects: any[] = r.data.data || []
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const order: Record<string, number> = { overdue: 0, at_risk: 1, on_track: 2 }
+          const health = projects
+            .filter(p => !['completed', 'cancelled'].includes(p.status))
+            .map(p => {
+              const deadline = p.deadline ? new Date(p.deadline) : null
+              const daysLeft = deadline ? Math.ceil((deadline.getTime() - today.getTime()) / 86400000) : null
+              const h: 'overdue' | 'at_risk' | 'on_track' =
+                daysLeft === null ? 'on_track' :
+                daysLeft < 0     ? 'overdue'  :
+                daysLeft <= 7    ? 'at_risk'  : 'on_track'
+              return { ...p, daysLeft, health: h }
+            })
+            .sort((a, b) => order[a.health] - order[b.health])
+          setHealthData(health)
         } else if (projectsView === 'team_summary') {
           const [mRes, pRes, tRes] = await Promise.all([
             teamService.listMembers({ limit: 200 }),
@@ -674,6 +697,85 @@ export default function ReportsPage() {
                 </div>
               )}
 
+              {/* Projects: Health */}
+              {projectsView === 'health' && (
+                <div>
+                  <div className="grid grid-cols-3 gap-4 mb-5">
+                    {[
+                      { label: 'Overdue', key: 'overdue', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500', text: 'text-red-600' },
+                      { label: 'At Risk', key: 'at_risk', bg: 'bg-yellow-50 border-yellow-200', dot: 'bg-yellow-500', text: 'text-yellow-600' },
+                      { label: 'On Track', key: 'on_track', bg: 'bg-green-50 border-green-200', dot: 'bg-green-500', text: 'text-green-600' },
+                    ].map(c => (
+                      <div key={c.key} className={`border rounded-lg p-4 flex items-center gap-3 ${c.bg}`}>
+                        <span className={`w-3 h-3 rounded-full flex-shrink-0 ${c.dot}`} />
+                        <div>
+                          <p className="text-xs text-gray-500">{c.label}</p>
+                          <p className={`text-2xl font-bold ${c.text}`}>{healthData.filter(p => p.health === c.key).length}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {healthData.length === 0
+                    ? <p className="text-sm text-gray-400 text-center py-8">No active projects</p>
+                    : (
+                      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Project</th>
+                              <th>Client</th>
+                              <th className="text-center">Status</th>
+                              <th className="text-center">Progress</th>
+                              <th className="text-center">Deadline</th>
+                              <th className="text-center">Health</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {healthData.map(p => (
+                              <tr key={p.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate('/projects/' + p.id)}>
+                                <td className="font-medium text-blue-600">{p.name}</td>
+                                <td className="text-gray-600 text-sm">{p.client?.name || '—'}</td>
+                                <td className="text-center">
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 capitalize">{p.status}</span>
+                                </td>
+                                <td className="text-center">
+                                  <div className="flex items-center gap-2 justify-center">
+                                    <div className="w-20 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${p.progress || 0}%` }} />
+                                    </div>
+                                    <span className="text-xs text-gray-600">{p.progress || 0}%</span>
+                                  </div>
+                                </td>
+                                <td className="text-center text-sm text-gray-600">
+                                  {p.deadline ? new Date(p.deadline).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                </td>
+                                <td className="text-center">
+                                  {p.health === 'overdue' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                                      🔴 Overdue {p.daysLeft !== null ? `(${Math.abs(p.daysLeft)}d ago)` : ''}
+                                    </span>
+                                  )}
+                                  {p.health === 'at_risk' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                                      🟡 At Risk ({p.daysLeft}d left)
+                                    </span>
+                                  )}
+                                  {p.health === 'on_track' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                      🟢 On Track {p.daysLeft !== null ? `(${p.daysLeft}d left)` : ''}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  }
+                </div>
+              )}
+
               {/* Projects: Team Members Summary */}
               {projectsView === 'team_summary' && (
                 <div>
@@ -776,7 +878,7 @@ export default function ReportsPage() {
                                     <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold flex-shrink-0">
                                       {c.name.charAt(0).toUpperCase()}
                                     </div>
-                                    <span className="text-sm font-medium text-blue-600 hover:underline cursor-pointer">{c.name}</span>
+                                    <span className="text-sm font-medium text-blue-600 hover:underline cursor-pointer" onClick={() => navigate('/clients/' + c.id)}>{c.name}</span>
                                   </div>
                                 </td>
                                 <td className="text-center font-semibold text-blue-600">{c.open_projects}</td>

@@ -43,6 +43,7 @@ func Migrate(db *gorm.DB) error {
 		&models.User{},
 		&models.Client{},
 		&models.Contact{},
+		&models.Cluster{},
 		&models.Project{},
 		&models.TaskKanbanColumn{},
 		&models.Task{},
@@ -67,6 +68,12 @@ func Migrate(db *gorm.DB) error {
 		&models.AuditLog{},
 		&models.AppRole{},
 		&models.RolePermission{},
+		&models.Milestone{},
+		&models.Deliverable{},
+		&models.UserPresence{},
+		&models.Conversation{},
+		&models.ConversationMember{},
+		&models.Message{},
 	); err != nil {
 		return err
 	}

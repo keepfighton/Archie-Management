@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { contractService, clientService, projectService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
@@ -9,6 +10,7 @@ import {
 } from '@/components/common'
 
 export default function ContractsPage() {
+  const navigate = useNavigate()
   const [contracts, setContracts] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
@@ -113,7 +115,7 @@ export default function ContractsPage() {
               {filtered.length === 0
                 ? <tr><td colSpan={8}><EmptyState /></td></tr>
                 : filtered.map(c => (
-                  <tr key={c.id}>
+                  <tr key={c.id} className="cursor-pointer hover:bg-blue-50/50" onClick={() => navigate(`/sales/contracts/${c.id}`)}>
                     <td className="font-medium text-blue-600">{c.contract_number}</td>
                     <td className="font-medium">{c.title}</td>
                     <td className="text-gray-500">{c.client?.name || '-'}</td>
@@ -125,8 +127,8 @@ export default function ContractsPage() {
                     <td><StatusBadge status={c.status} /></td>
                     <td>
                       <div className="flex gap-1">
-                        <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={() => openEdit(c)}>Edit</button>
-                        <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(c.id)}>×</button>
+                        <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={e => { e.stopPropagation(); openEdit(c) }}>Edit</button>
+                        <button className="btn btn-danger text-xs py-0.5 px-2" onClick={e => { e.stopPropagation(); setDeleteId(c.id) }}>×</button>
                       </div>
                     </td>
                   </tr>

@@ -14,7 +14,7 @@ export default function AnnouncementsPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>({ title: '', content: '', start_date: '', end_date: '' })
 
-  const load = () => {
+  const load = (overridePage?: number) => {
     setLoading(true)
     teamService.listAnnouncements()
       .then(r => setAnnouncements(r.data.data || []))

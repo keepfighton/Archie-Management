@@ -27,7 +27,7 @@ services:
     environment:
       PORT: 8080
       ENV: ${ENV}
-      DB_HOST: postgres
+      DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -41,6 +41,12 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-v20.0}
+      WHATSAPP_OWNER_NUMBERS: ${WHATSAPP_OWNER_NUMBERS}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

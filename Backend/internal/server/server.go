@@ -48,6 +48,14 @@ func (s *Server) setupRoutes() {
 		auth.POST("/reset-password", authH.ResetPassword)
 	}
 
+	// ─── WhatsApp Cloud API webhook (public Meta callback) ───
+	whatsAppH := handlers.NewWhatsAppHandler(s.db, s.cfg)
+	whatsApp := api.Group("/whatsapp")
+	{
+		whatsApp.GET("/webhook", whatsAppH.VerifyWebhook)
+		whatsApp.POST("/webhook", whatsAppH.ReceiveWebhook)
+	}
+
 	// ─── Protected routes ────────────────────────────
 	protected := api.Group("")
 	protected.Use(middleware.AuthRequired(s.cfg))
@@ -79,6 +87,17 @@ func (s *Server) setupRoutes() {
 			clients.GET("/:id/invoices", clientH.GetInvoices)
 		}
 
+		// Clusters
+		clusterH := handlers.NewClusterHandler(s.db)
+		clusters := protected.Group("/clusters")
+		{
+			clusters.GET("", clusterH.List)
+			clusters.POST("", clusterH.Create)
+			clusters.GET("/:id", clusterH.Get)
+			clusters.PUT("/:id", clusterH.Update)
+			clusters.DELETE("/:id", clusterH.Delete)
+		}
+
 		// Projects
 		projectH := handlers.NewProjectHandler(s.db)
 		projects := protected.Group("/projects")
@@ -91,6 +110,21 @@ func (s *Server) setupRoutes() {
 			projects.GET("/:id/tasks", projectH.GetTasks)
 			projects.GET("/:id/timeline", projectH.GetTimeline)
 			projects.PATCH("/:id/status", projectH.PatchStatus)
+
+			// Milestones
+			milestoneH := handlers.NewMilestoneHandler(s.db)
+			// NOTE: Use parameter name `id` to avoid gin panic caused by conflicting wildcards
+			projects.GET("/:id/milestones", milestoneH.List)
+			projects.POST("/:id/milestones", milestoneH.Create)
+			projects.PUT("/:id/milestones/:mid", milestoneH.Update)
+			projects.DELETE("/:id/milestones/:mid", milestoneH.Delete)
+
+			// Deliverables
+			deliverableH := handlers.NewDeliverableHandler(s.db)
+			projects.GET("/:id/deliverables", deliverableH.List)
+			projects.POST("/:id/deliverables", deliverableH.Create)
+			projects.PUT("/:id/deliverables/:did", deliverableH.Update)
+			projects.DELETE("/:id/deliverables/:did", deliverableH.Delete)
 		}
 
 		// Tasks
@@ -98,6 +132,7 @@ func (s *Server) setupRoutes() {
 		tasks := protected.Group("/tasks")
 		{
 			tasks.GET("", taskH.List)
+			tasks.GET("/report/pdf", taskH.ExportReportPDF)
 			tasks.GET("/columns", taskH.ListColumns)
 			tasks.POST("/columns", taskH.CreateColumn)
 			tasks.PATCH("/columns/reorder", taskH.ReorderColumns)
@@ -270,6 +305,19 @@ func (s *Server) setupRoutes() {
 			todos.POST("", todoH.Create)
 			todos.PATCH("/:id/done", todoH.MarkDone)
 			todos.DELETE("/:id", todoH.Delete)
+		}
+
+		// Internal Messages & Presence
+		messageH := handlers.NewMessageHandler(s.db)
+		protected.POST("/presence/heartbeat", messageH.Heartbeat)
+		messages := protected.Group("/messages")
+		{
+			messages.GET("/users", messageH.ListUsers)
+			messages.GET("/conversations", messageH.ListConversations)
+			messages.POST("/conversations/direct", messageH.GetOrCreateDirectConversation)
+			messages.GET("/conversations/:id/messages", messageH.ListMessages)
+			messages.POST("/conversations/:id/messages", messageH.SendMessage)
+			messages.POST("/conversations/:id/read", messageH.MarkRead)
 		}
 
 		// Reports

@@ -58,8 +58,8 @@ export const navGroups: NavGroupDef[] = [
     id: 'business',
     label: 'Business & Sales',
     items: [
-      { id: 'clients', to: '/clients', icon: Users, label: 'Clients', menu: 'clients' },
       { id: 'leads', to: '/leads', icon: TrendingUp, label: 'Leads', menu: 'leads' },
+      { id: 'clients', to: '/clients', icon: Users, label: 'Clients', menu: 'clients' },
       { id: 'sales-quotations', to: '/sales/quotations', icon: FileText, label: 'Quotations', menu: 'sales.quotations', legacyMenus: ['sales'] },
       { id: 'sales-contracts', to: '/sales/contracts', icon: FileCheck, label: 'Contracts', menu: 'sales.contracts', legacyMenus: ['sales'] },
       { id: 'sales-orders', to: '/sales/orders', icon: ShoppingCart, label: 'Orders', menu: 'sales.orders', legacyMenus: ['sales'] },
@@ -71,6 +71,7 @@ export const navGroups: NavGroupDef[] = [
     id: 'operations',
     label: 'Operations',
     items: [
+      { id: 'clusters', to: '/clusters', icon: Boxes, label: 'Cluster', menu: 'clusters' },
       { id: 'projects', to: '/projects', icon: FolderKanban, label: 'Projects', menu: 'projects' },
       { id: 'tasks', to: '/tasks', icon: CheckSquare, label: 'Tasks', menu: 'tasks' },
       { id: 'todo', to: '/todo', icon: CheckCircle, label: 'To Do', menu: 'todo' },

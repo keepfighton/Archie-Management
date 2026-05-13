@@ -54,6 +54,12 @@ func getUserID(c *gin.Context) uint {
 	return id.(uint)
 }
 
+func getUserRole(c *gin.Context) string {
+	role, _ := c.Get("role")
+	roleString, _ := role.(string)
+	return roleString
+}
+
 type PaginationQuery struct {
 	Page  int    `form:"page,default=1"`
 	Limit int    `form:"limit,default=10"`
@@ -70,29 +76,41 @@ func paginate(q PaginationQuery) func(db *gorm.DB) *gorm.DB {
 // ─── SEQUENCE / PROGRESS HELPERS ─────────────────────
 
 func recalcProjectProgress(db *gorm.DB, projectID uint) {
-	var total, done int64
-	db.Model(&models.Task{}).Where("project_id = ?", projectID).Count(&total)
-	db.Model(&models.Task{}).Where("project_id = ? AND status = ?", projectID, "done").Count(&done)
+	if projectID == 0 {
+		return
+	}
+	var stats struct {
+		Total int64
+		Done  int64
+	}
+	db.Model(&models.Task{}).
+		Select("COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'done') as done").
+		Where("project_id = ? AND deleted_at IS NULL", projectID).
+		Scan(&stats)
+
 	progress := 0
-	if total > 0 {
-		progress = int(float64(done) / float64(total) * 100)
+	if stats.Total > 0 {
+		progress = int(stats.Done * 100 / stats.Total)
 	}
 	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
 }
 
+// syncSequence aligns the PostgreSQL id sequence with the actual MAX(id) in the table.
+// Guarantees the next insert gets MAX(id)+1, or 1 for an empty table.
+// Includes ALL rows (raw SQL ignores GORM soft-delete filter).
+// Errors (e.g. missing sequence) are silently swallowed by the DO block.
 func syncSequence(db *gorm.DB, tableName string) {
-	db.Exec(fmt.Sprintf(`
-		DO $$ BEGIN
-		  PERFORM setval(
+	db.Exec(fmt.Sprintf(`DO $$ BEGIN
+		PERFORM setval(
 			pg_get_serial_sequence('%s', 'id'),
 			COALESCE((SELECT MAX(id) FROM %s), 0) + 1,
 			false
-		  );
-		END $$;
-	`, tableName, tableName))
+		);
+	EXCEPTION WHEN OTHERS THEN NULL; END $$`, tableName, tableName))
 }
 
-var resetSequenceIfEmpty = syncSequence
+// resetSequenceIfEmpty is kept as an alias for backward compatibility.
+func resetSequenceIfEmpty(db *gorm.DB, tableName string) { syncSequence(db, tableName) }
 
 // ─── DASHBOARD ───────────────────────────────────────
 
@@ -212,6 +230,7 @@ func (h *ClientHandler) List(c *gin.Context) {
 }
 
 func (h *ClientHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "clients")
 	var client models.Client
 	if err := c.ShouldBindJSON(&client); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -278,7 +297,10 @@ func (h *ClientHandler) AddContact(c *gin.Context) {
 		return
 	}
 	contact.ClientID = id
-	h.db.Create(&contact)
+	if err := h.db.Create(&contact).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, contact)
 }
 
@@ -303,7 +325,7 @@ func (h *ClientHandler) DeleteContact(c *gin.Context) {
 func (h *ClientHandler) GetProjects(c *gin.Context) {
 	id, _ := getID(c)
 	var projects []models.Project
-	h.db.Where("client_id = ?", id).Find(&projects)
+	h.db.Preload("Cluster").Preload("Pic").Where("client_id = ?", id).Find(&projects)
 	c.JSON(http.StatusOK, gin.H{"data": projects})
 }
 
@@ -312,6 +334,128 @@ func (h *ClientHandler) GetInvoices(c *gin.Context) {
 	var invoices []models.Invoice
 	h.db.Where("client_id = ?", id).Find(&invoices)
 	c.JSON(http.StatusOK, gin.H{"data": invoices})
+}
+
+// ─── CLUSTER ─────────────────────────────────────────
+
+type ClusterHandler struct{ db *gorm.DB }
+
+func NewClusterHandler(db *gorm.DB) *ClusterHandler { return &ClusterHandler{db: db} }
+
+func (h *ClusterHandler) List(c *gin.Context) {
+	var q PaginationQuery
+	c.ShouldBindQuery(&q)
+	var clusters []models.Cluster
+	var total int64
+	query := h.db.Model(&models.Cluster{})
+	if q.Q != "" {
+		query = query.Where("name ILIKE ?", "%"+q.Q+"%")
+	}
+	query.Count(&total)
+	query.Preload("Projects", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "title", "cluster_id", "status").Order("title asc")
+	}).Order("name asc").Scopes(paginate(q)).Find(&clusters)
+	c.JSON(http.StatusOK, gin.H{"data": clusters, "total": total})
+}
+
+func (h *ClusterHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "clusters")
+	var cluster models.Cluster
+	if err := c.ShouldBindJSON(&cluster); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cluster.Name = strings.TrimSpace(cluster.Name)
+	cluster.Description = strings.TrimSpace(cluster.Description)
+	if cluster.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster name is required"})
+		return
+	}
+	var existing models.Cluster
+	err := h.db.Unscoped().Where("name = ?", cluster.Name).First(&existing).Error
+	if err == nil {
+		if existing.DeletedAt.Valid {
+			if err := h.db.Unscoped().Model(&models.Cluster{}).Where("id = ?", existing.ID).Updates(map[string]any{
+				"deleted_at":  nil,
+				"description": cluster.Description,
+				"updated_at":  time.Now(),
+			}).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			h.db.First(&existing, existing.ID)
+			recordAudit(h.db, c, "create", "cluster", existing.ID, existing.Name)
+			c.JSON(http.StatusCreated, existing)
+			return
+		}
+		c.JSON(http.StatusConflict, gin.H{"error": "Cluster name already exists"})
+		return
+	}
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.db.Create(&cluster).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "create", "cluster", cluster.ID, cluster.Name)
+	c.JSON(http.StatusCreated, cluster)
+}
+
+func (h *ClusterHandler) Get(c *gin.Context) {
+	id, _ := getID(c)
+	var cluster models.Cluster
+	if err := h.db.Preload("Projects").First(&cluster, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cluster not found"})
+		return
+	}
+	c.JSON(http.StatusOK, cluster)
+}
+
+func (h *ClusterHandler) Update(c *gin.Context) {
+	id, _ := getID(c)
+	var cluster models.Cluster
+	if err := h.db.First(&cluster, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cluster not found"})
+		return
+	}
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cluster.Name = strings.TrimSpace(req.Name)
+	cluster.Description = strings.TrimSpace(req.Description)
+	if cluster.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster name is required"})
+		return
+	}
+	if err := h.db.Save(&cluster).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "update", "cluster", cluster.ID, cluster.Name)
+	c.JSON(http.StatusOK, cluster)
+}
+
+func (h *ClusterHandler) Delete(c *gin.Context) {
+	id, _ := getID(c)
+	var cluster models.Cluster
+	if err := h.db.First(&cluster, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cluster not found"})
+		return
+	}
+	h.db.Model(&models.Project{}).Where("cluster_id = ?", id).Update("cluster_id", nil)
+	if err := h.db.Delete(&cluster).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "delete", "cluster", id, cluster.Name)
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
 // ─── PROJECT ─────────────────────────────────────────
@@ -325,26 +469,36 @@ func (h *ProjectHandler) List(c *gin.Context) {
 	c.ShouldBindQuery(&q)
 	var projects []models.Project
 	var total int64
-	query := h.db.Model(&models.Project{}).Preload("Client").Preload("Labels")
+	query := h.db.Model(&models.Project{}).Preload("Client").Preload("Cluster").Preload("Pic").Preload("Labels")
 	if q.Q != "" {
 		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
 	}
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
+	if clusterID := c.Query("cluster_id"); clusterID != "" {
+		if clusterID == "none" {
+			query = query.Where("cluster_id IS NULL")
+		} else {
+			query = query.Where("cluster_id = ?", clusterID)
+		}
+	}
 	query.Count(&total)
-	query.Scopes(paginate(q)).Find(&projects)
+	query.Order("id asc").Scopes(paginate(q)).Find(&projects)
 	c.JSON(http.StatusOK, gin.H{"data": projects, "total": total})
 }
 
 func (h *ProjectHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "projects")
 	var project models.Project
 	if err := c.ShouldBindJSON(&project); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	resetSequenceIfEmpty(h.db, "projects")
-	h.db.Create(&project)
+	if err := h.db.Create(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "project", project.ID, project.Title)
 	c.JSON(http.StatusCreated, project)
 }
@@ -352,7 +506,7 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 func (h *ProjectHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var project models.Project
-	if err := h.db.Preload("Client").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
+	if err := h.db.Preload("Client").Preload("Cluster").Preload("Pic").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -595,6 +749,46 @@ func (h *TaskHandler) loadTaskWithRelations(tx *gorm.DB, id uint) (models.Task, 
 	return task, err
 }
 
+func isTaskMemberRequest(c *gin.Context) bool {
+	return strings.EqualFold(getUserRole(c), "member")
+}
+
+func (h *TaskHandler) visibleTaskQuery(c *gin.Context) *gorm.DB {
+	query := h.db.Model(&models.Task{}).
+		Preload("AssignedTo").
+		Preload("Project").
+		Preload("Labels").
+		Preload("KanbanColumn")
+
+	if isTaskMemberRequest(c) {
+		return query.Where("assigned_to_id = ?", getUserID(c))
+	}
+	return query
+}
+
+func (h *TaskHandler) currentUserCanAccessTask(c *gin.Context, task models.Task) bool {
+	if !isTaskMemberRequest(c) {
+		return true
+	}
+	return task.AssignedToID != nil && *task.AssignedToID == getUserID(c)
+}
+
+func (h *TaskHandler) applyTaskFilters(c *gin.Context, query *gorm.DB, q PaginationQuery) *gorm.DB {
+	if q.Q != "" {
+		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
+	}
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if projectID := c.Query("project_id"); projectID != "" {
+		query = query.Where("project_id = ?", projectID)
+	}
+	if assignedTo := c.Query("assigned_to_id"); assignedTo != "" && !isTaskMemberRequest(c) {
+		query = query.Where("assigned_to_id = ?", assignedTo)
+	}
+	return query
+}
+
 func (h *TaskHandler) resequenceKanbanColumns(tx *gorm.DB, orderedIDs []uint) error {
 	for index, id := range orderedIDs {
 		if err := tx.Model(&models.TaskKanbanColumn{}).
@@ -834,23 +1028,7 @@ func (h *TaskHandler) List(c *gin.Context) {
 	c.ShouldBindQuery(&q)
 	var tasks []models.Task
 	var total int64
-	query := h.db.Model(&models.Task{}).
-		Preload("AssignedTo").
-		Preload("Project").
-		Preload("Labels").
-		Preload("KanbanColumn")
-	if q.Q != "" {
-		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
-	}
-	if status := c.Query("status"); status != "" {
-		query = query.Where("status = ?", status)
-	}
-	if projectID := c.Query("project_id"); projectID != "" {
-		query = query.Where("project_id = ?", projectID)
-	}
-	if assignedTo := c.Query("assigned_to_id"); assignedTo != "" {
-		query = query.Where("assigned_to_id = ?", assignedTo)
-	}
+	query := h.applyTaskFilters(c, h.visibleTaskQuery(c), q)
 	query.Count(&total)
 	result := query
 	if strings.EqualFold(c.Query("fetch_all"), "true") {
@@ -863,7 +1041,135 @@ func (h *TaskHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": tasks, "total": total})
 }
 
+func (h *TaskHandler) ExportReportPDF(c *gin.Context) {
+	var q PaginationQuery
+	c.ShouldBindQuery(&q)
+	var tasks []models.Task
+	query := h.applyTaskFilters(c, h.visibleTaskQuery(c), q).
+		Order("deadline asc nulls last, updated_at desc, id desc")
+	if err := query.Find(&tasks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	tmpl := template.Must(template.New("task-report").Funcs(template.FuncMap{
+		"formatTaskDate": func(t models.FlexTime) string {
+			if t.IsZero() {
+				return "-"
+			}
+			return t.Format("02 January 2006")
+		},
+		"statusLabel": func(status string) string {
+			switch status {
+			case "in_progress":
+				return "In Progress"
+			case "done":
+				return "Done"
+			case "expired":
+				return "Expired"
+			default:
+				return "To Do"
+			}
+		},
+		"inc": func(i int) int { return i + 1 },
+	}).Parse(taskReportPDFTemplate))
+
+	scope := "All Tasks"
+	if isTaskMemberRequest(c) {
+		scope = "My Tasks"
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	data := struct {
+		Tasks     []models.Task
+		Scope     string
+		PrintedAt string
+	}{
+		Tasks:     tasks,
+		Scope:     scope,
+		PrintedAt: time.Now().Format("02 January 2006 15:04"),
+	}
+	tmpl.Execute(c.Writer, data)
+}
+
+const taskReportPDFTemplate = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Task Report</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; font-size: 12px; }
+  .header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding-bottom: 18px; margin-bottom: 22px; border-bottom: 3px solid #0f4f71; }
+  .brand { color: #0f4f71; font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+  h1 { margin: 6px 0 0; font-size: 28px; line-height: 1.1; }
+  .meta { color: #6b7280; line-height: 1.6; text-align: right; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 9px; background: #0f4f71; color: #fff; text-align: left; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; }
+  td { padding: 9px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .title { font-weight: 700; color: #111827; }
+  .muted { color: #6b7280; }
+  .status { display: inline-block; min-width: 74px; border-radius: 999px; padding: 3px 8px; text-align: center; font-size: 11px; font-weight: 700; background: #eef2f7; color: #374151; }
+  .priority { text-transform: capitalize; font-weight: 700; }
+  .footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; text-align: center; font-size: 11px; }
+  @media print { body { padding: 18px; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">NEXONE WORKSPACE</div>
+      <h1>Task Report</h1>
+    </div>
+    <div class="meta">
+      <div><strong>{{.Scope}}</strong></div>
+      <div>Total: {{len .Tasks}} task</div>
+      <div>Printed: {{.PrintedAt}}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">No.</th>
+        <th>Task</th>
+        <th>Project</th>
+        <th>Assigned To</th>
+        <th>Priority</th>
+        <th>Deadline</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{if .Tasks}}
+        {{range $i, $task := .Tasks}}
+        <tr>
+          <td>{{inc $i}}</td>
+          <td>
+            <div class="title">{{$task.Title}}</div>
+            {{if $task.Description}}<div class="muted">{{$task.Description}}</div>{{end}}
+          </td>
+          <td>{{if $task.Project}}{{$task.Project.Title}}{{else}}-{{end}}</td>
+          <td>{{if $task.AssignedTo}}{{$task.AssignedTo.Name}}{{else}}-{{end}}</td>
+          <td class="priority">{{$task.Priority}}</td>
+          <td>{{formatTaskDate $task.Deadline}}</td>
+          <td><span class="status">{{statusLabel $task.Status}}</span></td>
+        </tr>
+        {{end}}
+      {{else}}
+        <tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">No tasks match the current filters.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+
+  <div class="footer">Dokumen ini digenerate otomatis oleh NEXONE Workspace.</div>
+  <script>window.onload=function(){window.print()}</script>
+</body>
+</html>`
+
 func (h *TaskHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "tasks")
 	var req taskPayload
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -898,6 +1204,11 @@ func (h *TaskHandler) Create(c *gin.Context) {
 			return err
 		}
 
+		if isTaskMemberRequest(c) {
+			userID := getUserID(c)
+			req.AssignedToID = &userID
+		}
+
 		task = models.Task{
 			Title:          req.Title,
 			ProjectID:      req.ProjectID,
@@ -926,10 +1237,17 @@ func (h *TaskHandler) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if strings.Contains(err.Error(), "members can only") {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	recordAudit(h.db, c, "create", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusCreated, task)
 }
 
@@ -938,6 +1256,10 @@ func (h *TaskHandler) Get(c *gin.Context) {
 	var task models.Task
 	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Collaborators").Preload("KanbanColumn").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+	if !h.currentUserCanAccessTask(c, task) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only access tasks assigned to you"})
 		return
 	}
 	c.JSON(http.StatusOK, task)
@@ -977,6 +1299,9 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		if err := tx.First(&task, id).Error; err != nil {
 			return err
 		}
+		if !h.currentUserCanAccessTask(c, task) {
+			return gorm.ErrRecordNotFound
+		}
 
 		previousColumnID := task.KanbanColumnID
 		column, err := h.resolveTaskKanbanColumn(tx, status, req.KanbanColumnID)
@@ -987,6 +1312,13 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		task.Title = req.Title
 		task.ProjectID = req.ProjectID
 		task.AssignedToID = req.AssignedToID
+		if isTaskMemberRequest(c) {
+			userID := getUserID(c)
+			if task.AssignedToID == nil || *task.AssignedToID != userID {
+				return fmt.Errorf("members can only update tasks assigned to themselves")
+			}
+			task.AssignedToID = &userID
+		}
 		task.StartDate = req.StartDate
 		task.Deadline = req.Deadline
 		task.Milestone = req.Milestone
@@ -1036,6 +1368,9 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "update", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, task)
 }
 
@@ -1049,6 +1384,10 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 	var task models.Task
 	if err := h.db.First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+	if !h.currentUserCanAccessTask(c, task) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update tasks assigned to you"})
 		return
 	}
 
@@ -1107,6 +1446,9 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	recordAudit(h.db, c, "update_status", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated", "data": task})
 }
 
@@ -1131,6 +1473,9 @@ func (h *TaskHandler) MoveKanbanTask(c *gin.Context) {
 	if err := h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(&task, id).Error; err != nil {
 			return err
+		}
+		if !h.currentUserCanAccessTask(c, task) {
+			return gorm.ErrRecordNotFound
 		}
 
 		var destinationColumn models.TaskKanbanColumn
@@ -1195,6 +1540,9 @@ func (h *TaskHandler) MoveKanbanTask(c *gin.Context) {
 	}
 
 	recordAudit(h.db, c, "move", "task", task.ID, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Task moved", "data": task})
 }
 
@@ -1204,6 +1552,9 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 	if err := h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(&task, id).Error; err != nil {
 			return err
+		}
+		if !h.currentUserCanAccessTask(c, task) {
+			return gorm.ErrRecordNotFound
 		}
 
 		previousColumnID := task.KanbanColumnID
@@ -1234,6 +1585,9 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 		return
 	}
 	recordAudit(h.db, c, "delete", "task", id, task.Title)
+	if task.ProjectID != nil {
+		recalcProjectProgress(h.db, *task.ProjectID)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
@@ -1261,13 +1615,17 @@ func (h *LeadHandler) List(c *gin.Context) {
 }
 
 func (h *LeadHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "leads")
 	var lead models.Lead
 	if err := c.ShouldBindJSON(&lead); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	lead.OwnerID = getUserID(c)
-	h.db.Create(&lead)
+	if err := h.db.Create(&lead).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "lead", lead.ID, lead.Name)
 	c.JSON(http.StatusCreated, lead)
 }
@@ -1420,6 +1778,7 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 }
 
 func (h *InvoiceHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "invoices")
 	var invoice models.Invoice
 	if err := c.ShouldBindJSON(&invoice); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1430,7 +1789,10 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
 	h.applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
-	h.db.Create(&invoice)
+	if err := h.db.Create(&invoice).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusCreated, invoice)
 }
@@ -1664,6 +2026,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 </html>`
 
 func (h *InvoiceHandler) AddPayment(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "payments")
 	id, _ := getID(c)
 	var payment models.Payment
 	if err := c.ShouldBindJSON(&payment); err != nil {
@@ -1671,7 +2034,10 @@ func (h *InvoiceHandler) AddPayment(c *gin.Context) {
 		return
 	}
 	payment.InvoiceID = id
-	h.db.Create(&payment)
+	if err := h.db.Create(&payment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.recalcInvoice(id)
 	c.JSON(http.StatusCreated, payment)
 }
@@ -1685,7 +2051,10 @@ func (h *InvoiceHandler) AddItem(c *gin.Context) {
 	}
 	item.InvoiceID = id
 	item.Total = item.Quantity * item.UnitPrice
-	h.db.Create(&item)
+	if err := h.db.Create(&item).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.recalcInvoice(id)
 	c.JSON(http.StatusCreated, item)
 }
@@ -1829,12 +2198,16 @@ func (h *ContractHandler) List(c *gin.Context) {
 }
 
 func (h *ContractHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "contracts")
 	var contract models.Contract
 	if err := c.ShouldBindJSON(&contract); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&contract)
+	if err := h.db.Create(&contract).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	recordAudit(h.db, c, "create", "contract", contract.ID, contract.Title)
 	c.JSON(http.StatusCreated, contract)
 }
@@ -1883,6 +2256,7 @@ func (h *ItemHandler) List(c *gin.Context) {
 }
 
 func (h *ItemHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "items")
 	var item models.Item
 	if err := c.ShouldBindJSON(&item); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1926,12 +2300,16 @@ func (h *OrderHandler) List(c *gin.Context) {
 }
 
 func (h *OrderHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "orders")
 	var order models.Order
 	if err := c.ShouldBindJSON(&order); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&order)
+	if err := h.db.Create(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, order)
 }
 
@@ -1982,13 +2360,17 @@ func (h *EventHandler) List(c *gin.Context) {
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "events")
 	var event models.Event
 	if err := c.ShouldBindJSON(&event); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	event.CreatedByID = getUserID(c)
-	h.db.Create(&event)
+	if err := h.db.Create(&event).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, event)
 }
 
@@ -2028,13 +2410,17 @@ func (h *NoteHandler) List(c *gin.Context) {
 }
 
 func (h *NoteHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "notes")
 	var note models.Note
 	if err := c.ShouldBindJSON(&note); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	note.UserID = getUserID(c)
-	h.db.Create(&note)
+	if err := h.db.Create(&note).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, note)
 }
 
@@ -2064,12 +2450,23 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 	var expenses []models.Expense
 	var total int64
 	recurring := c.Query("recurring") == "true"
-	h.db.Model(&models.Expense{}).Where("user_id = ? AND is_recurring = ?", userID, recurring).Count(&total)
-	h.db.Where("user_id = ? AND is_recurring = ?", userID, recurring).Order("date desc").Find(&expenses)
+	q := h.db.Model(&models.Expense{})
+	if clientID := c.Query("client_id"); clientID != "" {
+		q = q.Where("client_id = ?", clientID)
+	} else if projectID := c.Query("project_id"); projectID != "" {
+		q = q.Where("project_id = ?", projectID)
+	} else if contractID := c.Query("contract_id"); contractID != "" {
+		q = q.Where("contract_id = ?", contractID)
+	} else {
+		q = q.Where("user_id = ? AND is_recurring = ?", userID, recurring)
+	}
+	q.Count(&total)
+	q.Preload("Contract").Preload("Client").Preload("Project").Order("date desc").Find(&expenses)
 	c.JSON(http.StatusOK, gin.H{"data": expenses, "total": total})
 }
 
 func (h *ExpenseHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "expenses")
 	var expense models.Expense
 	if err := c.ShouldBindJSON(&expense); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2077,7 +2474,11 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 	}
 	expense.UserID = getUserID(c)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
-	h.db.Create(&expense)
+	if err := h.db.Create(&expense).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Preload("Contract").Preload("Client").Preload("Project").First(&expense, expense.ID)
 	c.JSON(http.StatusCreated, expense)
 }
 
@@ -2088,6 +2489,7 @@ func (h *ExpenseHandler) Update(c *gin.Context) {
 	c.ShouldBindJSON(&expense)
 	expense.Total = expense.Amount + expense.Tax + expense.SecondTax
 	h.db.Save(&expense)
+	h.db.Preload("Contract").Preload("Client").Preload("Project").First(&expense, expense.ID)
 	c.JSON(http.StatusOK, expense)
 }
 
@@ -2467,21 +2869,33 @@ func (h *TeamHandler) ResetPassword(c *gin.Context) {
 
 func (h *TeamHandler) ListTimeCards(c *gin.Context) {
 	var cards []models.TimeCard
-	h.db.Preload("User").Order("in_date desc").Find(&cards)
+	q := h.db.Preload("User").Preload("Project")
+	if pid := c.Query("project_id"); pid != "" {
+		q = q.Where("project_id = ?", pid)
+	}
+	q.Order("in_date desc").Find(&cards)
 	c.JSON(http.StatusOK, gin.H{"data": cards})
 }
 
 func (h *TeamHandler) ClockIn(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "time_cards")
 	userID := getUserID(c)
 	var existing models.TimeCard
-	// Check if already clocked in
 	if err := h.db.Where("user_id = ? AND out_time IS NULL", userID).First(&existing).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Already clocked in"})
 		return
 	}
+	var req struct {
+		ProjectID *uint  `json:"project_id"`
+		Note      string `json:"note"`
+	}
+	c.ShouldBindJSON(&req)
 	now := time.Now()
-	card := models.TimeCard{UserID: userID, InTime: now, InDate: now}
-	h.db.Create(&card)
+	card := models.TimeCard{UserID: userID, InTime: now, InDate: now, ProjectID: req.ProjectID, Note: req.Note}
+	if err := h.db.Create(&card).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	h.db.Model(&models.User{}).Where("id = ?", userID).Update("clocked_in", true)
 	c.JSON(http.StatusCreated, card)
 }
@@ -2512,6 +2926,7 @@ func (h *TeamHandler) ListLeaves(c *gin.Context) {
 }
 
 func (h *TeamHandler) ApplyLeave(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "leaves")
 	var leave models.Leave
 	if err := c.ShouldBindJSON(&leave); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2519,7 +2934,10 @@ func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 	}
 	leave.UserID = getUserID(c)
 	leave.Status = "pending"
-	h.db.Create(&leave)
+	if err := h.db.Create(&leave).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, leave)
 }
 
@@ -2540,13 +2958,17 @@ func (h *TeamHandler) ListAnnouncements(c *gin.Context) {
 }
 
 func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "announcements")
 	var ann models.Announcement
 	if err := c.ShouldBindJSON(&ann); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	ann.CreatedByID = getUserID(c)
-	h.db.Create(&ann)
+	if err := h.db.Create(&ann).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, ann)
 }
 
@@ -2577,6 +2999,7 @@ func (h *FileHandler) List(c *gin.Context) {
 }
 
 func (h *FileHandler) Upload(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "files")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
@@ -2622,7 +3045,10 @@ func (h *FileHandler) Upload(c *gin.Context) {
 			f.FolderID = &id
 		}
 	}
-	h.db.Create(&f)
+	if err := h.db.Create(&f).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	// Update URL dengan ID yang sudah ada
 	h.db.Model(&f).Update("url", fmt.Sprintf("/api/v1/files/%d/download", f.ID))
 	c.JSON(http.StatusCreated, f)
@@ -2650,6 +3076,7 @@ func (h *FileHandler) Download(c *gin.Context) {
 }
 
 func (h *FileHandler) CreateFolder(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "files")
 	var folder models.File
 	if err := c.ShouldBindJSON(&folder); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2657,7 +3084,10 @@ func (h *FileHandler) CreateFolder(c *gin.Context) {
 	}
 	folder.IsFolder = true
 	folder.OwnerID = getUserID(c)
-	h.db.Create(&folder)
+	if err := h.db.Create(&folder).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, folder)
 }
 
@@ -2690,13 +3120,17 @@ func (h *TodoHandler) List(c *gin.Context) {
 }
 
 func (h *TodoHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "todos")
 	var todo models.Todo
 	if err := c.ShouldBindJSON(&todo); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	todo.UserID = getUserID(c)
-	h.db.Create(&todo)
+	if err := h.db.Create(&todo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, todo)
 }
 
@@ -2781,12 +3215,16 @@ func (h *LabelHandler) List(c *gin.Context) {
 }
 
 func (h *LabelHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "labels")
 	var label models.Label
 	if err := c.ShouldBindJSON(&label); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Create(&label)
+	if err := h.db.Create(&label).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, label)
 }
 
@@ -2804,7 +3242,7 @@ func NewAppRoleHandler(db *gorm.DB) *AppRoleHandler { return &AppRoleHandler{db:
 
 func (h *AppRoleHandler) List(c *gin.Context) {
 	var roles []models.AppRole
-	h.db.Preload("Permissions").Find(&roles)
+	h.db.Preload("Permissions").Order("name asc").Find(&roles)
 	c.JSON(http.StatusOK, gin.H{"data": roles})
 }
 
@@ -2814,8 +3252,38 @@ func (h *AppRoleHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.db.Create(&role).Error; err != nil {
+	role.Name = strings.TrimSpace(role.Name)
+	role.Description = strings.TrimSpace(role.Description)
+	if role.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role name is required"})
+		return
+	}
+
+	var existing models.AppRole
+	err := h.db.Unscoped().Where("name = ?", role.Name).First(&existing).Error
+	if err == nil {
+		if existing.DeletedAt.Valid {
+			if err := h.db.Unscoped().Model(&models.AppRole{}).Where("id = ?", existing.ID).Updates(map[string]any{
+				"deleted_at":  nil,
+				"description": role.Description,
+				"updated_at":  time.Now(),
+			}).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			h.db.First(&existing, existing.ID)
+			c.JSON(http.StatusCreated, existing)
+			return
+		}
 		c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"})
+		return
+	}
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.db.Create(&role).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, role)
@@ -2842,12 +3310,33 @@ func (h *AppRoleHandler) Update(c *gin.Context) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	c.ShouldBindJSON(&req)
-	if req.Name != "" {
-		role.Name = req.Name
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	role.Description = req.Description
-	h.db.Save(&role)
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role name is required"})
+		return
+	}
+
+	var duplicate models.AppRole
+	err := h.db.Unscoped().Where("name = ? AND id <> ?", name, role.ID).First(&duplicate).Error
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"})
+		return
+	}
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	role.Name = name
+	role.Description = strings.TrimSpace(req.Description)
+	if err := h.db.Save(&role).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, role)
 }
 
@@ -2875,14 +3364,26 @@ func (h *AppRoleHandler) SetPermissions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// Replace all permissions for this role
-	h.db.Where("app_role_id = ?", id).Delete(&models.RolePermission{})
-	for i := range permissions {
-		permissions[i].AppRoleID = id
-		permissions[i].ID = 0
-	}
-	if len(permissions) > 0 {
-		h.db.Create(&permissions)
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("app_role_id = ?", id).Delete(&models.RolePermission{}).Error; err != nil {
+			return err
+		}
+		for i := range permissions {
+			permissions[i].AppRoleID = id
+			permissions[i].ID = 0
+			if permissions[i].CanEdit {
+				permissions[i].CanRead = true
+			}
+		}
+		if len(permissions) > 0 {
+			if err := tx.Create(&permissions).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Preload("Permissions").First(&role, id)
 	c.JSON(http.StatusOK, role)
@@ -3025,4 +3526,116 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"error", "tipe laporan tidak dikenal: " + reportType})
 		w.Write([]string{"tersedia", strings.Join([]string{"invoices", "expenses", "leads", "projects", "timecards"}, ", ")})
 	}
+}
+
+// ─── MILESTONE ───────────────────────────────────────
+
+type MilestoneHandler struct{ db *gorm.DB }
+
+func NewMilestoneHandler(db *gorm.DB) *MilestoneHandler { return &MilestoneHandler{db: db} }
+
+func (h *MilestoneHandler) List(c *gin.Context) {
+	projectID := c.Param("id")
+	var items []models.Milestone
+	h.db.Preload("Assignee").Where("project_id = ?", projectID).Order("due_date asc, id asc").Find(&items)
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *MilestoneHandler) Create(c *gin.Context) {
+	projectID := c.Param("id")
+	var m models.Milestone
+	if err := c.ShouldBindJSON(&m); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pid, err := strconv.ParseUint(projectID, 10, 64)
+	if err != nil || pid == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID proyek tidak valid atau tidak ditemukan"})
+		return
+	}
+	m.ProjectID = uint(pid)
+	if err := h.db.Create(&m).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Preload("Assignee").First(&m, m.ID)
+	c.JSON(http.StatusCreated, m)
+}
+
+func (h *MilestoneHandler) Update(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("mid"), 10, 64)
+	var m models.Milestone
+	if err := h.db.First(&m, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&m); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Save(&m)
+	h.db.Preload("Assignee").First(&m, m.ID)
+	c.JSON(http.StatusOK, m)
+}
+
+func (h *MilestoneHandler) Delete(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("mid"), 10, 64)
+	h.db.Delete(&models.Milestone{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+// ─── DELIVERABLE ─────────────────────────────────────
+
+type DeliverableHandler struct{ db *gorm.DB }
+
+func NewDeliverableHandler(db *gorm.DB) *DeliverableHandler { return &DeliverableHandler{db: db} }
+
+func (h *DeliverableHandler) List(c *gin.Context) {
+	projectID := c.Param("id")
+	var items []models.Deliverable
+	h.db.Preload("File").Where("project_id = ?", projectID).Order("due_date asc, id asc").Find(&items)
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *DeliverableHandler) Create(c *gin.Context) {
+	projectID := c.Param("id")
+	var d models.Deliverable
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pid, err := strconv.ParseUint(projectID, 10, 64)
+	if err != nil || pid == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID proyek tidak valid atau tidak ditemukan"})
+		return
+	}
+	d.ProjectID = uint(pid)
+	if err := h.db.Create(&d).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Preload("File").First(&d, d.ID)
+	c.JSON(http.StatusCreated, d)
+}
+
+func (h *DeliverableHandler) Update(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("did"), 10, 64)
+	var d models.Deliverable
+	if err := h.db.First(&d, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Save(&d)
+	h.db.Preload("File").First(&d, d.ID)
+	c.JSON(http.StatusOK, d)
+}
+
+func (h *DeliverableHandler) Delete(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("did"), 10, 64)
+	h.db.Delete(&models.Deliverable{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }

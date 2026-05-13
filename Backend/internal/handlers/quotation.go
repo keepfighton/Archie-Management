@@ -265,24 +265,38 @@ func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 		Notes:          quotation.Notes,
 	}
 
-	if err := h.db.Create(&invoice).Error; err != nil {
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&invoice).Error; err != nil {
+			return err
+		}
+
+		for _, item := range quotation.Items {
+			invoiceItem := models.InvoiceItem{
+				InvoiceID:   invoice.ID,
+				Description: item.Description,
+				Quantity:    item.Quantity,
+				UnitPrice:   item.UnitPrice,
+				Total:       item.Total,
+			}
+			if err := tx.Create(&invoiceItem).Error; err != nil {
+				return err
+			}
+		}
+
+		quotation.Status = "converted"
+		if err := tx.Save(&quotation).Error; err != nil {
+			return err
+		}
+
+		recordAudit(tx, c, "convert", "quotation", quotation.ID, quotation.QuoteNumber+" -> "+invoice.InvoiceNumber)
+		return nil
+	})
+
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	for _, item := range quotation.Items {
-		h.db.Create(&models.InvoiceItem{
-			InvoiceID:   invoice.ID,
-			Description: item.Description,
-			Quantity:    item.Quantity,
-			UnitPrice:   item.UnitPrice,
-			Total:       item.Total,
-		})
-	}
-
-	quotation.Status = "converted"
-	h.db.Save(&quotation)
-	recordAudit(h.db, c, "convert", "quotation", quotation.ID, quotation.QuoteNumber+" -> "+invoice.InvoiceNumber)
 	c.JSON(http.StatusOK, gin.H{"message": "Converted to invoice", "invoice_id": invoice.ID})
 }
 

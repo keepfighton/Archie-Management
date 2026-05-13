@@ -131,7 +131,7 @@ export default function ClientsPage() {
     finally { setOverviewLoading(false) }
   }
 
-  const loadClients = () => {
+  const loadClients = (overridePage?: number) => {
     setLoading(true)
     clientService.list({ page, limit: 10, q: search })
       .then(r => { setClients(r.data.data || []); setTotal(r.data.total || 0) })
@@ -223,7 +223,8 @@ export default function ClientsPage() {
         await clientService.create(payload); toast.success('Client created!')
       }
       setShowModal(false)
-      if (tab === 'clients') loadClients()
+      setPage(1)
+      if (tab === 'clients') loadClients(1)
       else loadOverview()
     } catch { toast.error('Failed to save client') }
     finally { setSaving(false) }

@@ -1,7 +1,30 @@
 import axios from 'axios'
 
+export const API_BASE_URL = (() => {
+  const envValue = import.meta.env.VITE_API_URL
+  const normalized = normalizeApiBaseURL(envValue)
+
+  // Jika URL adalah absolut (mengandung http), gunakan langsung agar browser memanggil port backend.
+  // Ini penting agar browser bisa memanggil port 8080 dari port 3000.
+  if (normalized.startsWith('http')) {
+    return normalized
+  }
+
+  // Fallback ke relative path jika tidak ada http
+  return normalized.includes('/api') ? normalized : '/api/v1'
+})()
+
+function normalizeApiBaseURL(value: string | undefined) {
+  const baseURL = value?.trim()
+  if (!baseURL || baseURL === '/' || baseURL === '.') {
+    return '/api/v1'
+  }
+  return baseURL.replace(/\/+$/, '')
+}
+
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -68,6 +91,15 @@ export const clientService = {
   getInvoices: (id: number) => api.get(`/clients/${id}/invoices`),
 }
 
+// ─── Clusters ────────────────────────────────────────
+export const clusterService = {
+  list: (params?: any) => api.get('/clusters', { params }),
+  get: (id: number) => api.get(`/clusters/${id}`),
+  create: (data: any) => api.post('/clusters', data),
+  update: (id: number, data: any) => api.put(`/clusters/${id}`, data),
+  delete: (id: number) => api.delete(`/clusters/${id}`),
+}
+
 // ─── Projects ────────────────────────────────────────
 export const projectService = {
   list: (params?: any) => api.get('/projects', { params }),
@@ -83,6 +115,19 @@ export const projectService = {
 // ─── Tasks ───────────────────────────────────────────
 export const taskService = {
   list: (params?: any) => api.get('/tasks', { params }),
+  openReportPDF: (params?: any) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const query = new URLSearchParams()
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    })
+    const url = `${API_BASE_URL}/tasks/report/pdf${query.toString() ? `?${query.toString()}` : ''}`
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(async (res) => {
+      const html = await res.text()
+      const win = window.open('', '_blank')
+      if (win) { win.document.write(html); win.document.close() }
+    })
+  },
   listKanbanColumns: () => api.get('/tasks/columns'),
   createKanbanColumn: (data: any) => api.post('/tasks/columns', data),
   reorderKanbanColumns: (data: { column_ids: number[] }) => api.patch('/tasks/columns/reorder', data),
@@ -134,6 +179,7 @@ export const paymentService = {
 // ─── Contracts ───────────────────────────────────────
 export const contractService = {
   list: (params?: any) => api.get('/contracts', { params }),
+  get: (id: number) => api.get(`/contracts/${id}`),
   create: (data: any) => api.post('/contracts', data),
   update: (id: number, data: any) => api.put(`/contracts/${id}`, data),
   delete: (id: number) => api.delete(`/contracts/${id}`),
@@ -165,7 +211,7 @@ export const teamService = {
   resetPassword: (id: number, data?: { password?: string }) =>
     api.post(`/team/members/${id}/reset-password`, data ?? {}),
   deleteMember: (id: number) => api.delete(`/team/members/${id}`),
-  listTimeCards: () => api.get('/team/timecards'),
+  listTimeCards: (params?: any) => api.get('/team/timecards', { params }),
   clockIn: () => api.post('/team/timecards/clock-in'),
   clockOut: () => api.post('/team/timecards/clock-out'),
   listLeaves: () => api.get('/team/leaves'),
@@ -210,6 +256,21 @@ export const todoService = {
   delete: (id: number) => api.delete(`/todos/${id}`),
 }
 
+// ─── Internal Messages ──────────────────────────────
+export const messageService = {
+  heartbeat: () => api.post('/presence/heartbeat'),
+  listUsers: () => api.get('/messages/users'),
+  listConversations: () => api.get('/messages/conversations'),
+  openDirectConversation: (userId: number) =>
+    api.post('/messages/conversations/direct', { user_id: userId }),
+  listMessages: (conversationId: number) =>
+    api.get(`/messages/conversations/${conversationId}/messages`),
+  sendMessage: (conversationId: number, body: string) =>
+    api.post(`/messages/conversations/${conversationId}/messages`, { body }),
+  markRead: (conversationId: number) =>
+    api.post(`/messages/conversations/${conversationId}/read`),
+}
+
 // ─── Notes ───────────────────────────────────────────
 export const noteService = {
   list: () => api.get('/notes'),
@@ -227,25 +288,46 @@ export const reportService = {
   exportCSV: (type: string, year?: string) => {
     const params = new URLSearchParams({ type })
     if (year) params.append('year', year)
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
-    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
-    const a = document.createElement('a')
-    a.href = `${baseURL}/reports/export?${params.toString()}`
-    // inject token via query is not ideal; use window.fetch instead
-    return fetch(`${baseURL}/reports/export?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(async (res) => {
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      a.href = url
-      a.download = `laporan_${type}_${new Date().toISOString().slice(0, 10)}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    })
+
+    const fileName = `laporan_${type}_${new Date().toISOString().slice(0, 10)}.csv`
+
+    // Force Authorization header for this export request.
+    // Even if axios interceptor is configured, this prevents edge-cases
+    // where token storage/redirect timing results in missing Authorization.
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (!token) {
+      // Let caller handle errors; keep behavior consistent with other services.
+      return Promise.reject(new Error('Missing auth token'))
+    }
+
+    const path = `/reports/export?${params.toString()}`
+    console.log('[reportService.exportCSV] API_BASE_URL:', API_BASE_URL, 'path:', path)
+
+    return api
+      .get(path, {
+        responseType: 'blob',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        console.log(
+          '[reportService.exportCSV] status:', res.status,
+          'content-type:', res.headers?.['content-type']
+        )
+
+        const blob = res.data
+        const url = URL.createObjectURL(blob)
+
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      })
   },
 }
+
 
 // ─── Audit Logs ──────────────────────────────────────
 export const auditService = {
@@ -267,7 +349,7 @@ export const roleService = {
 export const invoicePDFService = {
   openPDF: (id: number) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
-    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+    const baseURL = API_BASE_URL
     fetch(`${baseURL}/invoices/${id}/pdf`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(async (res) => {
@@ -276,6 +358,22 @@ export const invoicePDFService = {
       if (win) { win.document.write(html); win.document.close() }
     })
   },
+}
+
+// ─── Milestones ──────────────────────────────────────
+export const milestoneService = {
+  list: (projectId: number) => api.get(`/projects/${projectId}/milestones`),
+  create: (projectId: number, data: any) => api.post(`/projects/${projectId}/milestones`, data),
+  update: (projectId: number, id: number, data: any) => api.put(`/projects/${projectId}/milestones/${id}`, data),
+  delete: (projectId: number, id: number) => api.delete(`/projects/${projectId}/milestones/${id}`),
+}
+
+// ─── Deliverables ────────────────────────────────────
+export const deliverableService = {
+  list: (projectId: number) => api.get(`/projects/${projectId}/deliverables`),
+  create: (projectId: number, data: any) => api.post(`/projects/${projectId}/deliverables`, data),
+  update: (projectId: number, id: number, data: any) => api.put(`/projects/${projectId}/deliverables/${id}`, data),
+  delete: (projectId: number, id: number) => api.delete(`/projects/${projectId}/deliverables/${id}`),
 }
 
 // ─── Labels ──────────────────────────────────────────
@@ -304,7 +402,7 @@ export const quotationService = {
 export const quotationPrintService = {
   openPDF: (id: number) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
-    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+    const baseURL = API_BASE_URL
     fetch(`${baseURL}/quotations/${id}/pdf`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(async (res) => {
@@ -315,7 +413,7 @@ export const quotationPrintService = {
   },
   openPrint: (id: number) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
-    const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+    const baseURL = API_BASE_URL
     return fetch(`${baseURL}/quotations/${id}/pdf`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then(async (res) => {

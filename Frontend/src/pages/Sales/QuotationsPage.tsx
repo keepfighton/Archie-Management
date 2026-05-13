@@ -69,9 +69,9 @@ export default function QuotationsPage() {
   const [form, setForm] = useState<any>(emptyForm())
   const [itemForm, setItemForm] = useState({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
 
-  const load = (q = search) => {
+  const load = (q = search, overridePage?: number) => {
     setLoading(true)
-    const params: any = { page, limit: 10 }
+    const params: any = { page: overridePage ?? page, limit: 10 }
     if (statusFilter) params.status = statusFilter
     if (q) params.q = q
     quotationService
@@ -173,7 +173,8 @@ export default function QuotationsPage() {
         toast.success('Quotation created!')
       }
       setShowModal(false)
-      load()
+      setPage(1)
+      load(search, 1)
     } catch {
       toast.error(editItem ? 'Failed to update quotation' : 'Failed to create quotation')
     } finally {

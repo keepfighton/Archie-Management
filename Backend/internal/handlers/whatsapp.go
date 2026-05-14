@@ -78,6 +78,15 @@ type amountGroup struct {
 	Total float64
 }
 
+type clientRevenueSummary struct {
+	ClientID    uint
+	ClientName  string
+	InvoiceCnt  int64
+	Invoiced    float64
+	Paid        float64
+	Outstanding float64
+}
+
 type projectTimeSummary struct {
 	ProjectID uint
 	Title     string
@@ -191,6 +200,8 @@ func (h *WhatsAppHandler) isAllowedOwner(from string) bool {
 func (h *WhatsAppHandler) buildReply(message string) string {
 	normalized := normalizeQuestion(message)
 	switch {
+	case normalized == "nexone" || normalized == "halo nexone" || normalized == "hi nexone":
+		return h.executiveQuestionsReply()
 	case normalized == "help" || normalized == "bantuan" || normalized == "menu":
 		return h.menuReply()
 	case strings.Contains(normalized, "laporan") ||
@@ -206,6 +217,8 @@ func (h *WhatsAppHandler) buildReply(message string) string {
 		return formatOwnerReport(report)
 	case containsAny(normalized, "semua data", "all data", "overview", "gambaran"):
 		return h.businessOverviewReply()
+	case containsAny(normalized, "revenue per client", "revenue per klien", "revenue by client", "revenue by klien", "income per client", "income per klien", "pendapatan per client", "pendapatan per klien", "omzet per client", "omset per client", "omzet per klien", "omset per klien"):
+		return h.clientRevenueReply()
 	case containsAny(normalized, "profit", "keuntungan", "laba", "margin", "cashflow", "cash flow", "income vs expense"):
 		return h.financeReply()
 	case containsAny(normalized, "cluster", "klaster"):
@@ -245,10 +258,27 @@ func (h *WhatsAppHandler) buildReply(message string) string {
 	}
 }
 
+func (h *WhatsAppHandler) executiveQuestionsReply() string {
+	return `NEXONE Executive Summary
+
+Pilih salah satu pertanyaan:
+1. Ringkasan NEXONE hari ini?
+2. Berapa project berjalan?
+3. Apa saja nama project berjalan?
+4. Revenue per client berapa?
+5. Berapa profit estimasi?
+6. Invoice overdue apa saja?
+7. Tagihan belum dibayar berapa?
+8. Project mana yang deadline dekat?
+9. Siapa PIC project berjalan?
+10. Lead yang masih aktif apa saja?`
+}
+
 func (h *WhatsAppHandler) menuReply() string {
 	return `NEXONE WA Assistant
 
 Contoh pertanyaan:
+- NEXONE
 - laporan
 - semua data
 - berapa project berjalan
@@ -716,6 +746,45 @@ Income diterima: %s
 Expense: %s
 Profit estimasi: %s
 Tagihan outstanding: %s`, formatIDR(invoiced), formatIDR(income), formatIDR(expenses), formatIDR(income-expenses), formatIDR(due))
+}
+
+func (h *WhatsAppHandler) clientRevenueReply() string {
+	var rows []clientRevenueSummary
+	if err := h.db.Table("clients").
+		Select(`clients.id as client_id,
+			clients.name as client_name,
+			COUNT(invoices.id) as invoice_cnt,
+			COALESCE(SUM(invoices.total_amount),0) as invoiced,
+			COALESCE(SUM(invoices.paid_amount),0) as paid,
+			COALESCE(SUM(invoices.due_amount),0) as outstanding`).
+		Joins("LEFT JOIN invoices ON invoices.client_id = clients.id AND invoices.deleted_at IS NULL").
+		Where("clients.deleted_at IS NULL").
+		Group("clients.id, clients.name").
+		Order("paid DESC, invoiced DESC, clients.name ASC").
+		Limit(15).
+		Scan(&rows).Error; err != nil {
+		log.Printf("failed building revenue per client: %v", err)
+		return "Maaf, revenue per client belum bisa dibaca."
+	}
+	if len(rows) == 0 {
+		return "Belum ada data client untuk revenue."
+	}
+
+	var totalInvoiced, totalPaid, totalOutstanding float64
+	for _, row := range rows {
+		totalInvoiced += row.Invoiced
+		totalPaid += row.Paid
+		totalOutstanding += row.Outstanding
+	}
+
+	lines := []string{
+		"Revenue per client:",
+		fmt.Sprintf("Total invoiced %s | paid %s | outstanding %s", formatIDR(totalInvoiced), formatIDR(totalPaid), formatIDR(totalOutstanding)),
+	}
+	for i, row := range rows {
+		lines = append(lines, fmt.Sprintf("%d. %s\n   invoice %d | revenue %s | tagihan %s", i+1, row.ClientName, row.InvoiceCnt, formatIDR(row.Paid), formatIDR(row.Outstanding)))
+	}
+	return limitWhatsAppText(strings.Join(lines, "\n"))
 }
 
 func (h *WhatsAppHandler) clientReply(q string) string {

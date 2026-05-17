@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { auditService } from '@/services/api'
 import { format } from 'date-fns'
 import { ShieldCheck, Search, Filter } from 'lucide-react'
+import { DEFAULT_PAGE_LIMIT, rowNumber } from '@/components/common'
 
 interface AuditLog {
   id: number
@@ -52,7 +53,7 @@ export default function AuditLogPage() {
   const fetchLogs = async () => {
     setLoading(true)
     try {
-      const params: Record<string, string | number> = { page, limit: 50 }
+      const params: Record<string, string | number> = { page, limit: DEFAULT_PAGE_LIMIT }
       if (filters.entity_type) params.entity_type = filters.entity_type
       if (filters.action) params.action = filters.action
       if (filters.from) params.from = filters.from
@@ -72,7 +73,7 @@ export default function AuditLogPage() {
     setPage(1)
   }
 
-  const totalPages = Math.ceil(total / 50)
+  const totalPages = Math.ceil(total / DEFAULT_PAGE_LIMIT)
 
   return (
     <div className="p-6">
@@ -151,6 +152,7 @@ export default function AuditLogPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 w-16">No.</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Waktu</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Pengguna</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Aksi</th>
@@ -160,8 +162,9 @@ export default function AuditLogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {logs.map(log => (
+              {logs.map((log, index) => (
                 <tr key={log.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-400">{rowNumber(page, index)}</td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                     {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss')}
                   </td>

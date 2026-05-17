@@ -5,7 +5,8 @@ import { toast } from 'react-toastify'
 import { Plus, FileDown } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
+  rowNumber,
 } from '@/components/common'
 
 export default function OrdersPage() {
@@ -88,13 +89,14 @@ export default function OrdersPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Order #</th><th>Client</th><th>Order Date</th><th>Amount</th><th>Status</th><th></th></tr>
+              <tr><th className="w-16">No.</th><th>Order #</th><th>Client</th><th>Order Date</th><th>Amount</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={6}><EmptyState /></td></tr>
-                : filtered.map(o => (
+                ? <tr><td colSpan={7}><EmptyState /></td></tr>
+                : filtered.map((o, index) => (
                   <tr key={o.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
                     <td className="font-medium text-blue-600">{o.order_number}</td>
                     <td className="text-gray-500">{o.client?.name || '-'}</td>
                     <td className="text-gray-400 whitespace-nowrap">{o.order_date ? new Date(o.order_date).toLocaleDateString('id') : '-'}</td>

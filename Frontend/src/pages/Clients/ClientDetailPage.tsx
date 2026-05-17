@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import {
   Loading, EmptyState, StatusBadge, ProgressBar, Avatar,
-  Modal, FormField, ViewTabs
+  Modal, FormField, ViewTabs, rowNumber
 } from '@/components/common'
 
 const TABS = [
@@ -337,11 +337,12 @@ export default function ClientDetailPage() {
                 : (
                   <table className="table">
                     <thead>
-                      <tr><th>Name</th><th>Position</th><th>Email</th><th>Phone</th></tr>
+                      <tr><th className="w-16">No.</th><th>Name</th><th>Position</th><th>Email</th><th>Phone</th></tr>
                     </thead>
                     <tbody>
-                      {contacts.map(c => (
+                      {contacts.map((c, index) => (
                         <tr key={c.id}>
+                          <td className="text-gray-400">{rowNumber(1, index, contacts.length || 1)}</td>
                           <td className="font-medium">{c.name}</td>
                           <td className="text-gray-400">{c.position || '-'}</td>
                           <td className="text-gray-400">{c.email   || '-'}</td>
@@ -458,18 +459,19 @@ export default function ClientDetailPage() {
           {tabLoading ? <Loading /> : (
             <table className="table">
               <thead>
-                <tr><th>Title</th><th>Status</th><th>Contract</th><th>Budget</th><th>Total Expenses</th><th>% Used</th><th>Progress</th><th>Deadline</th></tr>
+                <tr><th className="w-16">No.</th><th>Title</th><th>Status</th><th>Contract</th><th>Budget</th><th>Total Expenses</th><th>% Used</th><th>Progress</th><th>Deadline</th></tr>
               </thead>
               <tbody>
                 {projects.length === 0
-                  ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                  : projects.map(p => {
+                  ? <tr><td colSpan={9}><EmptyState /></td></tr>
+                  : projects.map((p, index) => {
                       const contract = contracts.find(c => c.project_id === p.id)
                       const budget = contract ? Number(contract.amount) : 0
                       const totalExp = expenses.filter(e => e.project_id === p.id).reduce((s, e) => s + (e.total || 0), 0)
                       const pct = budget > 0 ? Math.round((totalExp / budget) * 100) : null
                       return (
                         <tr key={p.id}>
+                          <td className="text-gray-400">{rowNumber(1, index, projects.length || 1)}</td>
                           <td>
                             <Link to={`/projects/${p.id}`} className="hover:underline" style={{ color: '#2aacb8' }}>{p.title}</Link>
                           </td>
@@ -502,13 +504,14 @@ export default function ClientDetailPage() {
         <div className="table-container">
           <table className="table">
             <thead>
-              <tr><th>Invoice #</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Status</th></tr>
+              <tr><th className="w-16">No.</th><th>Invoice #</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Status</th></tr>
             </thead>
             <tbody>
               {invoices.length === 0
-                ? <tr><td colSpan={5}><EmptyState /></td></tr>
-                : invoices.map(inv => (
+                ? <tr><td colSpan={6}><EmptyState /></td></tr>
+                : invoices.map((inv, index) => (
                   <tr key={inv.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, invoices.length || 1)}</td>
                     <td className="font-medium" style={{ color: '#2aacb8' }}>{inv.invoice_number}</td>
                     <td className="text-gray-400">{new Date(inv.bill_date).toLocaleDateString('id')}</td>
                     <td className="text-gray-400">{new Date(inv.due_date).toLocaleDateString('id')}</td>
@@ -532,13 +535,14 @@ export default function ClientDetailPage() {
             <div className="table-container">
               <table className="table">
                 <thead>
-                  <tr><th>Invoice #</th><th>Payment Date</th><th>Payment Method</th><th>Note</th><th className="text-right">Amount</th></tr>
+                  <tr><th className="w-16">No.</th><th>Invoice #</th><th>Payment Date</th><th>Payment Method</th><th>Note</th><th className="text-right">Amount</th></tr>
                 </thead>
                 <tbody>
                   {payments.length === 0
-                    ? <tr><td colSpan={5}><EmptyState message="No payments found." /></td></tr>
+                    ? <tr><td colSpan={6}><EmptyState message="No payments found." /></td></tr>
                     : payments.map((p, i) => (
                       <tr key={i}>
+                        <td className="text-gray-400">{rowNumber(1, i, payments.length || 1)}</td>
                         <td style={{ color: '#2aacb8' }} className="font-medium">{p.invoice_number || `INVOICE #${p.invoice_id}`}</td>
                         <td className="text-gray-500">{p.payment_date ? new Date(p.payment_date).toLocaleDateString('id') : '-'}</td>
                         <td className="text-gray-500">{p.payment_method || '-'}</td>
@@ -549,7 +553,7 @@ export default function ClientDetailPage() {
                   }
                   {payments.length > 0 && (
                     <tr className="font-semibold bg-gray-50">
-                      <td colSpan={4} className="text-right text-gray-700">Total</td>
+                      <td colSpan={5} className="text-right text-gray-700">Total</td>
                       <td className="text-right text-gray-900 whitespace-nowrap">
                         IDR {payments.reduce((s, p) => s + (Number(p.amount) || 0), 0).toLocaleString('id-ID')}
                       </td>
@@ -584,17 +588,18 @@ export default function ClientDetailPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>Invoice #</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th></tr>
+                <tr><th className="w-16">No.</th><th>Invoice #</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th></tr>
               </thead>
               <tbody>
                 {invoices.length === 0
-                  ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                  : invoices.map(inv => {
+                  ? <tr><td colSpan={8}><EmptyState /></td></tr>
+                  : invoices.map((inv, index) => {
                     const total = Number(inv.total_amount) || 0
                     const paid  = Number(inv.paid_amount)  || 0
                     const bal   = total - paid
                     return (
                       <tr key={inv.id}>
+                        <td className="text-gray-400">{rowNumber(1, index, invoices.length || 1)}</td>
                         <td className="font-medium" style={{ color: '#2aacb8' }}>{inv.invoice_number}</td>
                         <td className="text-gray-400">{new Date(inv.bill_date).toLocaleDateString('id')}</td>
                         <td className="text-gray-400">{new Date(inv.due_date).toLocaleDateString('id')}</td>
@@ -623,13 +628,14 @@ export default function ClientDetailPage() {
             <div className="table-container">
               <table className="table">
                 <thead>
-                  <tr><th>Order #</th><th>Date</th><th>Total</th><th>Status</th></tr>
+                  <tr><th className="w-16">No.</th><th>Order #</th><th>Date</th><th>Total</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {orders.length === 0
-                    ? <tr><td colSpan={4}><EmptyState message="No orders found." /></td></tr>
-                    : orders.map(o => (
+                    ? <tr><td colSpan={5}><EmptyState message="No orders found." /></td></tr>
+                    : orders.map((o, index) => (
                       <tr key={o.id}>
+                        <td className="text-gray-400">{rowNumber(1, index, orders.length || 1)}</td>
                         <td className="font-medium" style={{ color: '#2aacb8' }}>{o.order_number || `#${o.id}`}</td>
                         <td className="text-gray-400">{o.created_at ? new Date(o.created_at).toLocaleDateString('id') : '-'}</td>
                         <td className="whitespace-nowrap">{cur} {Number(o.total_amount || 0).toLocaleString('id-ID')}</td>
@@ -655,13 +661,14 @@ export default function ClientDetailPage() {
             <div className="table-container">
               <table className="table">
                 <thead>
-                  <tr><th>Title</th><th>Start Date</th><th>End Date</th><th>Value</th><th>Status</th></tr>
+                  <tr><th className="w-16">No.</th><th>Title</th><th>Start Date</th><th>End Date</th><th>Value</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {contracts.length === 0
-                    ? <tr><td colSpan={5}><EmptyState message="No contracts found." /></td></tr>
-                    : contracts.map(c => (
+                    ? <tr><td colSpan={6}><EmptyState message="No contracts found." /></td></tr>
+                    : contracts.map((c, index) => (
                       <tr key={c.id}>
+                        <td className="text-gray-400">{rowNumber(1, index, contracts.length || 1)}</td>
                         <td className="font-medium">{c.title || '-'}</td>
                         <td className="text-gray-400">{c.start_date ? new Date(c.start_date).toLocaleDateString('id') : '-'}</td>
                         <td className="text-gray-400">{c.end_date   ? new Date(c.end_date).toLocaleDateString('id')   : '-'}</td>
@@ -688,13 +695,14 @@ export default function ClientDetailPage() {
             <div className="table-container">
               <table className="table">
                 <thead>
-                  <tr><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th></tr>
+                  <tr><th className="w-16">No.</th><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th></tr>
                 </thead>
                 <tbody>
                   {files.length === 0
-                    ? <tr><td colSpan={4}><EmptyState message="No files found." /></td></tr>
-                    : files.map(f => (
+                    ? <tr><td colSpan={5}><EmptyState message="No files found." /></td></tr>
+                    : files.map((f, index) => (
                       <tr key={f.id}>
+                        <td className="text-gray-400">{rowNumber(1, index, files.length || 1)}</td>
                         <td className="font-medium" style={{ color: '#2aacb8' }}>{f.name}</td>
                         <td className="text-gray-400 uppercase text-[10px]">{f.file_type || '-'}</td>
                         <td className="text-gray-400">{f.size ? `${(f.size / 1024).toFixed(1)} KB` : '-'}</td>
@@ -725,6 +733,7 @@ export default function ClientDetailPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="w-16">No.</th>
                     <th>Date</th>
                     <th>Contract</th>
                     <th>Project</th>
@@ -737,9 +746,10 @@ export default function ClientDetailPage() {
                 </thead>
                 <tbody>
                   {expenses.length === 0
-                    ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                    : expenses.map(e => (
+                    ? <tr><td colSpan={9}><EmptyState /></td></tr>
+                    : expenses.map((e, index) => (
                         <tr key={e.id}>
+                          <td className="text-gray-400">{rowNumber(1, index, expenses.length || 1)}</td>
                           <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
                           <td className="text-sm text-gray-500">{e.contract?.contract_number || '-'}</td>
                           <td className="text-sm text-gray-500">{e.project?.title || '-'}</td>
@@ -769,13 +779,14 @@ export default function ClientDetailPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>Name</th><th>Position</th><th>Email</th><th>Phone</th></tr>
+                <tr><th className="w-16">No.</th><th>Name</th><th>Position</th><th>Email</th><th>Phone</th></tr>
               </thead>
               <tbody>
                 {contacts.length === 0
-                  ? <tr><td colSpan={4}><EmptyState /></td></tr>
-                  : contacts.map(c => (
+                  ? <tr><td colSpan={5}><EmptyState /></td></tr>
+                  : contacts.map((c, index) => (
                     <tr key={c.id}>
+                      <td className="text-gray-400">{rowNumber(1, index, contacts.length || 1)}</td>
                       <td className="font-medium">{c.name}</td>
                       <td className="text-gray-500">{c.position || '-'}</td>
                       <td className="text-gray-500">{c.email    || '-'}</td>

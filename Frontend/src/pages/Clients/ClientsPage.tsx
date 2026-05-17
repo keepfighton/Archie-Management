@@ -5,7 +5,8 @@ import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown, Printer, Briefcase, Users, ClipboardCheck, Clock, FolderKanban, CheckCircle2, PauseCircle, XCircle } from 'lucide-react'
 import {
   PageHeader, SearchInput, Pagination,
-  Modal, ConfirmDialog, Loading, EmptyState, Avatar
+  Modal, ConfirmDialog, Loading, EmptyState, Avatar,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { isValidEmail } from '@/utils/format'
@@ -43,7 +44,7 @@ export default function ClientsPage() {
   const [contactSearch, setContactSearch] = useState('')
   const [contactsLoading, setContactsLoading] = useState(false)
   const [contactPage, setContactPage] = useState(1)
-  const CONTACT_LIMIT = 10
+  const CONTACT_LIMIT = DEFAULT_PAGE_LIMIT
 
   // Contact modal state
   const [showContactModal, setShowContactModal] = useState(false)
@@ -133,7 +134,8 @@ export default function ClientsPage() {
 
   const loadClients = (overridePage?: number) => {
     setLoading(true)
-    clientService.list({ page, limit: 10, q: search })
+    const nextPage = overridePage ?? page
+    clientService.list({ page: nextPage, limit: DEFAULT_PAGE_LIMIT, q: search })
       .then(r => { setClients(r.data.data || []); setTotal(r.data.total || 0) })
       .catch(() => toast.error('Failed to load clients'))
       .finally(() => setLoading(false))
@@ -499,14 +501,14 @@ export default function ClientsPage() {
                 <>
                   <table className="table">
                     <thead>
-                      <tr><th>ID</th><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>Currency</th><th>Owner</th><th></th></tr>
+                      <tr><th className="w-16">No.</th><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>Currency</th><th>Owner</th><th></th></tr>
                     </thead>
                     <tbody>
                       {clients.length === 0
                         ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                        : clients.map(c => (
+                        : clients.map((c, index) => (
                           <tr key={c.id}>
-                            <td className="text-gray-400">{c.id}</td>
+                            <td className="text-gray-400">{rowNumber(page, index)}</td>
                             <td>
                               <div className="flex items-center gap-2">
                                 <Avatar name={c.name} />
@@ -529,7 +531,7 @@ export default function ClientsPage() {
                       }
                     </tbody>
                   </table>
-                  <Pagination page={page} total={total} limit={10} onChange={setPage} />
+                  <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
                 </>
               )}
             </div>
@@ -568,6 +570,7 @@ export default function ClientsPage() {
                   <table className="table">
                     <thead>
                       <tr>
+                        <th className="w-16">No.</th>
                         <th>Name</th>
                         <th>Position</th>
                         <th>Email</th>
@@ -579,9 +582,10 @@ export default function ClientsPage() {
                     </thead>
                     <tbody>
                       {pagedContacts.length === 0
-                        ? <tr><td colSpan={7}><EmptyState message="No contacts found" /></td></tr>
-                        : pagedContacts.map(ct => (
+                        ? <tr><td colSpan={8}><EmptyState message="No contacts found" /></td></tr>
+                        : pagedContacts.map((ct, index) => (
                           <tr key={ct.id}>
+                            <td className="text-gray-400">{rowNumber(contactPage, index, CONTACT_LIMIT)}</td>
                             <td>
                               <div className="flex items-center gap-2">
                                 <Avatar name={ct.name} />

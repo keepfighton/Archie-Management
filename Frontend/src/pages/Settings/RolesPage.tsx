@@ -3,7 +3,7 @@ import { roleService } from '@/services/api'
 import { dashboardItem, findPermissionEntry, navGroups, permissionItems } from '@/config/navigation'
 import { toast } from 'react-toastify'
 import { Plus, Trash2, ShieldCheck } from 'lucide-react'
-import { PageHeader, Modal, ConfirmDialog, Loading, EmptyState } from '@/components/common'
+import { PageHeader, Modal, ConfirmDialog, Loading, EmptyState, rowNumber } from '@/components/common'
 
 interface Role {
   id: number
@@ -207,14 +207,16 @@ export default function RolesPage() {
           <table className="table">
             <thead>
               <tr>
+                <th className="w-16">No.</th>
                 <th>Role Name</th>
                 <th>Description</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {roles.map(r => (
+              {roles.map((r, index) => (
                 <tr key={r.id}>
+                  <td className="text-gray-400">{rowNumber(1, index, roles.length || 1)}</td>
                   <td className="font-medium text-gray-800">{r.name}</td>
                   <td className="text-gray-500">{r.description || '-'}</td>
                   <td>

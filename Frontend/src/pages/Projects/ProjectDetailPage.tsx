@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
 import { ChevronLeft, Plus } from 'lucide-react'
 import {
   Loading, EmptyState, StatusBadge, ProgressBar, Avatar,
-  Modal, FormField, ConfirmDialog, ViewTabs
+  Modal, FormField, ConfirmDialog, ViewTabs, rowNumber
 } from '@/components/common'
 
 const TABS = [
@@ -248,13 +248,14 @@ export default function ProjectDetailPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>Title</th><th>Assigned To</th><th>Priority</th><th>Deadline</th><th>Status</th><th></th></tr>
+                <tr><th className="w-16">No.</th><th>Title</th><th>Assigned To</th><th>Priority</th><th>Deadline</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {tasks.length === 0
-                  ? <tr><td colSpan={6}><EmptyState /></td></tr>
-                  : tasks.map(t => (
+                  ? <tr><td colSpan={7}><EmptyState /></td></tr>
+                  : tasks.map((t, index) => (
                     <tr key={t.id}>
+                      <td className="text-gray-400">{rowNumber(1, index, tasks.length || 1)}</td>
                       <td className="font-medium">{t.title}</td>
                       <td>
                         {t.assigned_to
@@ -288,13 +289,14 @@ export default function ProjectDetailPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>Name</th><th>Assignee</th><th>Due Date</th><th>Status</th><th></th></tr>
+                <tr><th className="w-16">No.</th><th>Name</th><th>Assignee</th><th>Due Date</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {milestones.length === 0
-                  ? <tr><td colSpan={5}><EmptyState /></td></tr>
-                  : milestones.map(m => (
+                  ? <tr><td colSpan={6}><EmptyState /></td></tr>
+                  : milestones.map((m, index) => (
                     <tr key={m.id}>
+                      <td className="text-gray-400">{rowNumber(1, index, milestones.length || 1)}</td>
                       <td>
                         <p className="font-medium text-gray-800">{m.name}</p>
                         {m.description && <p className="text-xs text-gray-400">{m.description}</p>}
@@ -335,13 +337,14 @@ export default function ProjectDetailPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>Name</th><th>Due Date</th><th>Status</th><th></th></tr>
+                <tr><th className="w-16">No.</th><th>Name</th><th>Due Date</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {deliverables.length === 0
-                  ? <tr><td colSpan={4}><EmptyState /></td></tr>
-                  : deliverables.map(d => (
+                  ? <tr><td colSpan={5}><EmptyState /></td></tr>
+                  : deliverables.map((d, index) => (
                     <tr key={d.id}>
+                      <td className="text-gray-400">{rowNumber(1, index, deliverables.length || 1)}</td>
                       <td>
                         <p className="font-medium text-gray-800">{d.name}</p>
                         {d.description && <p className="text-xs text-gray-400">{d.description}</p>}
@@ -395,13 +398,14 @@ export default function ProjectDetailPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>Member</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th className="text-right">Duration</th><th>Note</th></tr>
+                <tr><th className="w-16">No.</th><th>Member</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th className="text-right">Duration</th><th>Note</th></tr>
               </thead>
               <tbody>
                 {timecards.length === 0
-                  ? <tr><td colSpan={6}><EmptyState message="No timesheet entries for this project" /></td></tr>
-                  : timecards.map(tc => (
+                  ? <tr><td colSpan={7}><EmptyState message="No timesheet entries for this project" /></td></tr>
+                  : timecards.map((tc, index) => (
                     <tr key={tc.id}>
+                      <td className="text-gray-400">{rowNumber(1, index, timecards.length || 1)}</td>
                       <td>
                         {tc.user ? <div className="flex items-center gap-1"><Avatar name={tc.user.name} /><span className="text-xs">{tc.user.name}</span></div> : '—'}
                       </td>
@@ -417,7 +421,7 @@ export default function ProjectDetailPage() {
               {timecards.length > 0 && (
                 <tfoot className="bg-gray-50 font-semibold text-sm">
                   <tr>
-                    <td colSpan={4}>Total</td>
+                    <td colSpan={5}>Total</td>
                     <td className="text-right">{timecards.reduce((s, tc) => s + (tc.duration || 0), 0).toFixed(1)}h</td>
                     <td></td>
                   </tr>

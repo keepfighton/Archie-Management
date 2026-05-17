@@ -4,7 +4,8 @@ import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput
+  Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput,
+  rowNumber,
 } from '@/components/common'
 
 const VIEWS = [{ key: 'expenses', label: 'Expenses' }, { key: 'recurring', label: 'Recurring' }]
@@ -150,13 +151,14 @@ export default function ExpensesPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
+              <tr><th className="w-16">No.</th><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                : filtered.map(e => (
+                ? <tr><td colSpan={10}><EmptyState /></td></tr>
+                : filtered.map((e, index) => (
                   <tr key={e.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
                     <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
                     <td className="text-sm">{e.contract ? `${e.contract.contract_number}` : '-'}</td>
                     <td className="text-sm text-gray-500">{e.client?.name || '-'}</td>

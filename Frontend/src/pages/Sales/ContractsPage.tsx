@@ -6,7 +6,8 @@ import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
+  rowNumber,
 } from '@/components/common'
 
 export default function ContractsPage() {
@@ -109,13 +110,14 @@ export default function ContractsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Contract #</th><th>Title</th><th>Client</th><th>Date</th><th>Valid Until</th><th>Amount</th><th>Status</th><th></th></tr>
+              <tr><th className="w-16">No.</th><th>Contract #</th><th>Title</th><th>Client</th><th>Date</th><th>Valid Until</th><th>Amount</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                : filtered.map(c => (
+                ? <tr><td colSpan={9}><EmptyState /></td></tr>
+                : filtered.map((c, index) => (
                   <tr key={c.id} className="cursor-pointer hover:bg-blue-50/50" onClick={() => navigate(`/sales/contracts/${c.id}`)}>
+                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
                     <td className="font-medium text-blue-600">{c.contract_number}</td>
                     <td className="font-medium">{c.title}</td>
                     <td className="text-gray-500">{c.client?.name || '-'}</td>

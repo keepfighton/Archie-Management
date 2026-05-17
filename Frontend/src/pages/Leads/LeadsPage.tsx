@@ -8,7 +8,8 @@ import { Plus, Filter, FileDown } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
 const VIEWS = [{ key: 'list', label: 'List' }, { key: 'kanban', label: 'Kanban' }]
@@ -61,7 +62,7 @@ export default function LeadsPage() {
 
   const load = (overridePage?: number) => {
     setLoading(true)
-    const params: any = { page: overridePage ?? page, limit: 10, q: search }
+    const params: any = { page: overridePage ?? page, limit: DEFAULT_PAGE_LIMIT, q: search }
     if (statusFilter) params.status = statusFilter
     leadService.list(params)
       .then(r => { setLeads(r.data.data || []); setTotal(r.data.total || 0) })
@@ -209,13 +210,14 @@ export default function LeadsPage() {
               <>
                 <table className="table">
                   <thead>
-                    <tr><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Source</th><th>Status</th><th>Owner</th><th></th></tr>
+                    <tr><th className="w-16">No.</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Source</th><th>Status</th><th>Owner</th><th></th></tr>
                   </thead>
                   <tbody>
                     {leads.length === 0
-                      ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                      : leads.map(l => (
+                      ? <tr><td colSpan={9}><EmptyState /></td></tr>
+                      : leads.map((l, index) => (
                         <tr key={l.id}>
+                          <td className="text-gray-400">{rowNumber(page, index)}</td>
                           <td className="font-medium">{l.name}</td>
                           <td className="text-gray-500">{l.primary_contact || '-'}</td>
                           <td className="text-gray-500">{l.email || '-'}</td>
@@ -235,7 +237,7 @@ export default function LeadsPage() {
                     }
                   </tbody>
                 </table>
-                <Pagination page={page} total={total} limit={10} onChange={setPage} />
+                <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
               </>
             )}
           </div>

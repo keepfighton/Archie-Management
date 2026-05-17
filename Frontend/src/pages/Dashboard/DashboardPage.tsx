@@ -18,7 +18,7 @@ import { toast } from 'react-toastify'
 import { RootState, AppDispatch } from '@/store'
 import { fetchMe, canRead } from '@/store/slices/authSlice'
 import { dashboardService, taskService, projectService, teamService } from '@/services/api'
-import { Loading, StatusBadge, ProgressBar } from '@/components/common'
+import { Loading, StatusBadge, ProgressBar, rowNumber } from '@/components/common'
 import { dashboardItem, findNavigationItemByMenu, navGroups } from '@/config/navigation'
 import { formatIDR } from '@/utils/format'
 import { useLocale } from '@/contexts/LocaleContext'
@@ -877,7 +877,7 @@ export default function DashboardPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th className="w-16">No.</th>
                     <th>Title</th>
                     <th>Start date</th>
                     <th>Deadline</th>
@@ -889,9 +889,9 @@ export default function DashboardPage() {
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-xs text-gray-400">No tasks found</td>
                     </tr>
-                  ) : tasks.map(task => (
+                  ) : tasks.map((task, index) => (
                     <tr key={task.id}>
-                      <td className="text-gray-400">{task.id}</td>
+                      <td className="text-gray-400">{rowNumber(1, index, tasks.length || 1)}</td>
                       <td>
                         <Link to={tasksRoute} className="font-medium text-primary hover:underline">
                           {task.title}

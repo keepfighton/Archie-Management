@@ -5,7 +5,8 @@ import { toast } from 'react-toastify'
 import { ChevronDown, ChevronRight, Edit2, Plus, Trash2 } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  Modal, FormField, ConfirmDialog, Loading, EmptyState
+  Modal, FormField, ConfirmDialog, Loading, EmptyState,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
 export default function ClustersPage() {
@@ -24,7 +25,7 @@ export default function ClustersPage() {
 
   const fetchClusters = (nextPage = page) => {
     setLoading(true)
-    clusterService.list({ page: nextPage, limit: 10, q: search })
+    clusterService.list({ page: nextPage, limit: DEFAULT_PAGE_LIMIT, q: search })
       .then(r => {
         setClusters(r.data.data || [])
         setTotal(r.data.total || 0)
@@ -120,7 +121,7 @@ export default function ClustersPage() {
                   return (
                     <Fragment key={cluster.id}>
                       <tr>
-                        <td className="text-gray-400">{(page - 1) * 10 + index + 1}</td>
+                        <td className="text-gray-400">{rowNumber(page, index)}</td>
                         <td className="font-medium text-gray-800">
                           <button
                             className="inline-flex items-center gap-2 text-left font-semibold text-gray-800 transition hover:text-blue-600"
@@ -174,7 +175,7 @@ export default function ClustersPage() {
                 })}
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={10} onChange={setPage} />
+            <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
           </>
         )}
       </div>

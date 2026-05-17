@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { API_BASE_URL, fileService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Folder, File, Star, Upload, FolderPlus, Trash2, ChevronRight, Download } from 'lucide-react'
-import { Loading, EmptyState, Modal, FormField, ConfirmDialog } from '@/components/common'
+import { Loading, EmptyState, Modal, FormField, ConfirmDialog, rowNumber } from '@/components/common'
 import clsx from 'clsx'
 
 function formatBytes(bytes: number) {
@@ -161,11 +161,12 @@ export default function FilesPage() {
                   <div className="bg-white rounded-lg border border-gray-200">
                     <table className="table">
                       <thead>
-                        <tr><th>Name</th><th>Size</th><th>Type</th><th></th></tr>
+                        <tr><th className="w-16">No.</th><th>Name</th><th>Size</th><th>Type</th><th></th></tr>
                       </thead>
                       <tbody>
-                        {docs.map(f => (
+                        {docs.map((f, index) => (
                           <tr key={f.id} className="group">
+                            <td className="text-gray-400">{rowNumber(1, index, docs.length || 1)}</td>
                             <td>
                               <div className="flex items-center gap-2">
                                 <File size={14} className="text-gray-400 flex-shrink-0" />

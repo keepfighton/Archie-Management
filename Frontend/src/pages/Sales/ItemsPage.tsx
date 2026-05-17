@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { itemService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, Search } from 'lucide-react'
-import { PageHeader, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput } from '@/components/common'
+import { PageHeader, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput, rowNumber } from '@/components/common'
 
 export default function ItemsPage() {
   const [items, setItems] = useState<any[]>([])
@@ -94,13 +94,14 @@ export default function ItemsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Title</th><th>Category</th><th>Unit</th><th>Rate</th><th>Currency</th><th></th></tr>
+              <tr><th className="w-16">No.</th><th>Title</th><th>Category</th><th>Unit</th><th>Rate</th><th>Currency</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={6}><EmptyState /></td></tr>
-                : filtered.map(item => (
+                ? <tr><td colSpan={7}><EmptyState /></td></tr>
+                : filtered.map((item, index) => (
                   <tr key={item.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
                     <td>
                       <div>
                         <p className="font-medium">{item.title}</p>

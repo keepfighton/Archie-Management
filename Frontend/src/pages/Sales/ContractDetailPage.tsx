@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { contractService, expenseService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { ArrowLeft, Building2, FolderKanban, Calendar, DollarSign, FileText } from 'lucide-react'
-import { StatusBadge, Loading } from '@/components/common'
+import { StatusBadge, Loading, rowNumber } from '@/components/common'
 
 interface Contract {
   id: number
@@ -142,11 +142,12 @@ export default function ContractDetailPage() {
         ) : (
           <table className="table">
             <thead>
-              <tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Tax</th><th>Total</th></tr>
+              <tr><th className="w-16">No.</th><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Tax</th><th>Total</th></tr>
             </thead>
             <tbody>
-              {expenses.map(e => (
+              {expenses.map((e, index) => (
                 <tr key={e.id}>
+                  <td className="text-gray-400">{rowNumber(1, index, expenses.length || 1)}</td>
                   <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
                   <td className="font-medium">{e.title}</td>
                   <td><span className="badge badge-blue">{e.category || 'Other'}</span></td>

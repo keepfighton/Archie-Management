@@ -7,7 +7,8 @@ import { toast } from 'react-toastify'
 import { Plus, Printer, FileDown, Filter } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  StatusBadge, ProgressBar, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
+  StatusBadge, ProgressBar, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
 export default function ProjectsPage() {
@@ -38,7 +39,7 @@ export default function ProjectsPage() {
     setLoading(true)
     projectService.list({
       page: nextPage,
-      limit: 30,
+      limit: DEFAULT_PAGE_LIMIT,
       q: search,
       status: statusFilter || undefined,
       cluster_id: clusterFilter || undefined,
@@ -199,7 +200,7 @@ export default function ProjectsPage() {
                   ? <tr><td colSpan={11}><EmptyState /></td></tr>
                   : projects.map((p, index) => (
                     <tr key={p.id}>
-                      <td className="text-gray-400">{(page - 1) * 30 + index + 1}</td>
+                      <td className="text-gray-400">{rowNumber(page, index)}</td>
                       <td>
                         <Link to={`/projects/${p.id}`} className="text-blue-600 hover:underline font-medium">{p.title}</Link>
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -244,7 +245,7 @@ export default function ProjectsPage() {
                 }
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={30} onChange={setPage} />
+            <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
           </>
         )}
       </div>

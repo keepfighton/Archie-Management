@@ -62,7 +62,7 @@ func getUserRole(c *gin.Context) string {
 
 type PaginationQuery struct {
 	Page  int    `form:"page,default=1"`
-	Limit int    `form:"limit,default=10"`
+	Limit int    `form:"limit,default=30"`
 	Q     string `form:"q"`
 }
 
@@ -2642,7 +2642,7 @@ func (h *TeamHandler) ListMembers(c *gin.Context) {
 		q.Page = 1
 	}
 	if hasLimit && q.Limit <= 0 {
-		q.Limit = 10
+		q.Limit = 30
 	}
 
 	var members []models.User
@@ -2669,7 +2669,7 @@ func (h *TeamHandler) ListMembers(c *gin.Context) {
 			q.Page = 1
 		}
 		if q.Limit <= 0 {
-			q.Limit = 10
+			q.Limit = 30
 		}
 		query = query.Scopes(paginate(q.PaginationQuery))
 	}
@@ -3418,7 +3418,7 @@ func (h *AuditLogHandler) List(c *gin.Context) {
 
 	query.Count(&total)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "30"))
 	offset := (page - 1) * limit
 	query.Order("created_at desc").Offset(offset).Limit(limit).Find(&logs)
 	c.JSON(http.StatusOK, gin.H{"data": logs, "total": total, "page": page, "limit": limit})

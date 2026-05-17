@@ -5,7 +5,7 @@ import { RootState, AppDispatch } from '@/store'
 import { fetchMe } from '@/store/slices/authSlice'
 import { toast } from 'react-toastify'
 import { Clock, LogIn, LogOut } from 'lucide-react'
-import { Loading, EmptyState, Avatar } from '@/components/common'
+import { Loading, EmptyState, Avatar, rowNumber } from '@/components/common'
 
 export default function TimeCardsPage() {
   const dispatch = useDispatch<AppDispatch>()
@@ -84,13 +84,14 @@ export default function TimeCardsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Member</th><th>In Date</th><th>In Time</th><th>Out Time</th><th>Duration</th><th>Note</th></tr>
+              <tr><th className="w-16">No.</th><th>Member</th><th>In Date</th><th>In Time</th><th>Out Time</th><th>Duration</th><th>Note</th></tr>
             </thead>
             <tbody>
               {cards.length === 0
-                ? <tr><td colSpan={6}><EmptyState /></td></tr>
-                : cards.map(c => (
+                ? <tr><td colSpan={7}><EmptyState /></td></tr>
+                : cards.map((c, index) => (
                   <tr key={c.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, cards.length || 1)}</td>
                     <td>
                       <div className="flex items-center gap-2">
                         <Avatar name={c.user?.name || '?'} />

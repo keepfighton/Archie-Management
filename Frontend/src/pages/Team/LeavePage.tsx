@@ -5,7 +5,7 @@ import { toast } from 'react-toastify'
 import { Plus } from 'lucide-react'
 import {
   PageHeader, Loading, EmptyState, StatusBadge,
-  Modal, FormField, ConfirmDialog
+  Modal, FormField, ConfirmDialog, rowNumber
 } from '@/components/common'
 
 const LEAVE_TYPES = ['annual', 'sick', 'maternity', 'paternity', 'unpaid', 'other']
@@ -74,13 +74,14 @@ export default function LeavePage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Type</th><th>Start Date</th><th>End Date</th><th>Duration</th><th>Reason</th><th>Status</th></tr>
+              <tr><th className="w-16">No.</th><th>Type</th><th>Start Date</th><th>End Date</th><th>Duration</th><th>Reason</th><th>Status</th></tr>
             </thead>
             <tbody>
               {leaves.length === 0
-                ? <tr><td colSpan={6}><EmptyState /></td></tr>
-                : leaves.map(l => (
+                ? <tr><td colSpan={7}><EmptyState /></td></tr>
+                : leaves.map((l, index) => (
                   <tr key={l.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, leaves.length || 1)}</td>
                     <td className="capitalize font-medium">{l.leave_type?.replace(/_/g, ' ')}</td>
                     <td className="text-gray-400">{new Date(l.start_date).toLocaleDateString('id')}</td>
                     <td className="text-gray-400">{new Date(l.end_date).toLocaleDateString('id')}</td>

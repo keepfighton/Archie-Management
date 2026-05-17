@@ -5,7 +5,7 @@ import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
 import { ChevronLeft, Plus, Trash2, Pencil } from 'lucide-react'
 import {
-  Loading, EmptyState, StatusBadge, Modal, FormField, ConfirmDialog, PriceInput
+  Loading, EmptyState, StatusBadge, Modal, FormField, ConfirmDialog, PriceInput, rowNumber
 } from '@/components/common'
 
 const STATUSES = ['draft', 'not_paid', 'partially_paid', 'fully_paid', 'overdue']
@@ -283,6 +283,7 @@ export default function InvoiceDetailPage() {
         <table className="table">
           <thead>
             <tr>
+              <th className="w-16">No.</th>
               <th>Description</th>
               <th className="text-right">Qty</th>
               <th className="text-right">Unit Price</th>
@@ -292,9 +293,10 @@ export default function InvoiceDetailPage() {
           </thead>
           <tbody>
             {items.length === 0
-              ? <tr><td colSpan={5}><EmptyState message="No items yet. Add your first line item." /></td></tr>
-              : items.map((item: any) => (
+              ? <tr><td colSpan={6}><EmptyState message="No items yet. Add your first line item." /></td></tr>
+              : items.map((item: any, index: number) => (
                 <tr key={item.id}>
+                  <td className="text-gray-400">{rowNumber(1, index, items.length || 1)}</td>
                   <td className="font-medium">{item.description}</td>
                   <td className="text-right text-gray-500">{Number(item.quantity).toLocaleString('id-ID')}</td>
                   <td className="text-right text-gray-500">{fmt(item.unit_price, invoice.currency)}</td>
@@ -312,7 +314,7 @@ export default function InvoiceDetailPage() {
           {items.length > 0 && (
             <tfoot>
               <tr className="bg-gray-50">
-                <td colSpan={3} className="text-right text-sm font-medium text-gray-600 px-4 py-2">Subtotal</td>
+                <td colSpan={4} className="text-right text-sm font-medium text-gray-600 px-4 py-2">Subtotal</td>
                 <td className="text-right font-bold px-4 py-2">{fmt(subtotal, invoice.currency)}</td>
                 <td></td>
               </tr>
@@ -330,6 +332,7 @@ export default function InvoiceDetailPage() {
         <table className="table">
           <thead>
             <tr>
+              <th className="w-16">No.</th>
               <th>Date</th>
               <th>Method</th>
               <th>Note</th>
@@ -339,9 +342,10 @@ export default function InvoiceDetailPage() {
           </thead>
           <tbody>
             {payments.length === 0
-              ? <tr><td colSpan={5}><EmptyState message="No payments recorded yet." /></td></tr>
-              : payments.map((p: any) => (
+              ? <tr><td colSpan={6}><EmptyState message="No payments recorded yet." /></td></tr>
+              : payments.map((p: any, index: number) => (
                 <tr key={p.id}>
+                  <td className="text-gray-400">{rowNumber(1, index, payments.length || 1)}</td>
                   <td className="text-gray-500 whitespace-nowrap">
                     {p.payment_date ? new Date(p.payment_date).toLocaleDateString('id') : '—'}
                   </td>
@@ -358,7 +362,7 @@ export default function InvoiceDetailPage() {
           {payments.length > 0 && (
             <tfoot>
               <tr className="bg-gray-50">
-                <td colSpan={3} className="text-right text-sm font-medium text-gray-600 px-4 py-2">Total Paid</td>
+                <td colSpan={4} className="text-right text-sm font-medium text-gray-600 px-4 py-2">Total Paid</td>
                 <td className="text-right font-bold text-green-600 px-4 py-2">{fmt(invoice.paid_amount, invoice.currency)}</td>
                 <td></td>
               </tr>

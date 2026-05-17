@@ -1679,18 +1679,39 @@ func (h *LeadHandler) ConvertToClient(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"})
 		return
 	}
-	client := models.Client{
-		Name:    lead.Name,
-		Email:   lead.Email,
-		Phone:   lead.Phone,
-		OwnerID: getUserID(c),
-	}
-	if err := h.db.Create(&client).Error; err != nil {
+
+	var client models.Client
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		client = models.Client{
+			Name:    lead.Name,
+			Type:    "company",
+			Email:   lead.Email,
+			Phone:   lead.Phone,
+			Needs:   lead.Notes,
+			OwnerID: getUserID(c),
+		}
+		if err := tx.Create(&client).Error; err != nil {
+			return err
+		}
+
+		if strings.TrimSpace(lead.PrimaryContact) != "" {
+			contact := models.Contact{
+				ClientID: client.ID,
+				Name:     lead.PrimaryContact,
+				Email:    lead.Email,
+				Phone:    lead.Phone,
+			}
+			if err := tx.Create(&contact).Error; err != nil {
+				return err
+			}
+		}
+
+		recordAudit(tx, c, "convert", "lead", lead.ID, lead.Name+" → Client")
+		return tx.Delete(&lead).Error
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Model(&lead).Update("status", "won")
-	recordAudit(h.db, c, "convert", "lead", lead.ID, lead.Name+" → Client")
 	c.JSON(http.StatusCreated, client)
 }
 

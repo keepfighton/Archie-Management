@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { clientService, projectService, quotationPrintService, quotationService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
@@ -70,6 +70,11 @@ export default function QuotationsPage() {
 
   const [form, setForm] = useState<any>(emptyForm())
   const [itemForm, setItemForm] = useState({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
+
+  const projectOptions = useMemo(() => {
+    if (!form.client_id) return []
+    return projects.filter((project: any) => String(project.client_id) === String(form.client_id))
+  }, [form.client_id, projects])
 
   const load = (q = search, overridePage?: number) => {
     setLoading(true)
@@ -396,16 +401,21 @@ export default function QuotationsPage() {
 
           {/* CLIENT + PROJECT */}
           <FormField label="Client" required>
-            <select className="input" value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}>
+            <select
+              className="input"
+              value={form.client_id}
+              onChange={(e) => setForm({ ...form, client_id: e.target.value, project_id: '' })}
+            >
               <option value="">Select client...</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
 
-          <FormField label="Project">
+          <FormField label="Project" hint={form.client_id ? 'Project list follows selected client' : 'Select client first'}>
             <select
               className="input"
               value={form.project_id}
+              disabled={!form.client_id}
               onChange={(e) => {
                 const pid = e.target.value
                 const proj = projects.find((p: any) => String(p.id) === pid)
@@ -423,9 +433,12 @@ export default function QuotationsPage() {
                 }))
               }}
             >
-              <option value="">No project</option>
-              {projects.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              <option value="">{form.client_id ? 'No project' : 'Select client first'}</option>
+              {projectOptions.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
+            {form.client_id && projectOptions.length === 0 && (
+              <p className="mt-1 text-xs text-gray-400">No projects found for this client.</p>
+            )}
           </FormField>
 
           {/* PIC */}

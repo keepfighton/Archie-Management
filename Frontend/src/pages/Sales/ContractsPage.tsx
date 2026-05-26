@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { contractService, clientService, projectService } from '@/services/api'
 import { toISODate } from '@/utils/format'
@@ -26,6 +26,11 @@ export default function ContractsPage() {
     contract_number: '', title: '', client_id: '', project_id: '',
     contract_date: '', valid_until: '', amount: '', currency: 'IDR', status: 'draft', file_url: '',
   })
+
+  const projectOptions = useMemo(() => {
+    if (!form.client_id) return []
+    return projects.filter((project: any) => String(project.client_id) === String(form.client_id))
+  }, [form.client_id, projects])
 
   const load = () => {
     setLoading(true)
@@ -167,15 +172,20 @@ export default function ContractsPage() {
             </FormField>
           </div>
           <FormField label="Client" required>
-            <select className="input" value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}>
+            <select
+              className="input"
+              value={form.client_id}
+              onChange={e => setForm({ ...form, client_id: e.target.value, project_id: '' })}
+            >
               <option value="">Select client...</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Project">
+          <FormField label="Project" hint={form.client_id ? 'Project list follows selected client' : 'Select client first'}>
             <select
               className="input"
               value={form.project_id}
+              disabled={!form.client_id}
               onChange={e => {
                 const pid = e.target.value
                 const proj = projects.find((p: any) => String(p.id) === pid)
@@ -192,9 +202,12 @@ export default function ContractsPage() {
                 }))
               }}
             >
-              <option value="">No project</option>
-              {projects.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              <option value="">{form.client_id ? 'No project' : 'Select client first'}</option>
+              {projectOptions.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
+            {form.client_id && projectOptions.length === 0 && (
+              <p className="mt-1 text-xs text-gray-400">No projects found for this client.</p>
+            )}
           </FormField>
           <FormField label="Contract Date" hint={form.project_id ? 'Auto-filled from project start date' : undefined}>
             <input className="input" type="date" value={form.contract_date} onChange={e => setForm({ ...form, contract_date: e.target.value })} />

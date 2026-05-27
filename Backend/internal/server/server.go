@@ -48,6 +48,14 @@ func (s *Server) setupRoutes() {
 		auth.POST("/reset-password", authH.ResetPassword)
 	}
 
+	// ─── WhatsApp Cloud API webhook (public Meta callback) ───
+	whatsAppH := handlers.NewWhatsAppHandler(s.db, s.cfg)
+	whatsApp := api.Group("/whatsapp")
+	{
+		whatsApp.GET("/webhook", whatsAppH.VerifyWebhook)
+		whatsApp.POST("/webhook", whatsAppH.ReceiveWebhook)
+	}
+
 	// ─── Protected routes ────────────────────────────
 	protected := api.Group("")
 	protected.Use(middleware.AuthRequired(s.cfg))
@@ -79,6 +87,17 @@ func (s *Server) setupRoutes() {
 			clients.GET("/:id/invoices", clientH.GetInvoices)
 		}
 
+		// Clusters
+		clusterH := handlers.NewClusterHandler(s.db)
+		clusters := protected.Group("/clusters")
+		{
+			clusters.GET("", clusterH.List)
+			clusters.POST("", clusterH.Create)
+			clusters.GET("/:id", clusterH.Get)
+			clusters.PUT("/:id", clusterH.Update)
+			clusters.DELETE("/:id", clusterH.Delete)
+		}
+
 		// Projects
 		projectH := handlers.NewProjectHandler(s.db)
 		projects := protected.Group("/projects")
@@ -91,6 +110,21 @@ func (s *Server) setupRoutes() {
 			projects.GET("/:id/tasks", projectH.GetTasks)
 			projects.GET("/:id/timeline", projectH.GetTimeline)
 			projects.PATCH("/:id/status", projectH.PatchStatus)
+
+			// Milestones
+			milestoneH := handlers.NewMilestoneHandler(s.db)
+			// NOTE: Use parameter name `id` to avoid gin panic caused by conflicting wildcards
+			projects.GET("/:id/milestones", milestoneH.List)
+			projects.POST("/:id/milestones", milestoneH.Create)
+			projects.PUT("/:id/milestones/:mid", milestoneH.Update)
+			projects.DELETE("/:id/milestones/:mid", milestoneH.Delete)
+
+			// Deliverables
+			deliverableH := handlers.NewDeliverableHandler(s.db)
+			projects.GET("/:id/deliverables", deliverableH.List)
+			projects.POST("/:id/deliverables", deliverableH.Create)
+			projects.PUT("/:id/deliverables/:did", deliverableH.Update)
+			projects.DELETE("/:id/deliverables/:did", deliverableH.Delete)
 		}
 
 		// Tasks
@@ -98,6 +132,7 @@ func (s *Server) setupRoutes() {
 		tasks := protected.Group("/tasks")
 		{
 			tasks.GET("", taskH.List)
+			tasks.GET("/report/pdf", taskH.ExportReportPDF)
 			tasks.GET("/columns", taskH.ListColumns)
 			tasks.POST("/columns", taskH.CreateColumn)
 			tasks.PATCH("/columns/reorder", taskH.ReorderColumns)
@@ -122,6 +157,7 @@ func (s *Server) setupRoutes() {
 			leads.PATCH("/:id/status", leadH.UpdateStatus)
 			leads.DELETE("/:id", leadH.Delete)
 			leads.POST("/:id/convert", leadH.ConvertToClient)
+			leads.GET("/:id/quotations", leadH.GetQuotations)
 		}
 
 		// Invoices
@@ -229,6 +265,27 @@ func (s *Server) setupRoutes() {
 			expenses.DELETE("/:id", expenseH.Delete)
 		}
 
+		// Assets
+		assetH := handlers.NewAssetHandler(s.db)
+		assets := protected.Group("/assets")
+		{
+			assets.GET("", assetH.List)
+			assets.POST("", assetH.Create)
+			assets.GET("/scan", assetH.Scan)
+			assets.GET("/export", assetH.Export)
+			assets.GET("/:id", assetH.Get)
+			assets.PUT("/:id", assetH.Update)
+			assets.DELETE("/:id", middleware.AdminRequired(), assetH.Delete)
+		}
+		assetMDH := handlers.NewAssetMasterDataHandler(s.db)
+		assetMD := protected.Group("/asset-settings")
+		{
+			assetMD.GET("", assetMDH.List)
+			assetMD.POST("", assetMDH.Create)
+			assetMD.PUT("/:id", assetMDH.Update)
+			assetMD.DELETE("/:id", middleware.AdminRequired(), assetMDH.Delete)
+		}
+
 		// Team
 		teamH := handlers.NewTeamHandler(s.db)
 		team := protected.Group("/team")
@@ -246,6 +303,7 @@ func (s *Server) setupRoutes() {
 			team.GET("/leaves", teamH.ListLeaves)
 			team.POST("/leaves", teamH.ApplyLeave)
 			team.PATCH("/leaves/:id/status", teamH.UpdateLeaveStatus)
+			team.DELETE("/leaves/:id", teamH.DeleteLeave)
 			team.GET("/announcements", teamH.ListAnnouncements)
 			team.POST("/announcements", teamH.CreateAnnouncement)
 		}
@@ -270,6 +328,19 @@ func (s *Server) setupRoutes() {
 			todos.POST("", todoH.Create)
 			todos.PATCH("/:id/done", todoH.MarkDone)
 			todos.DELETE("/:id", todoH.Delete)
+		}
+
+		// Internal Messages & Presence
+		messageH := handlers.NewMessageHandler(s.db)
+		protected.POST("/presence/heartbeat", messageH.Heartbeat)
+		messages := protected.Group("/messages")
+		{
+			messages.GET("/users", messageH.ListUsers)
+			messages.GET("/conversations", messageH.ListConversations)
+			messages.POST("/conversations/direct", messageH.GetOrCreateDirectConversation)
+			messages.GET("/conversations/:id/messages", messageH.ListMessages)
+			messages.POST("/conversations/:id/messages", messageH.SendMessage)
+			messages.POST("/conversations/:id/read", messageH.MarkRead)
 		}
 
 		// Reports

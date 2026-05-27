@@ -3,25 +3,50 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { contractService, expenseService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { ArrowLeft, Building2, FolderKanban, Calendar, DollarSign, FileText } from 'lucide-react'
-import { StatusBadge, Loading } from '@/components/common'
+import { StatusBadge, Loading, rowNumber } from '@/components/common'
+
+interface Contract {
+  id: number
+  contract_number: string
+  title: string
+  status: string
+  currency: string
+  amount: number
+  contract_date?: string
+  valid_until?: string
+  file_url?: string
+  client?: { name: string }
+  project?: { title: string }
+}
+
+interface Expense {
+  id: number
+  contract_id: number
+  date: string
+  title: string
+  category: string
+  amount: number
+  tax: number
+  second_tax: number
+  total: number
+}
 
 export default function ContractDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [contract, setContract] = useState<any>(null)
-  const [expenses, setExpenses] = useState<any[]>([])
+  const [contract, setContract] = useState<Contract | null>(null)
+  const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
     Promise.all([
       contractService.get(Number(id)),
-      expenseService.list({ per_page: 999 }),
+      expenseService.list({ contract_id: id, limit: 1000 }),
     ])
       .then(([cRes, eRes]) => {
         setContract(cRes.data)
-        const all: any[] = eRes.data.data || []
-        setExpenses(all.filter(e => e.contract_id === Number(id)))
+        setExpenses(eRes.data.data || [])
       })
       .catch(() => toast.error('Failed to load contract'))
       .finally(() => setLoading(false))
@@ -117,11 +142,12 @@ export default function ContractDetailPage() {
         ) : (
           <table className="table">
             <thead>
-              <tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Tax</th><th>Total</th></tr>
+              <tr><th className="w-16">No.</th><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Tax</th><th>Total</th></tr>
             </thead>
             <tbody>
-              {expenses.map(e => (
+              {expenses.map((e, index) => (
                 <tr key={e.id}>
+                  <td className="text-gray-400">{rowNumber(1, index, expenses.length || 1)}</td>
                   <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
                   <td className="font-medium">{e.title}</td>
                   <td><span className="badge badge-blue">{e.category || 'Other'}</span></td>

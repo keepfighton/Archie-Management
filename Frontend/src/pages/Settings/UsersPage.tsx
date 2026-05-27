@@ -4,7 +4,8 @@ import { toast } from 'react-toastify'
 import { Plus, KeyRound, UserX, UserCheck, Trash2 } from 'lucide-react'
 import {
   PageHeader, SearchInput, Pagination,
-  Modal, ConfirmDialog, Loading, EmptyState, Avatar
+  Modal, ConfirmDialog, Loading, EmptyState, Avatar,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 import { useSelector } from 'react-redux'
 import { isValidEmail } from '@/utils/format'
@@ -76,7 +77,7 @@ export default function UsersPage() {
   const [resetUserId, setResetUserId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const LIMIT = 10
+  const LIMIT = DEFAULT_PAGE_LIMIT
 
   const load = () => {
     setLoading(true)
@@ -234,6 +235,7 @@ export default function UsersPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="w-16">No.</th>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Job Title</th>
@@ -246,8 +248,9 @@ export default function UsersPage() {
               <tbody>
                 {users.length === 0
                   ? <tr><td colSpan={8}><EmptyState /></td></tr>
-                  : users.map(u => (
+                  : users.map((u, index) => (
                     <tr key={u.id} className={!u.is_active ? 'opacity-50' : ''}>
+                      <td className="text-gray-400">{rowNumber(page, index, LIMIT)}</td>
                       <td>
                         <div className="flex items-center gap-2">
                           <Avatar name={u.name} />

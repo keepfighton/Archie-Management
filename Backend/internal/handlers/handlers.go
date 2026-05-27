@@ -54,9 +54,15 @@ func getUserID(c *gin.Context) uint {
 	return id.(uint)
 }
 
+func getUserRole(c *gin.Context) string {
+	role, _ := c.Get("role")
+	roleString, _ := role.(string)
+	return roleString
+}
+
 type PaginationQuery struct {
 	Page  int    `form:"page,default=1"`
-	Limit int    `form:"limit,default=10"`
+	Limit int    `form:"limit,default=30"`
 	Q     string `form:"q"`
 }
 
@@ -73,12 +79,18 @@ func recalcProjectProgress(db *gorm.DB, projectID uint) {
 	if projectID == 0 {
 		return
 	}
-	var total, done int64
-	db.Model(&models.Task{}).Where("project_id = ? AND deleted_at IS NULL", projectID).Count(&total)
-	db.Model(&models.Task{}).Where("project_id = ? AND status = 'done' AND deleted_at IS NULL", projectID).Count(&done)
-	var progress int
-	if total > 0 {
-		progress = int(done * 100 / total)
+	var stats struct {
+		Total int64
+		Done  int64
+	}
+	db.Model(&models.Task{}).
+		Select("COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'done') as done").
+		Where("project_id = ? AND deleted_at IS NULL", projectID).
+		Scan(&stats)
+
+	progress := 0
+	if stats.Total > 0 {
+		progress = int(stats.Done * 100 / stats.Total)
 	}
 	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
 }
@@ -136,8 +148,10 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Range               string  `json:"range"`
 		OpenTasks           int64   `json:"open_tasks"`
 		OpenProjects        int64   `json:"open_projects"`
+		InProgressProjects  int64   `json:"in_progress_projects"`
 		CompletedProjects   int64   `json:"completed_projects"`
 		HoldProjects        int64   `json:"hold_projects"`
+		CancelledProjects   int64   `json:"cancelled_projects"`
 		TotalClients        int64   `json:"total_clients"`
 		TotalLeads          int64   `json:"total_leads"`
 		TotalMembers        int64   `json:"total_members"`
@@ -168,8 +182,10 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 
 	applyRange(h.db.Model(&models.Task{})).Where("assigned_to_id = ? AND status != 'done'", userID).Count(&stats.OpenTasks)
 	applyRange(h.db.Model(&models.Project{})).Where("status = 'open'").Count(&stats.OpenProjects)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'in_progress'").Count(&stats.InProgressProjects)
 	applyRange(h.db.Model(&models.Project{})).Where("status = 'completed'").Count(&stats.CompletedProjects)
 	applyRange(h.db.Model(&models.Project{})).Where("status = 'hold'").Count(&stats.HoldProjects)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'cancelled'").Count(&stats.CancelledProjects)
 	applyRange(h.db.Model(&models.Client{})).Count(&stats.TotalClients)
 	applyRange(h.db.Model(&models.Lead{})).Count(&stats.TotalLeads)
 	h.db.Model(&models.User{}).Where("is_active = true").Count(&stats.TotalMembers)
@@ -224,6 +240,21 @@ func (h *ClientHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Duplicate check: name
+	var count int64
+	h.db.Model(&models.Client{}).Where("LOWER(name) = LOWER(?)", client.Name).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Client dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email
+	if client.Email != "" {
+		h.db.Model(&models.Client{}).Where("LOWER(email) = LOWER(?) AND email != ''", client.Email).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah terdaftar untuk client lain"})
+			return
+		}
+	}
 	if client.OwnerID == 0 {
 		client.OwnerID = getUserID(c)
 	}
@@ -255,6 +286,21 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	if err := c.ShouldBindJSON(&client); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	// Duplicate check: name (exclude self)
+	var count int64
+	h.db.Model(&models.Client{}).Where("LOWER(name) = LOWER(?) AND id <> ?", client.Name, id).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Client dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email (exclude self)
+	if client.Email != "" {
+		h.db.Model(&models.Client{}).Where("LOWER(email) = LOWER(?) AND email != '' AND id <> ?", client.Email, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah terdaftar untuk client lain"})
+			return
+		}
 	}
 	h.db.Save(&client)
 	recordAudit(h.db, c, "update", "client", client.ID, client.Name)
@@ -313,7 +359,7 @@ func (h *ClientHandler) DeleteContact(c *gin.Context) {
 func (h *ClientHandler) GetProjects(c *gin.Context) {
 	id, _ := getID(c)
 	var projects []models.Project
-	h.db.Where("client_id = ?", id).Find(&projects)
+	h.db.Preload("Cluster").Preload("Pic").Where("client_id = ?", id).Find(&projects)
 	c.JSON(http.StatusOK, gin.H{"data": projects})
 }
 
@@ -322,6 +368,128 @@ func (h *ClientHandler) GetInvoices(c *gin.Context) {
 	var invoices []models.Invoice
 	h.db.Where("client_id = ?", id).Find(&invoices)
 	c.JSON(http.StatusOK, gin.H{"data": invoices})
+}
+
+// ─── CLUSTER ─────────────────────────────────────────
+
+type ClusterHandler struct{ db *gorm.DB }
+
+func NewClusterHandler(db *gorm.DB) *ClusterHandler { return &ClusterHandler{db: db} }
+
+func (h *ClusterHandler) List(c *gin.Context) {
+	var q PaginationQuery
+	c.ShouldBindQuery(&q)
+	var clusters []models.Cluster
+	var total int64
+	query := h.db.Model(&models.Cluster{})
+	if q.Q != "" {
+		query = query.Where("name ILIKE ?", "%"+q.Q+"%")
+	}
+	query.Count(&total)
+	query.Preload("Projects", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id", "title", "cluster_id", "status").Order("title asc")
+	}).Order("name asc").Scopes(paginate(q)).Find(&clusters)
+	c.JSON(http.StatusOK, gin.H{"data": clusters, "total": total})
+}
+
+func (h *ClusterHandler) Create(c *gin.Context) {
+	resetSequenceIfEmpty(h.db, "clusters")
+	var cluster models.Cluster
+	if err := c.ShouldBindJSON(&cluster); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cluster.Name = strings.TrimSpace(cluster.Name)
+	cluster.Description = strings.TrimSpace(cluster.Description)
+	if cluster.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster name is required"})
+		return
+	}
+	var existing models.Cluster
+	err := h.db.Unscoped().Where("name = ?", cluster.Name).First(&existing).Error
+	if err == nil {
+		if existing.DeletedAt.Valid {
+			if err := h.db.Unscoped().Model(&models.Cluster{}).Where("id = ?", existing.ID).Updates(map[string]any{
+				"deleted_at":  nil,
+				"description": cluster.Description,
+				"updated_at":  time.Now(),
+			}).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			h.db.First(&existing, existing.ID)
+			recordAudit(h.db, c, "create", "cluster", existing.ID, existing.Name)
+			c.JSON(http.StatusCreated, existing)
+			return
+		}
+		c.JSON(http.StatusConflict, gin.H{"error": "Cluster name already exists"})
+		return
+	}
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.db.Create(&cluster).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "create", "cluster", cluster.ID, cluster.Name)
+	c.JSON(http.StatusCreated, cluster)
+}
+
+func (h *ClusterHandler) Get(c *gin.Context) {
+	id, _ := getID(c)
+	var cluster models.Cluster
+	if err := h.db.Preload("Projects").First(&cluster, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cluster not found"})
+		return
+	}
+	c.JSON(http.StatusOK, cluster)
+}
+
+func (h *ClusterHandler) Update(c *gin.Context) {
+	id, _ := getID(c)
+	var cluster models.Cluster
+	if err := h.db.First(&cluster, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cluster not found"})
+		return
+	}
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cluster.Name = strings.TrimSpace(req.Name)
+	cluster.Description = strings.TrimSpace(req.Description)
+	if cluster.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cluster name is required"})
+		return
+	}
+	if err := h.db.Save(&cluster).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "update", "cluster", cluster.ID, cluster.Name)
+	c.JSON(http.StatusOK, cluster)
+}
+
+func (h *ClusterHandler) Delete(c *gin.Context) {
+	id, _ := getID(c)
+	var cluster models.Cluster
+	if err := h.db.First(&cluster, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cluster not found"})
+		return
+	}
+	h.db.Model(&models.Project{}).Where("cluster_id = ?", id).Update("cluster_id", nil)
+	if err := h.db.Delete(&cluster).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "delete", "cluster", id, cluster.Name)
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
 // ─── PROJECT ─────────────────────────────────────────
@@ -335,15 +503,22 @@ func (h *ProjectHandler) List(c *gin.Context) {
 	c.ShouldBindQuery(&q)
 	var projects []models.Project
 	var total int64
-	query := h.db.Model(&models.Project{}).Preload("Client").Preload("Labels")
+	query := h.db.Model(&models.Project{}).Preload("Client").Preload("Cluster").Preload("Pic").Preload("Labels")
 	if q.Q != "" {
 		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
 	}
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
+	if clusterID := c.Query("cluster_id"); clusterID != "" {
+		if clusterID == "none" {
+			query = query.Where("cluster_id IS NULL")
+		} else {
+			query = query.Where("cluster_id = ?", clusterID)
+		}
+	}
 	query.Count(&total)
-	query.Scopes(paginate(q)).Find(&projects)
+	query.Order("id asc").Scopes(paginate(q)).Find(&projects)
 	c.JSON(http.StatusOK, gin.H{"data": projects, "total": total})
 }
 
@@ -365,7 +540,7 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 func (h *ProjectHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var project models.Project
-	if err := h.db.Preload("Client").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
+	if err := h.db.Preload("Client").Preload("Cluster").Preload("Pic").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -608,6 +783,46 @@ func (h *TaskHandler) loadTaskWithRelations(tx *gorm.DB, id uint) (models.Task, 
 	return task, err
 }
 
+func isTaskMemberRequest(c *gin.Context) bool {
+	return strings.EqualFold(getUserRole(c), "member")
+}
+
+func (h *TaskHandler) visibleTaskQuery(c *gin.Context) *gorm.DB {
+	query := h.db.Model(&models.Task{}).
+		Preload("AssignedTo").
+		Preload("Project").
+		Preload("Labels").
+		Preload("KanbanColumn")
+
+	if isTaskMemberRequest(c) {
+		return query.Where("assigned_to_id = ?", getUserID(c))
+	}
+	return query
+}
+
+func (h *TaskHandler) currentUserCanAccessTask(c *gin.Context, task models.Task) bool {
+	if !isTaskMemberRequest(c) {
+		return true
+	}
+	return task.AssignedToID != nil && *task.AssignedToID == getUserID(c)
+}
+
+func (h *TaskHandler) applyTaskFilters(c *gin.Context, query *gorm.DB, q PaginationQuery) *gorm.DB {
+	if q.Q != "" {
+		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
+	}
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if projectID := c.Query("project_id"); projectID != "" {
+		query = query.Where("project_id = ?", projectID)
+	}
+	if assignedTo := c.Query("assigned_to_id"); assignedTo != "" && !isTaskMemberRequest(c) {
+		query = query.Where("assigned_to_id = ?", assignedTo)
+	}
+	return query
+}
+
 func (h *TaskHandler) resequenceKanbanColumns(tx *gorm.DB, orderedIDs []uint) error {
 	for index, id := range orderedIDs {
 		if err := tx.Model(&models.TaskKanbanColumn{}).
@@ -847,23 +1062,7 @@ func (h *TaskHandler) List(c *gin.Context) {
 	c.ShouldBindQuery(&q)
 	var tasks []models.Task
 	var total int64
-	query := h.db.Model(&models.Task{}).
-		Preload("AssignedTo").
-		Preload("Project").
-		Preload("Labels").
-		Preload("KanbanColumn")
-	if q.Q != "" {
-		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
-	}
-	if status := c.Query("status"); status != "" {
-		query = query.Where("status = ?", status)
-	}
-	if projectID := c.Query("project_id"); projectID != "" {
-		query = query.Where("project_id = ?", projectID)
-	}
-	if assignedTo := c.Query("assigned_to_id"); assignedTo != "" {
-		query = query.Where("assigned_to_id = ?", assignedTo)
-	}
+	query := h.applyTaskFilters(c, h.visibleTaskQuery(c), q)
 	query.Count(&total)
 	result := query
 	if strings.EqualFold(c.Query("fetch_all"), "true") {
@@ -875,6 +1074,133 @@ func (h *TaskHandler) List(c *gin.Context) {
 	result.Find(&tasks)
 	c.JSON(http.StatusOK, gin.H{"data": tasks, "total": total})
 }
+
+func (h *TaskHandler) ExportReportPDF(c *gin.Context) {
+	var q PaginationQuery
+	c.ShouldBindQuery(&q)
+	var tasks []models.Task
+	query := h.applyTaskFilters(c, h.visibleTaskQuery(c), q).
+		Order("deadline asc nulls last, updated_at desc, id desc")
+	if err := query.Find(&tasks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	tmpl := template.Must(template.New("task-report").Funcs(template.FuncMap{
+		"formatTaskDate": func(t models.FlexTime) string {
+			if t.IsZero() {
+				return "-"
+			}
+			return t.Format("02 January 2006")
+		},
+		"statusLabel": func(status string) string {
+			switch status {
+			case "in_progress":
+				return "In Progress"
+			case "done":
+				return "Done"
+			case "expired":
+				return "Expired"
+			default:
+				return "To Do"
+			}
+		},
+		"inc": func(i int) int { return i + 1 },
+	}).Parse(taskReportPDFTemplate))
+
+	scope := "All Tasks"
+	if isTaskMemberRequest(c) {
+		scope = "My Tasks"
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	data := struct {
+		Tasks     []models.Task
+		Scope     string
+		PrintedAt string
+	}{
+		Tasks:     tasks,
+		Scope:     scope,
+		PrintedAt: time.Now().Format("02 January 2006 15:04"),
+	}
+	tmpl.Execute(c.Writer, data)
+}
+
+const taskReportPDFTemplate = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Task Report</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; font-size: 12px; }
+  .header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding-bottom: 18px; margin-bottom: 22px; border-bottom: 3px solid #0f4f71; }
+  .brand { color: #0f4f71; font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+  h1 { margin: 6px 0 0; font-size: 28px; line-height: 1.1; }
+  .meta { color: #6b7280; line-height: 1.6; text-align: right; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 9px; background: #0f4f71; color: #fff; text-align: left; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; }
+  td { padding: 9px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .title { font-weight: 700; color: #111827; }
+  .muted { color: #6b7280; }
+  .status { display: inline-block; min-width: 74px; border-radius: 999px; padding: 3px 8px; text-align: center; font-size: 11px; font-weight: 700; background: #eef2f7; color: #374151; }
+  .priority { text-transform: capitalize; font-weight: 700; }
+  .footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #9ca3af; text-align: center; font-size: 11px; }
+  @media print { body { padding: 18px; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">NEXONE WORKSPACE</div>
+      <h1>Task Report</h1>
+    </div>
+    <div class="meta">
+      <div><strong>{{.Scope}}</strong></div>
+      <div>Total: {{len .Tasks}} task</div>
+      <div>Printed: {{.PrintedAt}}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">No.</th>
+        <th>Task</th>
+        <th>Project</th>
+        <th>Assigned To</th>
+        <th>Priority</th>
+        <th>Deadline</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{if .Tasks}}
+        {{range $i, $task := .Tasks}}
+        <tr>
+          <td>{{inc $i}}</td>
+          <td>
+            <div class="title">{{$task.Title}}</div>
+            {{if $task.Description}}<div class="muted">{{$task.Description}}</div>{{end}}
+          </td>
+          <td>{{if $task.Project}}{{$task.Project.Title}}{{else}}-{{end}}</td>
+          <td>{{if $task.AssignedTo}}{{$task.AssignedTo.Name}}{{else}}-{{end}}</td>
+          <td class="priority">{{$task.Priority}}</td>
+          <td>{{formatTaskDate $task.Deadline}}</td>
+          <td><span class="status">{{statusLabel $task.Status}}</span></td>
+        </tr>
+        {{end}}
+      {{else}}
+        <tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">No tasks match the current filters.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+
+  <div class="footer">Dokumen ini digenerate otomatis oleh NEXONE Workspace.</div>
+  <script>window.onload=function(){window.print()}</script>
+</body>
+</html>`
 
 func (h *TaskHandler) Create(c *gin.Context) {
 	resetSequenceIfEmpty(h.db, "tasks")
@@ -912,6 +1238,11 @@ func (h *TaskHandler) Create(c *gin.Context) {
 			return err
 		}
 
+		if isTaskMemberRequest(c) {
+			userID := getUserID(c)
+			req.AssignedToID = &userID
+		}
+
 		task = models.Task{
 			Title:          req.Title,
 			ProjectID:      req.ProjectID,
@@ -940,6 +1271,10 @@ func (h *TaskHandler) Create(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if strings.Contains(err.Error(), "members can only") {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -955,6 +1290,10 @@ func (h *TaskHandler) Get(c *gin.Context) {
 	var task models.Task
 	if err := h.db.Preload("AssignedTo").Preload("Project").Preload("Collaborators").Preload("KanbanColumn").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+	if !h.currentUserCanAccessTask(c, task) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only access tasks assigned to you"})
 		return
 	}
 	c.JSON(http.StatusOK, task)
@@ -994,6 +1333,9 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		if err := tx.First(&task, id).Error; err != nil {
 			return err
 		}
+		if !h.currentUserCanAccessTask(c, task) {
+			return gorm.ErrRecordNotFound
+		}
 
 		previousColumnID := task.KanbanColumnID
 		column, err := h.resolveTaskKanbanColumn(tx, status, req.KanbanColumnID)
@@ -1004,6 +1346,13 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		task.Title = req.Title
 		task.ProjectID = req.ProjectID
 		task.AssignedToID = req.AssignedToID
+		if isTaskMemberRequest(c) {
+			userID := getUserID(c)
+			if task.AssignedToID == nil || *task.AssignedToID != userID {
+				return fmt.Errorf("members can only update tasks assigned to themselves")
+			}
+			task.AssignedToID = &userID
+		}
 		task.StartDate = req.StartDate
 		task.Deadline = req.Deadline
 		task.Milestone = req.Milestone
@@ -1069,6 +1418,10 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 	var task models.Task
 	if err := h.db.First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+	if !h.currentUserCanAccessTask(c, task) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update tasks assigned to you"})
 		return
 	}
 
@@ -1155,6 +1508,9 @@ func (h *TaskHandler) MoveKanbanTask(c *gin.Context) {
 		if err := tx.First(&task, id).Error; err != nil {
 			return err
 		}
+		if !h.currentUserCanAccessTask(c, task) {
+			return gorm.ErrRecordNotFound
+		}
 
 		var destinationColumn models.TaskKanbanColumn
 		if err := tx.First(&destinationColumn, req.DestinationColumnID).Error; err != nil {
@@ -1231,6 +1587,9 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 		if err := tx.First(&task, id).Error; err != nil {
 			return err
 		}
+		if !h.currentUserCanAccessTask(c, task) {
+			return gorm.ErrRecordNotFound
+		}
 
 		previousColumnID := task.KanbanColumnID
 		if err := tx.Delete(&models.Task{}, id).Error; err != nil {
@@ -1296,6 +1655,29 @@ func (h *LeadHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Duplicate check: name
+	var count int64
+	h.db.Model(&models.Lead{}).Where("LOWER(name) = LOWER(?)", lead.Name).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Lead dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email
+	if lead.Email != "" {
+		h.db.Model(&models.Lead{}).Where("LOWER(email) = LOWER(?) AND email != ''", lead.Email).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah digunakan lead lain"})
+			return
+		}
+	}
+	// Duplicate check: phone
+	if lead.Phone != "" {
+		h.db.Model(&models.Lead{}).Where("phone = ? AND phone != ''", lead.Phone).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor telepon ini sudah digunakan lead lain"})
+			return
+		}
+	}
 	lead.OwnerID = getUserID(c)
 	if err := h.db.Create(&lead).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -1322,7 +1704,33 @@ func (h *LeadHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	c.ShouldBindJSON(&lead)
+	if err := c.ShouldBindJSON(&lead); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Duplicate check: name (exclude self)
+	var count int64
+	h.db.Model(&models.Lead{}).Where("LOWER(name) = LOWER(?) AND id <> ?", lead.Name, id).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Lead dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email (exclude self)
+	if lead.Email != "" {
+		h.db.Model(&models.Lead{}).Where("LOWER(email) = LOWER(?) AND email != '' AND id <> ?", lead.Email, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah digunakan lead lain"})
+			return
+		}
+	}
+	// Duplicate check: phone (exclude self)
+	if lead.Phone != "" {
+		h.db.Model(&models.Lead{}).Where("phone = ? AND phone != '' AND id <> ?", lead.Phone, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor telepon ini sudah digunakan lead lain"})
+			return
+		}
+	}
 	h.db.Save(&lead)
 	recordAudit(h.db, c, "update", "lead", lead.ID, lead.Name)
 	c.JSON(http.StatusOK, lead)
@@ -1347,6 +1755,13 @@ func (h *LeadHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
+func (h *LeadHandler) GetQuotations(c *gin.Context) {
+	id, _ := getID(c)
+	var quotations []models.Quotation
+	h.db.Where("lead_id = ?", id).Preload("Client").Order("id desc").Find(&quotations)
+	c.JSON(http.StatusOK, gin.H{"data": quotations})
+}
+
 func (h *LeadHandler) ConvertToClient(c *gin.Context) {
 	id, _ := getID(c)
 	var lead models.Lead
@@ -1354,18 +1769,39 @@ func (h *LeadHandler) ConvertToClient(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"})
 		return
 	}
-	client := models.Client{
-		Name:    lead.Name,
-		Email:   lead.Email,
-		Phone:   lead.Phone,
-		OwnerID: getUserID(c),
-	}
-	if err := h.db.Create(&client).Error; err != nil {
+
+	var client models.Client
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		client = models.Client{
+			Name:    lead.Name,
+			Type:    "company",
+			Email:   lead.Email,
+			Phone:   lead.Phone,
+			Needs:   lead.Notes,
+			OwnerID: getUserID(c),
+		}
+		if err := tx.Create(&client).Error; err != nil {
+			return err
+		}
+
+		if strings.TrimSpace(lead.PrimaryContact) != "" {
+			contact := models.Contact{
+				ClientID: client.ID,
+				Name:     lead.PrimaryContact,
+				Email:    lead.Email,
+				Phone:    lead.Phone,
+			}
+			if err := tx.Create(&contact).Error; err != nil {
+				return err
+			}
+		}
+
+		recordAudit(tx, c, "convert", "lead", lead.ID, lead.Name+" → Client")
+		return tx.Delete(&lead).Error
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	h.db.Model(&lead).Update("status", "won")
-	recordAudit(h.db, c, "convert", "lead", lead.ID, lead.Name+" → Client")
 	c.JSON(http.StatusCreated, client)
 }
 
@@ -1550,7 +1986,18 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 
 	tmpl := template.Must(template.New("invoice").Funcs(template.FuncMap{
 		"formatCurrency": func(amount float64, currency string) string {
-			return fmt.Sprintf("%s %.2f", currency, amount)
+			intPart := int64(amount)
+			frac := int(amount*100+0.5) % 100
+			s := fmt.Sprintf("%d", intPart)
+			n := len(s)
+			result := ""
+			for i, ch := range s {
+				if i > 0 && (n-i)%3 == 0 {
+					result += "."
+				}
+				result += string(ch)
+			}
+			return fmt.Sprintf("%s %s,%02d", currency, result, frac)
 		},
 		"formatDate": func(t models.FlexTime) string {
 			if t.IsZero() {
@@ -2130,6 +2577,8 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 		q = q.Where("client_id = ?", clientID)
 	} else if projectID := c.Query("project_id"); projectID != "" {
 		q = q.Where("project_id = ?", projectID)
+	} else if contractID := c.Query("contract_id"); contractID != "" {
+		q = q.Where("contract_id = ?", contractID)
 	} else {
 		q = q.Where("user_id = ? AND is_recurring = ?", userID, recurring)
 	}
@@ -2315,7 +2764,7 @@ func (h *TeamHandler) ListMembers(c *gin.Context) {
 		q.Page = 1
 	}
 	if hasLimit && q.Limit <= 0 {
-		q.Limit = 10
+		q.Limit = 30
 	}
 
 	var members []models.User
@@ -2342,7 +2791,7 @@ func (h *TeamHandler) ListMembers(c *gin.Context) {
 			q.Page = 1
 		}
 		if q.Limit <= 0 {
-			q.Limit = 10
+			q.Limit = 30
 		}
 		query = query.Scopes(paginate(q.PaginationQuery))
 	}
@@ -2542,7 +2991,11 @@ func (h *TeamHandler) ResetPassword(c *gin.Context) {
 
 func (h *TeamHandler) ListTimeCards(c *gin.Context) {
 	var cards []models.TimeCard
-	h.db.Preload("User").Order("in_date desc").Find(&cards)
+	q := h.db.Preload("User").Preload("Project")
+	if pid := c.Query("project_id"); pid != "" {
+		q = q.Where("project_id = ?", pid)
+	}
+	q.Order("in_date desc").Find(&cards)
 	c.JSON(http.StatusOK, gin.H{"data": cards})
 }
 
@@ -2550,13 +3003,17 @@ func (h *TeamHandler) ClockIn(c *gin.Context) {
 	resetSequenceIfEmpty(h.db, "time_cards")
 	userID := getUserID(c)
 	var existing models.TimeCard
-	// Check if already clocked in
 	if err := h.db.Where("user_id = ? AND out_time IS NULL", userID).First(&existing).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Already clocked in"})
 		return
 	}
+	var req struct {
+		ProjectID *uint  `json:"project_id"`
+		Note      string `json:"note"`
+	}
+	c.ShouldBindJSON(&req)
 	now := time.Now()
-	card := models.TimeCard{UserID: userID, InTime: now, InDate: now}
+	card := models.TimeCard{UserID: userID, InTime: now, InDate: now, ProjectID: req.ProjectID, Note: req.Note}
 	if err := h.db.Create(&card).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2586,7 +3043,11 @@ func (h *TeamHandler) ClockOut(c *gin.Context) {
 func (h *TeamHandler) ListLeaves(c *gin.Context) {
 	userID := getUserID(c)
 	var leaves []models.Leave
-	h.db.Where("user_id = ?", userID).Order("start_date desc").Find(&leaves)
+	if getUserRole(c) == "admin" {
+		h.db.Preload("User").Preload("ApprovedBy").Order("created_at desc").Find(&leaves)
+	} else {
+		h.db.Preload("ApprovedBy").Where("user_id = ?", userID).Order("start_date desc").Find(&leaves)
+	}
 	c.JSON(http.StatusOK, gin.H{"data": leaves})
 }
 
@@ -2597,23 +3058,64 @@ func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	leave.UserID = getUserID(c)
-	leave.Status = "pending"
+	userID := getUserID(c)
+	leave.UserID = userID
+	if getUserRole(c) == "admin" {
+		// Admin bisa langsung approve untuk dirinya sendiri
+		leave.Status = "approved"
+		leave.ApprovedByID = &userID
+	} else {
+		leave.Status = "pending"
+	}
 	if err := h.db.Create(&leave).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.db.Preload("User").Preload("ApprovedBy").First(&leave, leave.ID)
 	c.JSON(http.StatusCreated, leave)
 }
 
 func (h *TeamHandler) UpdateLeaveStatus(c *gin.Context) {
+	if getUserRole(c) != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Hanya admin yang dapat menyetujui/menolak cuti"})
+		return
+	}
 	id, _ := getID(c)
 	var req struct {
 		Status string `json:"status"`
 	}
-	c.ShouldBindJSON(&req)
-	h.db.Model(&models.Leave{}).Where("id = ?", id).Update("status", req.Status)
-	c.JSON(http.StatusOK, gin.H{"message": "Updated"})
+	if err := c.ShouldBindJSON(&req); err != nil || (req.Status != "approved" && req.Status != "rejected") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Status harus approved atau rejected"})
+		return
+	}
+	adminID := getUserID(c)
+	updates := map[string]interface{}{"status": req.Status, "approved_by_id": adminID}
+	h.db.Model(&models.Leave{}).Where("id = ?", id).Updates(updates)
+	var leave models.Leave
+	h.db.Preload("User").Preload("ApprovedBy").First(&leave, id)
+	c.JSON(http.StatusOK, leave)
+}
+
+func (h *TeamHandler) DeleteLeave(c *gin.Context) {
+	id, _ := getID(c)
+	userID := getUserID(c)
+	var leave models.Leave
+	if err := h.db.First(&leave, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Leave not found"})
+		return
+	}
+	if getUserRole(c) != "admin" {
+		if leave.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Tidak dapat menghapus cuti milik orang lain"})
+			return
+		}
+		if leave.Status != "pending" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Hanya cuti dengan status pending yang dapat dibatalkan"})
+			return
+		}
+	}
+	h.db.Delete(&models.Leave{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
 func (h *TeamHandler) ListAnnouncements(c *gin.Context) {
@@ -2907,7 +3409,7 @@ func NewAppRoleHandler(db *gorm.DB) *AppRoleHandler { return &AppRoleHandler{db:
 
 func (h *AppRoleHandler) List(c *gin.Context) {
 	var roles []models.AppRole
-	h.db.Preload("Permissions").Find(&roles)
+	h.db.Preload("Permissions").Order("name asc").Find(&roles)
 	c.JSON(http.StatusOK, gin.H{"data": roles})
 }
 
@@ -2917,8 +3419,38 @@ func (h *AppRoleHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.db.Create(&role).Error; err != nil {
+	role.Name = strings.TrimSpace(role.Name)
+	role.Description = strings.TrimSpace(role.Description)
+	if role.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role name is required"})
+		return
+	}
+
+	var existing models.AppRole
+	err := h.db.Unscoped().Where("name = ?", role.Name).First(&existing).Error
+	if err == nil {
+		if existing.DeletedAt.Valid {
+			if err := h.db.Unscoped().Model(&models.AppRole{}).Where("id = ?", existing.ID).Updates(map[string]any{
+				"deleted_at":  nil,
+				"description": role.Description,
+				"updated_at":  time.Now(),
+			}).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			h.db.First(&existing, existing.ID)
+			c.JSON(http.StatusCreated, existing)
+			return
+		}
 		c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"})
+		return
+	}
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.db.Create(&role).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, role)
@@ -2945,12 +3477,33 @@ func (h *AppRoleHandler) Update(c *gin.Context) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	c.ShouldBindJSON(&req)
-	if req.Name != "" {
-		role.Name = req.Name
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	role.Description = req.Description
-	h.db.Save(&role)
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role name is required"})
+		return
+	}
+
+	var duplicate models.AppRole
+	err := h.db.Unscoped().Where("name = ? AND id <> ?", name, role.ID).First(&duplicate).Error
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"})
+		return
+	}
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	role.Name = name
+	role.Description = strings.TrimSpace(req.Description)
+	if err := h.db.Save(&role).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, role)
 }
 
@@ -2978,14 +3531,26 @@ func (h *AppRoleHandler) SetPermissions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// Replace all permissions for this role
-	h.db.Where("app_role_id = ?", id).Delete(&models.RolePermission{})
-	for i := range permissions {
-		permissions[i].AppRoleID = id
-		permissions[i].ID = 0
-	}
-	if len(permissions) > 0 {
-		h.db.Create(&permissions)
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("app_role_id = ?", id).Delete(&models.RolePermission{}).Error; err != nil {
+			return err
+		}
+		for i := range permissions {
+			permissions[i].AppRoleID = id
+			permissions[i].ID = 0
+			if permissions[i].CanEdit {
+				permissions[i].CanRead = true
+			}
+		}
+		if len(permissions) > 0 {
+			if err := tx.Create(&permissions).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	h.db.Preload("Permissions").First(&role, id)
 	c.JSON(http.StatusOK, role)
@@ -3020,7 +3585,7 @@ func (h *AuditLogHandler) List(c *gin.Context) {
 
 	query.Count(&total)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "30"))
 	offset := (page - 1) * limit
 	query.Order("created_at desc").Offset(offset).Limit(limit).Find(&logs)
 	c.JSON(http.StatusOK, gin.H{"data": logs, "total": total, "page": page, "limit": limit})
@@ -3128,4 +3693,116 @@ func (h *ReportHandler) ExportCSV(c *gin.Context) {
 		w.Write([]string{"error", "tipe laporan tidak dikenal: " + reportType})
 		w.Write([]string{"tersedia", strings.Join([]string{"invoices", "expenses", "leads", "projects", "timecards"}, ", ")})
 	}
+}
+
+// ─── MILESTONE ───────────────────────────────────────
+
+type MilestoneHandler struct{ db *gorm.DB }
+
+func NewMilestoneHandler(db *gorm.DB) *MilestoneHandler { return &MilestoneHandler{db: db} }
+
+func (h *MilestoneHandler) List(c *gin.Context) {
+	projectID := c.Param("id")
+	var items []models.Milestone
+	h.db.Preload("Assignee").Where("project_id = ?", projectID).Order("due_date asc, id asc").Find(&items)
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *MilestoneHandler) Create(c *gin.Context) {
+	projectID := c.Param("id")
+	var m models.Milestone
+	if err := c.ShouldBindJSON(&m); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pid, err := strconv.ParseUint(projectID, 10, 64)
+	if err != nil || pid == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID proyek tidak valid atau tidak ditemukan"})
+		return
+	}
+	m.ProjectID = uint(pid)
+	if err := h.db.Create(&m).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Preload("Assignee").First(&m, m.ID)
+	c.JSON(http.StatusCreated, m)
+}
+
+func (h *MilestoneHandler) Update(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("mid"), 10, 64)
+	var m models.Milestone
+	if err := h.db.First(&m, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&m); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Save(&m)
+	h.db.Preload("Assignee").First(&m, m.ID)
+	c.JSON(http.StatusOK, m)
+}
+
+func (h *MilestoneHandler) Delete(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("mid"), 10, 64)
+	h.db.Delete(&models.Milestone{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+// ─── DELIVERABLE ─────────────────────────────────────
+
+type DeliverableHandler struct{ db *gorm.DB }
+
+func NewDeliverableHandler(db *gorm.DB) *DeliverableHandler { return &DeliverableHandler{db: db} }
+
+func (h *DeliverableHandler) List(c *gin.Context) {
+	projectID := c.Param("id")
+	var items []models.Deliverable
+	h.db.Preload("File").Where("project_id = ?", projectID).Order("due_date asc, id asc").Find(&items)
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *DeliverableHandler) Create(c *gin.Context) {
+	projectID := c.Param("id")
+	var d models.Deliverable
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pid, err := strconv.ParseUint(projectID, 10, 64)
+	if err != nil || pid == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID proyek tidak valid atau tidak ditemukan"})
+		return
+	}
+	d.ProjectID = uint(pid)
+	if err := h.db.Create(&d).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Preload("File").First(&d, d.ID)
+	c.JSON(http.StatusCreated, d)
+}
+
+func (h *DeliverableHandler) Update(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("did"), 10, 64)
+	var d models.Deliverable
+	if err := h.db.First(&d, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.db.Save(&d)
+	h.db.Preload("File").First(&d, d.ID)
+	c.JSON(http.StatusOK, d)
+}
+
+func (h *DeliverableHandler) Delete(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("did"), 10, 64)
+	h.db.Delete(&models.Deliverable{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }

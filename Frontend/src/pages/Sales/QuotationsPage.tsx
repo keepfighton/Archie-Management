@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { clientService, projectService, quotationPrintService, quotationService } from '@/services/api'
+import { useEffect, useMemo, useState } from 'react'
+import { clientService, leadService, projectService, quotationPrintService, quotationService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
 import { ArrowRightLeft, FileDown, Plus, Printer } from 'lucide-react'
@@ -15,6 +15,8 @@ import {
   SearchInput,
   StatusBadge,
   Toolbar,
+  DEFAULT_PAGE_LIMIT,
+  rowNumber,
 } from '@/components/common'
 
 const STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted']
@@ -25,6 +27,7 @@ const emptyForm = () => ({
   quote_number: '',
   revision: 1,
   title: '',
+  lead_id: '',
   client_id: '',
   project_id: '',
   issue_date: new Date().toISOString().split('T')[0],
@@ -53,6 +56,7 @@ export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
+  const [leads, setLeads] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -69,9 +73,14 @@ export default function QuotationsPage() {
   const [form, setForm] = useState<any>(emptyForm())
   const [itemForm, setItemForm] = useState({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
 
+  const projectOptions = useMemo(() => {
+    if (!form.client_id) return []
+    return projects.filter((project: any) => String(project.client_id) === String(form.client_id))
+  }, [form.client_id, projects])
+
   const load = (q = search, overridePage?: number) => {
     setLoading(true)
-    const params: any = { page: overridePage ?? page, limit: 10 }
+    const params: any = { page: overridePage ?? page, limit: DEFAULT_PAGE_LIMIT }
     if (statusFilter) params.status = statusFilter
     if (q) params.q = q
     quotationService
@@ -94,6 +103,7 @@ export default function QuotationsPage() {
   useEffect(() => {
     clientService.list({ limit: 200 }).then((r) => setClients(r.data.data || [])).catch(() => {})
     projectService.list({ limit: 200 }).then((r) => setProjects(r.data.data || [])).catch(() => {})
+    leadService.list({ limit: 500, status: '' }).then((r) => setLeads(r.data.data || [])).catch(() => {})
   }, [])
 
   const genQuoteNumber = () => {
@@ -113,6 +123,7 @@ export default function QuotationsPage() {
       quote_number: row.quote_number,
       revision: row.revision || 1,
       title: row.title,
+      lead_id: String(row.lead_id || ''),
       client_id: String(row.client_id || ''),
       project_id: String(row.project_id || ''),
       issue_date: row.issue_date?.split('T')[0] || '',
@@ -155,6 +166,7 @@ export default function QuotationsPage() {
     try {
       const payload = {
         ...form,
+        lead_id: form.lead_id ? Number(form.lead_id) : null,
         client_id: Number(form.client_id),
         project_id: form.project_id ? Number(form.project_id) : null,
         revision: Number(form.revision) || 1,
@@ -275,6 +287,7 @@ export default function QuotationsPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="w-16">No.</th>
                   <th>Quote #</th>
                   <th>Rev</th>
                   <th>Title</th>
@@ -290,11 +303,12 @@ export default function QuotationsPage() {
               <tbody>
                 {quotations.length === 0 ? (
                   <tr>
-                    <td colSpan={10}><EmptyState message="No quotations yet." /></td>
+                    <td colSpan={11}><EmptyState message="No quotations yet." /></td>
                   </tr>
                 ) : (
-                  quotations.map((row) => (
+                  quotations.map((row, index) => (
                     <tr key={row.id}>
+                      <td className="text-gray-400">{rowNumber(page, index)}</td>
                       <td className="font-medium text-blue-600">{row.quote_number}</td>
                       <td className="text-gray-400 text-xs">r{row.revision || 1}</td>
                       <td>{row.title}</td>
@@ -341,7 +355,7 @@ export default function QuotationsPage() {
                 )}
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={10} onChange={setPage} />
+            <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
           </>
         )}
       </div>
@@ -390,18 +404,37 @@ export default function QuotationsPage() {
             </FormField>
           </div>
 
+          {/* LEAD */}
+          <div className="col-span-2">
+            <FormField label="Lead (opsional)" hint="Hubungkan proposal ini ke lead yang ada">
+              <select
+                className="input"
+                value={form.lead_id}
+                onChange={(e) => setForm({ ...form, lead_id: e.target.value })}
+              >
+                <option value="">— Tidak terhubung ke Lead —</option>
+                {leads.map((l) => <option key={l.id} value={l.id}>{l.name}{l.estimated_value ? ` — ${l.currency || 'IDR'} ${Number(l.estimated_value).toLocaleString('id-ID')}` : ''}</option>)}
+              </select>
+            </FormField>
+          </div>
+
           {/* CLIENT + PROJECT */}
           <FormField label="Client" required>
-            <select className="input" value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}>
+            <select
+              className="input"
+              value={form.client_id}
+              onChange={(e) => setForm({ ...form, client_id: e.target.value, project_id: '' })}
+            >
               <option value="">Select client...</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
 
-          <FormField label="Project">
+          <FormField label="Project" hint={form.client_id ? 'Project list follows selected client' : 'Select client first'}>
             <select
               className="input"
               value={form.project_id}
+              disabled={!form.client_id}
               onChange={(e) => {
                 const pid = e.target.value
                 const proj = projects.find((p: any) => String(p.id) === pid)
@@ -419,9 +452,12 @@ export default function QuotationsPage() {
                 }))
               }}
             >
-              <option value="">No project</option>
-              {projects.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              <option value="">{form.client_id ? 'No project' : 'Select client first'}</option>
+              {projectOptions.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
+            {form.client_id && projectOptions.length === 0 && (
+              <p className="mt-1 text-xs text-gray-400">No projects found for this client.</p>
+            )}
           </FormField>
 
           {/* PIC */}

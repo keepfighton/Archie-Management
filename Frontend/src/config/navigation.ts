@@ -71,6 +71,7 @@ export const navGroups: NavGroupDef[] = [
     id: 'operations',
     label: 'Operations',
     items: [
+      { id: 'clusters', to: '/clusters', icon: Boxes, label: 'Cluster', menu: 'clusters' },
       { id: 'projects', to: '/projects', icon: FolderKanban, label: 'Projects', menu: 'projects' },
       { id: 'tasks', to: '/tasks', icon: CheckSquare, label: 'Tasks', menu: 'tasks' },
       { id: 'todo', to: '/todo', icon: CheckCircle, label: 'To Do', menu: 'todo' },
@@ -109,7 +110,7 @@ export const navGroups: NavGroupDef[] = [
     id: 'assets',
     label: 'Assets',
     items: [
-      { id: 'assets', to: '/assets', icon: Boxes, label: 'Asset Management', menu: 'assets', comingSoon: true },
+      { id: 'assets', to: '/assets', icon: Boxes, label: 'Asset Management', menu: 'assets' },
     ],
   },
   {

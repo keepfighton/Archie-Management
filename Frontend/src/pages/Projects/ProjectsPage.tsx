@@ -1,46 +1,63 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { projectService, clientService } from '@/services/api'
+import { projectService, clientService, clusterService, teamService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { toast } from 'react-toastify'
 import { Plus, Printer, FileDown, Filter } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  StatusBadge, ProgressBar, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
+  StatusBadge, ProgressBar, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
 export default function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [projects, setProjects] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
+  const [clusters, setClusters] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(() => !!searchParams.get('status'))
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || '')
+  const [clusterFilter, setClusterFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showManageLabels, setShowManageLabels] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [form, setForm] = useState<any>({
-    title: '', client_id: '', price: '', currency: 'IDR',
+    title: '', cluster_id: '', pic_id: '', client_id: '', price: '', currency: 'IDR',
     start_date: '', deadline: '', status: 'open', description: ''
   })
   const [editItem, setEditItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
 
   const fetch = (overridePage?: number) => {
+    const nextPage = overridePage || page
     setLoading(true)
-    projectService.list({ page, limit: 10, q: search })
+    projectService.list({
+      page: nextPage,
+      limit: DEFAULT_PAGE_LIMIT,
+      q: search,
+      status: statusFilter || undefined,
+      cluster_id: clusterFilter || undefined,
+    })
       .then(r => { setProjects(r.data.data || []); setTotal(r.data.total || 0) })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetch() }, [page, search])
-  useEffect(() => { clientService.list({ limit: 100 }).then(r => setClients(r.data.data || [])) }, [])
+  useEffect(() => { fetch() }, [page, search, statusFilter, clusterFilter])
+  useEffect(() => {
+    clientService.list({ limit: 100 }).then(r => setClients(r.data.data || []))
+    clusterService.list({ limit: 500 }).then(r => setClusters(r.data.data || []))
+    teamService.listMembers({ limit: 500 }).then(r => setMembers(r.data.data || []))
+  }, [])
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ title: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
+    setForm({ title: '', cluster_id: '', pic_id: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
     setShowModal(true)
   }
 
@@ -48,7 +65,7 @@ export default function ProjectsPage() {
     if (searchParams.get('compose') !== 'new') return
 
     setEditItem(null)
-    setForm({ title: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
+    setForm({ title: '', cluster_id: '', pic_id: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
     setShowModal(true)
 
     const nextParams = new URLSearchParams(searchParams)
@@ -60,6 +77,8 @@ export default function ProjectsPage() {
     setEditItem(p)
     setForm({
       title: p.title,
+      cluster_id: p.cluster_id ? String(p.cluster_id) : '',
+      pic_id: p.pic_id ? String(p.pic_id) : '',
       client_id: String(p.client_id || ''),
       price: p.price,
       currency: p.currency,
@@ -77,6 +96,8 @@ export default function ProjectsPage() {
     try {
       const payload = {
         ...form,
+        cluster_id: form.cluster_id ? Number(form.cluster_id) : null,
+        pic_id: form.pic_id ? Number(form.pic_id) : null,
         client_id: Number(form.client_id) || 0,
         price: Number(form.price) || 0,
         start_date: toISODate(form.start_date),
@@ -117,15 +138,52 @@ export default function ProjectsPage() {
       />
 
       <Toolbar
-        left={<button className="btn btn-secondary"><Filter size={12} />+ Add new filter</button>}
+        left={
+          <button className="btn btn-secondary" onClick={() => setShowFilters(v => !v)}>
+            <Filter size={12} />+ Add new filter
+          </button>
+        }
         right={
           <>
             <button className="btn btn-secondary"><FileDown size={12} />Excel</button>
             <button className="btn btn-secondary"><Printer size={12} />Print</button>
-            <SearchInput value={search} onChange={setSearch} />
+            <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1) }} />
           </>
         }
       />
+
+      {showFilters && (
+        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white p-3">
+          <FormField label="Status">
+            <select className="input input-sm h-10 min-w-40" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
+              <option value="">All status</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="hold">Hold</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </FormField>
+          <FormField label="Cluster">
+            <select className="input input-sm h-10 min-w-48" value={clusterFilter} onChange={e => { setClusterFilter(e.target.value); setPage(1) }}>
+              <option value="">All clusters</option>
+              <option value="none">Tanpa cluster</option>
+              {clusters.map(cluster => <option key={cluster.id} value={cluster.id}>{cluster.name}</option>)}
+            </select>
+          </FormField>
+          <button
+            className="btn btn-secondary h-10"
+            onClick={() => {
+              setStatusFilter('')
+              setClusterFilter('')
+              setSearch('')
+              setPage(1)
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       <div className="table-container">
         {loading ? <Loading /> : (
@@ -133,16 +191,16 @@ export default function ProjectsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th><th>Title</th><th>Client</th><th>Price</th>
+                  <th>No.</th><th>Title</th><th>Cluster</th><th>PIC</th><th>Client</th><th>Price</th>
                   <th>Start date</th><th>Deadline</th><th>Progress</th><th>Status</th><th></th>
                 </tr>
               </thead>
               <tbody>
                 {projects.length === 0
-                  ? <tr><td colSpan={9}><EmptyState /></td></tr>
-                  : projects.map(p => (
+                  ? <tr><td colSpan={11}><EmptyState /></td></tr>
+                  : projects.map((p, index) => (
                     <tr key={p.id}>
-                      <td className="text-gray-400">{p.id}</td>
+                      <td className="text-gray-400">{rowNumber(page, index)}</td>
                       <td>
                         <Link to={`/projects/${p.id}`} className="text-blue-600 hover:underline font-medium">{p.title}</Link>
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -151,6 +209,8 @@ export default function ProjectsPage() {
                           ))}
                         </div>
                       </td>
+                      <td className="text-gray-500">{p.cluster?.name || 'Tanpa cluster'}</td>
+                      <td className="text-gray-500">{p.pic?.name || '-'}</td>
                       <td className="text-gray-500">{p.client?.name || '-'}</td>
                       <td className="whitespace-nowrap">{p.currency} {Number(p.price).toLocaleString()}</td>
                       <td className="text-gray-400 whitespace-nowrap">{p.start_date ? new Date(p.start_date).toLocaleDateString('id') : '-'}</td>
@@ -185,7 +245,7 @@ export default function ProjectsPage() {
                 }
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={10} onChange={setPage} />
+            <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
           </>
         )}
       </div>
@@ -210,6 +270,18 @@ export default function ProjectsPage() {
             <select className="input" value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}>
               <option value="">Select client...</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Cluster">
+            <select className="input" value={form.cluster_id} onChange={e => setForm({ ...form, cluster_id: e.target.value })}>
+              <option value="">Tanpa cluster</option>
+              {clusters.map(cluster => <option key={cluster.id} value={cluster.id}>{cluster.name}</option>)}
+            </select>
+          </FormField>
+          <FormField label="PIC">
+            <select className="input" value={form.pic_id} onChange={e => setForm({ ...form, pic_id: e.target.value })}>
+              <option value="">--select PIC--</option>
+              {members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
             </select>
           </FormField>
           <FormField label="Status">

@@ -3,6 +3,12 @@ import { formatNumber, parseNumber } from '@/utils/format'
 import { X, Search, ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import clsx from 'clsx'
 
+export const DEFAULT_PAGE_LIMIT = 30
+
+export function rowNumber(page: number, index: number, limit = DEFAULT_PAGE_LIMIT) {
+  return (page - 1) * limit + index + 1
+}
+
 // ─── Modal ───────────────────────────────────────────
 interface ModalProps {
   open: boolean

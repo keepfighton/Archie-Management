@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSelector } from 'react-redux'
 import { taskService, projectService, teamService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown, GripVertical, Pencil, Trash2, Check, X } from 'lucide-react'
+import type { RootState } from '@/store'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import {
   PageHeader, SearchInput, Pagination,
   StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, Avatar,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
 type TaskStatus = 'todo' | 'in_progress' | 'done' | 'expired'
@@ -73,7 +76,7 @@ const TASK_STATUSES: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'expired', label: 'Expired', color: 'bg-red-50' },
 ]
 
-const LIST_LIMIT = 10
+const LIST_LIMIT = DEFAULT_PAGE_LIMIT
 
 const priorityColor: Record<string, string> = {
   high: 'text-red-500',
@@ -229,6 +232,8 @@ function reorderColumns(columns: KanbanColumn[], result: DropResult) {
 }
 
 export default function TasksPage() {
+  const { user } = useSelector((state: RootState) => state.auth)
+  const isMember = user?.role === 'member'
   const [view, setView] = useState('list')
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [kanbanColumns, setKanbanColumns] = useState<KanbanColumn[]>([])
@@ -294,13 +299,27 @@ export default function TasksPage() {
     [boardTasks, columnToDelete]
   )
 
+  const memberVisibleProjectIds = useMemo(() => {
+    const ids = new Set<number>()
+    ;[...tasks, ...allBoardTasks].forEach(task => {
+      if (task.project_id) ids.add(task.project_id)
+      if (task.project?.id) ids.add(task.project.id)
+    })
+    return ids
+  }, [allBoardTasks, tasks])
+
+  const visibleProjects = useMemo(
+    () => isMember ? projects.filter(project => memberVisibleProjectIds.has(project.id)) : projects,
+    [isMember, memberVisibleProjectIds, projects]
+  )
+
   const buildQueryParams = (base?: Record<string, string | number | boolean>) => {
     const params: Record<string, string | number | boolean> = { ...(base || {}) }
 
     if (search.trim()) params.q = search.trim()
     if (statusFilter) params.status = statusFilter
     if (projectFilter) params.project_id = projectFilter
-    if (assigneeFilter) params.assigned_to_id = assigneeFilter
+    if (assigneeFilter && !isMember) params.assigned_to_id = assigneeFilter
 
     return params
   }
@@ -346,11 +365,17 @@ export default function TasksPage() {
 
   useEffect(() => {
     void loadList()
-  }, [page, search, statusFilter, projectFilter, assigneeFilter])
+  }, [page, search, statusFilter, projectFilter, assigneeFilter, isMember])
 
   useEffect(() => {
     void loadBoard()
-  }, [search, statusFilter, projectFilter, assigneeFilter])
+  }, [search, statusFilter, projectFilter, assigneeFilter, isMember])
+
+  useEffect(() => {
+    if (isMember) {
+      setAssigneeFilter('')
+    }
+  }, [isMember])
 
   useEffect(() => {
     Promise.all([
@@ -366,6 +391,13 @@ export default function TasksPage() {
       })
   }, [])
 
+  useEffect(() => {
+    if (projectFilter && isMember && !memberVisibleProjectIds.has(Number(projectFilter))) {
+      setProjectFilter('')
+      setPage(1)
+    }
+  }, [isMember, memberVisibleProjectIds, projectFilter])
+
   const closeTaskModal = () => {
     setShowModal(false)
     setEditTask(null)
@@ -376,7 +408,10 @@ export default function TasksPage() {
     const nextStatus = column && isTaskStatus(column.status) ? column.status : 'todo'
     const nextColumnId = column?.id || defaultColumnIdByStatus[nextStatus]
     setEditTask(null)
-    setForm(createEmptyForm(nextStatus, nextColumnId))
+    setForm({
+      ...createEmptyForm(nextStatus, nextColumnId),
+      assigned_to_id: isMember && user?.id ? String(user.id) : '',
+    })
     setShowModal(true)
   }
 
@@ -433,6 +468,14 @@ export default function TasksPage() {
       await refreshTasks()
     } catch {
       toast.error('Failed to delete task')
+    }
+  }
+
+  const handleOpenTaskPDF = async () => {
+    try {
+      await taskService.openReportPDF(buildQueryParams())
+    } catch {
+      toast.error('Failed to open task PDF')
     }
   }
 
@@ -654,31 +697,37 @@ export default function TasksPage() {
                 setPage(1)
               }}
             >
-              <option value="">All projects</option>
-              {projects.map(project => (
+              <option value="">{isMember ? 'My projects' : 'All projects'}</option>
+              {visibleProjects.map(project => (
                 <option key={project.id} value={project.id}>{project.title}</option>
               ))}
             </select>
 
-            <select
-              className="input input-sm h-10"
-              value={assigneeFilter}
-              onChange={e => {
-                setAssigneeFilter(e.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="">All assignees</option>
-              {members.map(member => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
-            </select>
+            {isMember ? (
+              <div className="input input-sm h-10 flex items-center text-gray-500">
+                Assigned to me
+              </div>
+            ) : (
+              <select
+                className="input input-sm h-10"
+                value={assigneeFilter}
+                onChange={e => {
+                  setAssigneeFilter(e.target.value)
+                  setPage(1)
+                }}
+              >
+                <option value="">All assignees</option>
+                {members.map(member => (
+                  <option key={member.id} value={member.id}>{member.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 xl:ml-auto xl:flex-nowrap">
-            <button className="btn btn-secondary">
+            <button className="btn btn-secondary" onClick={handleOpenTaskPDF}>
               <FileDown size={12} />
-              Excel
+              PDF
             </button>
             <SearchInput
               value={search}
@@ -730,6 +779,7 @@ export default function TasksPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="w-16">No.</th>
                     <th>Title</th>
                     <th>Project</th>
                     <th>Assigned To</th>
@@ -743,17 +793,18 @@ export default function TasksPage() {
                   {tasks.length === 0
                     ? (
                       <tr>
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <EmptyState message="No tasks match the current filters." />
                         </td>
                       </tr>
                     )
-                    : tasks.map(task => (
+                    : tasks.map((task, index) => (
                       <tr
                         key={task.id}
                         className="cursor-pointer"
                         onClick={() => openEdit(task)}
                       >
+                        <td className="text-gray-400">{rowNumber(page, index, LIST_LIMIT)}</td>
                         <td>
                           <div className="max-w-[280px]">
                             <p className="font-medium text-gray-900">{task.title}</p>
@@ -1170,7 +1221,7 @@ export default function TasksPage() {
               onChange={e => setForm(current => ({ ...current, project_id: e.target.value }))}
             >
               <option value="">No project</option>
-              {projects.map(project => (
+              {(isMember ? visibleProjects : projects).map(project => (
                 <option key={project.id} value={project.id}>{project.title}</option>
               ))}
             </select>
@@ -1181,11 +1232,18 @@ export default function TasksPage() {
               className="input"
               value={form.assigned_to_id}
               onChange={e => setForm(current => ({ ...current, assigned_to_id: e.target.value }))}
+              disabled={isMember}
             >
-              <option value="">Unassigned</option>
-              {members.map(member => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
+              {isMember ? (
+                <option value={user?.id || ''}>{user?.name || 'Assigned to me'}</option>
+              ) : (
+                <>
+                  <option value="">Unassigned</option>
+                  {members.map(member => (
+                    <option key={member.id} value={member.id}>{member.name}</option>
+                  ))}
+                </>
+              )}
             </select>
           </FormField>
 

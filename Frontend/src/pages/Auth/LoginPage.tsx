@@ -266,7 +266,7 @@ export default function LoginPage() {
           DESKTOP LAYOUT (unchanged)
       ══════════════════════════════════════════════ */}
       <div className="hidden lg:flex min-h-screen w-full flex-row">
-        <div className="anim-fadeInLeft relative flex min-h-screen w-[30%] flex-col bg-white">
+        <div className="anim-fadeInLeft relative z-10 flex min-h-screen w-[30%] flex-col bg-white shadow-[18px_0_48px_rgba(15,23,42,0.12)]">
           <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2">
             <img src={nexoraPartUrl} alt="Nexora" className="anim-logoDesktop h-[288px] w-auto object-contain"/>
           </div>

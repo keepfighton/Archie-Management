@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { paymentService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { FileDown, Printer, Trash2 } from 'lucide-react'
-import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog } from '@/components/common'
+import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog, rowNumber } from '@/components/common'
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([])
@@ -73,13 +73,14 @@ export default function PaymentsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th><th>Actions</th></tr>
+              <tr><th className="w-16">No.</th><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {payments.length === 0
-                ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                : payments.map(p => (
+                ? <tr><td colSpan={8}><EmptyState /></td></tr>
+                : payments.map((p, index) => (
                   <tr key={p.id}>
+                    <td className="text-gray-400">{rowNumber(1, index, payments.length || 1)}</td>
                     <td className="font-medium text-blue-600">{p.invoice?.invoice_number || '-'}</td>
                     <td className="text-gray-500">{p.invoice?.client?.name || '-'}</td>
                     <td className="whitespace-nowrap font-medium text-green-600">{fmt(p.amount, p.currency)}</td>

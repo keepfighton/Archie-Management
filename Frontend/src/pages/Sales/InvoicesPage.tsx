@@ -6,7 +6,8 @@ import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown, Printer } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
+  DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
 const STATUSES = ['draft', 'not_paid', 'partially_paid', 'fully_paid', 'overdue']
@@ -38,7 +39,7 @@ export default function InvoicesPage() {
 
   const load = (q = search, overridePage?: number) => {
     setLoading(true)
-    const params: any = { page: overridePage ?? page, limit: 10 }
+    const params: any = { page: overridePage ?? page, limit: DEFAULT_PAGE_LIMIT }
     if (statusFilter) params.status = statusFilter
     if (q) params.q = q
     invoiceService.list(params)
@@ -52,7 +53,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     const timer = setTimeout(() => { setPage(1); load(search) }, 300)
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, statusFilter]) // Tambahkan statusFilter agar re-fetch saat filter berubah
   useEffect(() => {
     clientService.list({ limit: 100 }).then(r => setClients(r.data.data || [])).catch(() => {})
     projectService.list({ limit: 100 }).then(r => setProjects(r.data.data || [])).catch(() => {})
@@ -181,13 +182,14 @@ export default function InvoicesPage() {
           <>
             <table className="table">
               <thead>
-                <tr><th>Invoice #</th><th>Client</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr>
+                <tr><th className="w-16">No.</th><th>Invoice #</th><th>Client</th><th>Bill Date</th><th>Due Date</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {invoices.length === 0
-                  ? <tr><td colSpan={9}><EmptyState /></td></tr>
-                  : invoices.map(inv => (
+                  ? <tr><td colSpan={10}><EmptyState /></td></tr>
+                  : invoices.map((inv, index) => (
                     <tr key={inv.id}>
+                      <td className="text-gray-400">{rowNumber(page, index)}</td>
                       <td className="font-medium text-blue-600">{inv.invoice_number}</td>
                       <td className="text-gray-500">{inv.client?.name || '-'}</td>
                       <td className="text-gray-400 whitespace-nowrap">{inv.bill_date ? new Date(inv.bill_date).toLocaleDateString('id') : '-'}</td>
@@ -216,7 +218,7 @@ export default function InvoicesPage() {
                 }
               </tbody>
             </table>
-            <Pagination page={page} total={total} limit={10} onChange={setPage} />
+            <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
           </>
         )}
       </div>

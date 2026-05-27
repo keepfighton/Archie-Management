@@ -18,7 +18,7 @@ import { toast } from 'react-toastify'
 import { RootState, AppDispatch } from '@/store'
 import { fetchMe, canRead } from '@/store/slices/authSlice'
 import { dashboardService, taskService, projectService, teamService } from '@/services/api'
-import { Loading, StatusBadge, ProgressBar } from '@/components/common'
+import { Loading, StatusBadge, ProgressBar, rowNumber } from '@/components/common'
 import { dashboardItem, findNavigationItemByMenu, navGroups } from '@/config/navigation'
 import { formatIDR } from '@/utils/format'
 import { useLocale } from '@/contexts/LocaleContext'
@@ -29,8 +29,10 @@ const EMPTY_STATS = {
   range: '30d',
   open_tasks: 0,
   open_projects: 0,
+  in_progress_projects: 0,
   completed_projects: 0,
   hold_projects: 0,
+  cancelled_projects: 0,
   total_clients: 0,
   total_leads: 0,
   total_members: 0,
@@ -321,8 +323,10 @@ export default function DashboardPage() {
 
   const projectTotal =
     (stats.open_projects ?? 0) +
+    (stats.in_progress_projects ?? 0) +
     (stats.completed_projects ?? 0) +
-    (stats.hold_projects ?? 0)
+    (stats.hold_projects ?? 0) +
+    (stats.cancelled_projects ?? 0)
   const projectCompletion = projectTotal > 0
     ? Math.round(((stats.completed_projects ?? 0) / projectTotal) * 100)
     : 0
@@ -623,18 +627,26 @@ export default function DashboardPage() {
                 </Link>
               </div>
               <div className="card-body space-y-4">
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <Link to={projectsRoute} className="rounded-xl bg-slate-50 px-3 py-4 transition hover:bg-slate-100">
+                <div className="grid grid-cols-5 gap-2 text-center">
+                  <Link to={`${projectsRoute}?status=open`} className="rounded-xl bg-slate-50 px-2 py-3 transition hover:bg-slate-100">
                     <div className="text-xl font-semibold text-primary">{stats.open_projects ?? 0}</div>
-                    <div className="mt-1 text-xs text-gray-500">Open</div>
+                    <div className="mt-1 text-[11px] text-gray-500">Open</div>
                   </Link>
-                  <Link to={projectsRoute} className="rounded-xl bg-emerald-50 px-3 py-4 transition hover:bg-emerald-100">
+                  <Link to={`${projectsRoute}?status=in_progress`} className="rounded-xl bg-blue-50 px-2 py-3 transition hover:bg-blue-100">
+                    <div className="text-xl font-semibold text-blue-600">{stats.in_progress_projects ?? 0}</div>
+                    <div className="mt-1 text-[11px] text-gray-500">On Progress</div>
+                  </Link>
+                  <Link to={`${projectsRoute}?status=completed`} className="rounded-xl bg-emerald-50 px-2 py-3 transition hover:bg-emerald-100">
                     <div className="text-xl font-semibold text-emerald-700">{stats.completed_projects ?? 0}</div>
-                    <div className="mt-1 text-xs text-gray-500">Completed</div>
+                    <div className="mt-1 text-[11px] text-gray-500">Complete</div>
                   </Link>
-                  <Link to={projectsRoute} className="rounded-xl bg-amber-50 px-3 py-4 transition hover:bg-amber-100">
-                    <div className="text-xl font-semibold text-amber-700">{stats.hold_projects ?? 0}</div>
-                    <div className="mt-1 text-xs text-gray-500">Hold</div>
+                  <Link to={`${projectsRoute}?status=hold`} className="rounded-xl bg-amber-50 px-2 py-3 transition hover:bg-amber-100">
+                    <div className="text-xl font-semibold text-amber-600">{stats.hold_projects ?? 0}</div>
+                    <div className="mt-1 text-[11px] text-gray-500">On Hold</div>
+                  </Link>
+                  <Link to={`${projectsRoute}?status=cancelled`} className="rounded-xl bg-red-50 px-2 py-3 transition hover:bg-red-100">
+                    <div className="text-xl font-semibold text-red-500">{stats.cancelled_projects ?? 0}</div>
+                    <div className="mt-1 text-[11px] text-gray-500">Cancelled</div>
                   </Link>
                 </div>
 
@@ -877,7 +889,7 @@ export default function DashboardPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th className="w-16">No.</th>
                     <th>Title</th>
                     <th>Start date</th>
                     <th>Deadline</th>
@@ -889,9 +901,9 @@ export default function DashboardPage() {
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-xs text-gray-400">No tasks found</td>
                     </tr>
-                  ) : tasks.map(task => (
+                  ) : tasks.map((task, index) => (
                     <tr key={task.id}>
-                      <td className="text-gray-400">{task.id}</td>
+                      <td className="text-gray-400">{rowNumber(1, index, tasks.length || 1)}</td>
                       <td>
                         <Link to={tasksRoute} className="font-medium text-primary hover:underline">
                           {task.title}

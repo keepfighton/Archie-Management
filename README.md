@@ -255,6 +255,42 @@ SMTP_PORT=587
 SMTP_USER=your@gmail.com
 SMTP_PASSWORD=your-app-password
 SMTP_FROM=noreply@cbqa.com
+
+💬 WhatsApp Owner Report
+Backend menyediakan webhook WhatsApp Cloud API di:
+
+```text
+GET  /api/v1/whatsapp/webhook
+POST /api/v1/whatsapp/webhook
+```
+
+Gunakan URL public production untuk konfigurasi webhook Meta:
+
+```text
+https://nexone.nexoratech.co/api/v1/whatsapp/webhook
+```
+
+Isi env berikut di `.env` root untuk Docker, atau `Backend/.env` untuk run manual:
+
+```env
+WHATSAPP_VERIFY_TOKEN=token-verifikasi-bebas-yang-sama-dengan-meta
+WHATSAPP_ACCESS_TOKEN=token-dari-meta
+WHATSAPP_PHONE_NUMBER_ID=phone-number-id-dari-meta
+WHATSAPP_APP_SECRET=app-secret-dari-meta
+WHATSAPP_API_VERSION=v20.0
+WHATSAPP_OWNER_NUMBERS=6281234567890
+```
+
+Nomor yang terdaftar di `WHATSAPP_OWNER_NUMBERS` bisa mengirim:
+
+```text
+laporan
+report
+ringkasan
+summary
+```
+
+Sistem akan membalas ringkasan project, invoice, income, expense, estimasi profit, tagihan belum dibayar, client, dan lead.
 🐘 pgAdmin (opsional)
 Key	Value
 URL	http://localhost:5050
@@ -266,4 +302,3 @@ Jalankan dengan: docker-compose --profile tools up
 Role	Email	Password
 Admin	admin@cbqa.com	Admin123!
 Member	fauzi@cbqa.com	Member123!
-

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { clientService, projectService, quotationPrintService, quotationService } from '@/services/api'
+import { clientService, leadService, projectService, quotationPrintService, quotationService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
 import { ArrowRightLeft, FileDown, Plus, Printer } from 'lucide-react'
@@ -27,6 +27,7 @@ const emptyForm = () => ({
   quote_number: '',
   revision: 1,
   title: '',
+  lead_id: '',
   client_id: '',
   project_id: '',
   issue_date: new Date().toISOString().split('T')[0],
@@ -55,6 +56,7 @@ export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
+  const [leads, setLeads] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -101,6 +103,7 @@ export default function QuotationsPage() {
   useEffect(() => {
     clientService.list({ limit: 200 }).then((r) => setClients(r.data.data || [])).catch(() => {})
     projectService.list({ limit: 200 }).then((r) => setProjects(r.data.data || [])).catch(() => {})
+    leadService.list({ limit: 500, status: '' }).then((r) => setLeads(r.data.data || [])).catch(() => {})
   }, [])
 
   const genQuoteNumber = () => {
@@ -120,6 +123,7 @@ export default function QuotationsPage() {
       quote_number: row.quote_number,
       revision: row.revision || 1,
       title: row.title,
+      lead_id: String(row.lead_id || ''),
       client_id: String(row.client_id || ''),
       project_id: String(row.project_id || ''),
       issue_date: row.issue_date?.split('T')[0] || '',
@@ -162,6 +166,7 @@ export default function QuotationsPage() {
     try {
       const payload = {
         ...form,
+        lead_id: form.lead_id ? Number(form.lead_id) : null,
         client_id: Number(form.client_id),
         project_id: form.project_id ? Number(form.project_id) : null,
         revision: Number(form.revision) || 1,
@@ -396,6 +401,20 @@ export default function QuotationsPage() {
           <div className="col-span-2">
             <FormField label="Title" required>
               <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </FormField>
+          </div>
+
+          {/* LEAD */}
+          <div className="col-span-2">
+            <FormField label="Lead (opsional)" hint="Hubungkan proposal ini ke lead yang ada">
+              <select
+                className="input"
+                value={form.lead_id}
+                onChange={(e) => setForm({ ...form, lead_id: e.target.value })}
+              >
+                <option value="">— Tidak terhubung ke Lead —</option>
+                {leads.map((l) => <option key={l.id} value={l.id}>{l.name}{l.estimated_value ? ` — ${l.currency || 'IDR'} ${Number(l.estimated_value).toLocaleString('id-ID')}` : ''}</option>)}
+              </select>
             </FormField>
           </div>
 

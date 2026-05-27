@@ -148,8 +148,10 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		Range               string  `json:"range"`
 		OpenTasks           int64   `json:"open_tasks"`
 		OpenProjects        int64   `json:"open_projects"`
+		InProgressProjects  int64   `json:"in_progress_projects"`
 		CompletedProjects   int64   `json:"completed_projects"`
 		HoldProjects        int64   `json:"hold_projects"`
+		CancelledProjects   int64   `json:"cancelled_projects"`
 		TotalClients        int64   `json:"total_clients"`
 		TotalLeads          int64   `json:"total_leads"`
 		TotalMembers        int64   `json:"total_members"`
@@ -180,8 +182,10 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 
 	applyRange(h.db.Model(&models.Task{})).Where("assigned_to_id = ? AND status != 'done'", userID).Count(&stats.OpenTasks)
 	applyRange(h.db.Model(&models.Project{})).Where("status = 'open'").Count(&stats.OpenProjects)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'in_progress'").Count(&stats.InProgressProjects)
 	applyRange(h.db.Model(&models.Project{})).Where("status = 'completed'").Count(&stats.CompletedProjects)
 	applyRange(h.db.Model(&models.Project{})).Where("status = 'hold'").Count(&stats.HoldProjects)
+	applyRange(h.db.Model(&models.Project{})).Where("status = 'cancelled'").Count(&stats.CancelledProjects)
 	applyRange(h.db.Model(&models.Client{})).Count(&stats.TotalClients)
 	applyRange(h.db.Model(&models.Lead{})).Count(&stats.TotalLeads)
 	h.db.Model(&models.User{}).Where("is_active = true").Count(&stats.TotalMembers)
@@ -236,6 +240,21 @@ func (h *ClientHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Duplicate check: name
+	var count int64
+	h.db.Model(&models.Client{}).Where("LOWER(name) = LOWER(?)", client.Name).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Client dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email
+	if client.Email != "" {
+		h.db.Model(&models.Client{}).Where("LOWER(email) = LOWER(?) AND email != ''", client.Email).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah terdaftar untuk client lain"})
+			return
+		}
+	}
 	if client.OwnerID == 0 {
 		client.OwnerID = getUserID(c)
 	}
@@ -267,6 +286,21 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	if err := c.ShouldBindJSON(&client); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	// Duplicate check: name (exclude self)
+	var count int64
+	h.db.Model(&models.Client{}).Where("LOWER(name) = LOWER(?) AND id <> ?", client.Name, id).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Client dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email (exclude self)
+	if client.Email != "" {
+		h.db.Model(&models.Client{}).Where("LOWER(email) = LOWER(?) AND email != '' AND id <> ?", client.Email, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah terdaftar untuk client lain"})
+			return
+		}
 	}
 	h.db.Save(&client)
 	recordAudit(h.db, c, "update", "client", client.ID, client.Name)
@@ -1621,6 +1655,29 @@ func (h *LeadHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Duplicate check: name
+	var count int64
+	h.db.Model(&models.Lead{}).Where("LOWER(name) = LOWER(?)", lead.Name).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Lead dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email
+	if lead.Email != "" {
+		h.db.Model(&models.Lead{}).Where("LOWER(email) = LOWER(?) AND email != ''", lead.Email).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah digunakan lead lain"})
+			return
+		}
+	}
+	// Duplicate check: phone
+	if lead.Phone != "" {
+		h.db.Model(&models.Lead{}).Where("phone = ? AND phone != ''", lead.Phone).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor telepon ini sudah digunakan lead lain"})
+			return
+		}
+	}
 	lead.OwnerID = getUserID(c)
 	if err := h.db.Create(&lead).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -1647,7 +1704,33 @@ func (h *LeadHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	c.ShouldBindJSON(&lead)
+	if err := c.ShouldBindJSON(&lead); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Duplicate check: name (exclude self)
+	var count int64
+	h.db.Model(&models.Lead{}).Where("LOWER(name) = LOWER(?) AND id <> ?", lead.Name, id).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Lead dengan nama ini sudah terdaftar"})
+		return
+	}
+	// Duplicate check: email (exclude self)
+	if lead.Email != "" {
+		h.db.Model(&models.Lead{}).Where("LOWER(email) = LOWER(?) AND email != '' AND id <> ?", lead.Email, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email ini sudah digunakan lead lain"})
+			return
+		}
+	}
+	// Duplicate check: phone (exclude self)
+	if lead.Phone != "" {
+		h.db.Model(&models.Lead{}).Where("phone = ? AND phone != '' AND id <> ?", lead.Phone, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor telepon ini sudah digunakan lead lain"})
+			return
+		}
+	}
 	h.db.Save(&lead)
 	recordAudit(h.db, c, "update", "lead", lead.ID, lead.Name)
 	c.JSON(http.StatusOK, lead)
@@ -1670,6 +1753,13 @@ func (h *LeadHandler) Delete(c *gin.Context) {
 	h.db.Delete(&models.Lead{}, id)
 	recordAudit(h.db, c, "delete", "lead", id, lead.Name)
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
+func (h *LeadHandler) GetQuotations(c *gin.Context) {
+	id, _ := getID(c)
+	var quotations []models.Quotation
+	h.db.Where("lead_id = ?", id).Preload("Client").Order("id desc").Find(&quotations)
+	c.JSON(http.StatusOK, gin.H{"data": quotations})
 }
 
 func (h *LeadHandler) ConvertToClient(c *gin.Context) {
@@ -1896,7 +1986,18 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 
 	tmpl := template.Must(template.New("invoice").Funcs(template.FuncMap{
 		"formatCurrency": func(amount float64, currency string) string {
-			return fmt.Sprintf("%s %.2f", currency, amount)
+			intPart := int64(amount)
+			frac := int(amount*100+0.5) % 100
+			s := fmt.Sprintf("%d", intPart)
+			n := len(s)
+			result := ""
+			for i, ch := range s {
+				if i > 0 && (n-i)%3 == 0 {
+					result += "."
+				}
+				result += string(ch)
+			}
+			return fmt.Sprintf("%s %s,%02d", currency, result, frac)
 		},
 		"formatDate": func(t models.FlexTime) string {
 			if t.IsZero() {
@@ -2942,7 +3043,11 @@ func (h *TeamHandler) ClockOut(c *gin.Context) {
 func (h *TeamHandler) ListLeaves(c *gin.Context) {
 	userID := getUserID(c)
 	var leaves []models.Leave
-	h.db.Where("user_id = ?", userID).Order("start_date desc").Find(&leaves)
+	if getUserRole(c) == "admin" {
+		h.db.Preload("User").Preload("ApprovedBy").Order("created_at desc").Find(&leaves)
+	} else {
+		h.db.Preload("ApprovedBy").Where("user_id = ?", userID).Order("start_date desc").Find(&leaves)
+	}
 	c.JSON(http.StatusOK, gin.H{"data": leaves})
 }
 
@@ -2953,23 +3058,64 @@ func (h *TeamHandler) ApplyLeave(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	leave.UserID = getUserID(c)
-	leave.Status = "pending"
+	userID := getUserID(c)
+	leave.UserID = userID
+	if getUserRole(c) == "admin" {
+		// Admin bisa langsung approve untuk dirinya sendiri
+		leave.Status = "approved"
+		leave.ApprovedByID = &userID
+	} else {
+		leave.Status = "pending"
+	}
 	if err := h.db.Create(&leave).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.db.Preload("User").Preload("ApprovedBy").First(&leave, leave.ID)
 	c.JSON(http.StatusCreated, leave)
 }
 
 func (h *TeamHandler) UpdateLeaveStatus(c *gin.Context) {
+	if getUserRole(c) != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Hanya admin yang dapat menyetujui/menolak cuti"})
+		return
+	}
 	id, _ := getID(c)
 	var req struct {
 		Status string `json:"status"`
 	}
-	c.ShouldBindJSON(&req)
-	h.db.Model(&models.Leave{}).Where("id = ?", id).Update("status", req.Status)
-	c.JSON(http.StatusOK, gin.H{"message": "Updated"})
+	if err := c.ShouldBindJSON(&req); err != nil || (req.Status != "approved" && req.Status != "rejected") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Status harus approved atau rejected"})
+		return
+	}
+	adminID := getUserID(c)
+	updates := map[string]interface{}{"status": req.Status, "approved_by_id": adminID}
+	h.db.Model(&models.Leave{}).Where("id = ?", id).Updates(updates)
+	var leave models.Leave
+	h.db.Preload("User").Preload("ApprovedBy").First(&leave, id)
+	c.JSON(http.StatusOK, leave)
+}
+
+func (h *TeamHandler) DeleteLeave(c *gin.Context) {
+	id, _ := getID(c)
+	userID := getUserID(c)
+	var leave models.Leave
+	if err := h.db.First(&leave, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Leave not found"})
+		return
+	}
+	if getUserRole(c) != "admin" {
+		if leave.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Tidak dapat menghapus cuti milik orang lain"})
+			return
+		}
+		if leave.Status != "pending" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Hanya cuti dengan status pending yang dapat dibatalkan"})
+			return
+		}
+	}
+	h.db.Delete(&models.Leave{}, id)
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
 
 func (h *TeamHandler) ListAnnouncements(c *gin.Context) {

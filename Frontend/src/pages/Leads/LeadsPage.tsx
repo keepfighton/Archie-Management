@@ -8,7 +8,7 @@ import { Plus, Filter, FileDown } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs,
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput,
   DEFAULT_PAGE_LIMIT, rowNumber,
 } from '@/components/common'
 
@@ -40,7 +40,7 @@ export default function LeadsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>({
-    name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '',
+    name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', estimated_value: 0, currency: 'IDR',
   })
 
   // Client combobox state
@@ -84,7 +84,7 @@ export default function LeadsPage() {
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '' })
+    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', estimated_value: 0, currency: 'IDR' })
     setClientSearch('')
     setSelectedClientId(null)
     setClientContacts([])
@@ -96,7 +96,7 @@ export default function LeadsPage() {
     if (searchParams.get('compose') !== 'new') return
 
     setEditItem(null)
-    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '' })
+    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', estimated_value: 0, currency: 'IDR' })
     setClientSearch('')
     setSelectedClientId(null)
     setClientContacts([])
@@ -110,7 +110,7 @@ export default function LeadsPage() {
 
   const openEdit = (l: any) => {
     setEditItem(l)
-    setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, notes: l.notes || '' })
+    setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, notes: l.notes || '', estimated_value: l.estimated_value || 0, currency: l.currency || 'IDR' })
     setClientSearch(l.name)
     setSelectedClientId(null)
     setClientContacts([])
@@ -134,7 +134,7 @@ export default function LeadsPage() {
       setPage(1)
       load(1)
       loadAll()
-    } catch { toast.error('Failed to save lead') }
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to save lead') }
     finally { setSaving(false) }
   }
 
@@ -210,11 +210,11 @@ export default function LeadsPage() {
               <>
                 <table className="table">
                   <thead>
-                    <tr><th className="w-16">No.</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Source</th><th>Status</th><th>Owner</th><th></th></tr>
+                    <tr><th className="w-16">No.</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Source</th><th className="text-right">Estimasi Nilai</th><th>Status</th><th>Owner</th><th></th></tr>
                   </thead>
                   <tbody>
                     {leads.length === 0
-                      ? <tr><td colSpan={9}><EmptyState /></td></tr>
+                      ? <tr><td colSpan={10}><EmptyState /></td></tr>
                       : leads.map((l, index) => (
                         <tr key={l.id}>
                           <td className="text-gray-400">{rowNumber(page, index)}</td>
@@ -223,6 +223,9 @@ export default function LeadsPage() {
                           <td className="text-gray-500">{l.email || '-'}</td>
                           <td className="text-gray-500">{l.phone || '-'}</td>
                           <td className="text-gray-400">{l.source || '-'}</td>
+                          <td className="text-right text-sm font-medium text-gray-700">
+                            {l.estimated_value ? `${l.currency || 'IDR'} ${Number(l.estimated_value).toLocaleString('id-ID')}` : '-'}
+                          </td>
                           <td><StatusBadge status={l.status} /></td>
                           <td className="text-gray-400">{l.owner?.name || '-'}</td>
                           <td>
@@ -404,11 +407,19 @@ export default function LeadsPage() {
           <FormField label="Phone">
             <input className="input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+62..." />
           </FormField>
+          <FormField label="Status">
+            <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+              {PIPELINE.map(s => <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Mata Uang">
+            <select className="input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>
+              {['IDR', 'USD', 'EUR', 'SGD'].map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </FormField>
           <div className="col-span-2">
-            <FormField label="Status">
-              <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                {PIPELINE.map(s => <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>)}
-              </select>
+            <FormField label="Estimasi Nilai">
+              <PriceInput value={form.estimated_value} onChange={(v: number) => setForm({ ...form, estimated_value: v })} />
             </FormField>
           </div>
           <div className="col-span-2">

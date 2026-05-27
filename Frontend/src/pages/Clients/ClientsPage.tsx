@@ -228,7 +228,7 @@ export default function ClientsPage() {
       setPage(1)
       if (tab === 'clients') loadClients(1)
       else loadOverview()
-    } catch { toast.error('Failed to save client') }
+    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to save client') }
     finally { setSaving(false) }
   }
 

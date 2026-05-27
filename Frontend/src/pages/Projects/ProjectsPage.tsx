@@ -217,7 +217,12 @@ export default function ProjectsPage() {
                       <td className={`whitespace-nowrap ${new Date(p.deadline) < new Date() && p.status !== 'completed' ? 'text-red-500' : 'text-gray-400'}`}>
                         {p.deadline ? new Date(p.deadline).toLocaleDateString('id') : '-'}
                       </td>
-                      <td><ProgressBar value={p.progress} className="w-20" /></td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <ProgressBar value={p.progress} className="w-20" />
+                          <span className="text-xs text-gray-500 w-8">{p.progress ?? 0}%</span>
+                        </div>
+                      </td>
                       <td>
                         <select
                           value={p.status}

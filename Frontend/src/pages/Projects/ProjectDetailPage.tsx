@@ -206,8 +206,8 @@ export default function ProjectDetailPage() {
           <div>
             <p className="text-xs text-gray-400">Progress</p>
             <div className="flex items-center gap-2 mt-1">
-              <ProgressBar value={project.progress} className="w-20" />
-              <span className="text-xs text-gray-500">{project.progress}%</span>
+              <ProgressBar value={project.progress} className="w-28" />
+              <span className="text-sm font-medium text-gray-700">{project.progress ?? 0}%</span>
             </div>
           </div>
         </div>

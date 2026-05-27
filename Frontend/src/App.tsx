@@ -38,6 +38,7 @@ import LeavePage from '@/pages/Team/LeavePage'
 import AnnouncementsPage from '@/pages/Team/AnnouncementsPage'
 import HelpPage from '@/pages/Team/HelpPage'
 import FilesPage from '@/pages/Files/FilesPage'
+import AssetsPage from '@/pages/Assets/AssetsPage'
 import ExpensesPage from '@/pages/Expenses/ExpensesPage'
 import ReportsPage from '@/pages/Reports/ReportsPage'
 import TodoPage from '@/pages/Todo/TodoPage'
@@ -102,6 +103,7 @@ function AppShell() {
         <Route path="team/announcements" element={<AnnouncementsPage />} />
         <Route path="team/help" element={<HelpPage />} />
         <Route path="files" element={<FilesPage />} />
+        <Route path="assets" element={<AssetsPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="todo" element={<TodoPage />} />

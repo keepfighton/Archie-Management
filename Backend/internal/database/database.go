@@ -74,6 +74,8 @@ func Migrate(db *gorm.DB) error {
 		&models.Conversation{},
 		&models.ConversationMember{},
 		&models.Message{},
+		&models.Asset{},
+		&models.AssetMasterData{},
 	); err != nil {
 		return err
 	}

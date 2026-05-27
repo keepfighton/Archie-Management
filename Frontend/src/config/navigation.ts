@@ -110,7 +110,7 @@ export const navGroups: NavGroupDef[] = [
     id: 'assets',
     label: 'Assets',
     items: [
-      { id: 'assets', to: '/assets', icon: Boxes, label: 'Asset Management', menu: 'assets', comingSoon: true },
+      { id: 'assets', to: '/assets', icon: Boxes, label: 'Asset Management', menu: 'assets' },
     ],
   },
   {

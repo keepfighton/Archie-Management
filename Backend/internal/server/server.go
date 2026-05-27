@@ -157,6 +157,7 @@ func (s *Server) setupRoutes() {
 			leads.PATCH("/:id/status", leadH.UpdateStatus)
 			leads.DELETE("/:id", leadH.Delete)
 			leads.POST("/:id/convert", leadH.ConvertToClient)
+			leads.GET("/:id/quotations", leadH.GetQuotations)
 		}
 
 		// Invoices
@@ -264,6 +265,27 @@ func (s *Server) setupRoutes() {
 			expenses.DELETE("/:id", expenseH.Delete)
 		}
 
+		// Assets
+		assetH := handlers.NewAssetHandler(s.db)
+		assets := protected.Group("/assets")
+		{
+			assets.GET("", assetH.List)
+			assets.POST("", assetH.Create)
+			assets.GET("/scan", assetH.Scan)
+			assets.GET("/export", assetH.Export)
+			assets.GET("/:id", assetH.Get)
+			assets.PUT("/:id", assetH.Update)
+			assets.DELETE("/:id", middleware.AdminRequired(), assetH.Delete)
+		}
+		assetMDH := handlers.NewAssetMasterDataHandler(s.db)
+		assetMD := protected.Group("/asset-settings")
+		{
+			assetMD.GET("", assetMDH.List)
+			assetMD.POST("", assetMDH.Create)
+			assetMD.PUT("/:id", assetMDH.Update)
+			assetMD.DELETE("/:id", middleware.AdminRequired(), assetMDH.Delete)
+		}
+
 		// Team
 		teamH := handlers.NewTeamHandler(s.db)
 		team := protected.Group("/team")
@@ -281,6 +303,7 @@ func (s *Server) setupRoutes() {
 			team.GET("/leaves", teamH.ListLeaves)
 			team.POST("/leaves", teamH.ApplyLeave)
 			team.PATCH("/leaves/:id/status", teamH.UpdateLeaveStatus)
+			team.DELETE("/leaves/:id", teamH.DeleteLeave)
 			team.GET("/announcements", teamH.ListAnnouncements)
 			team.POST("/announcements", teamH.CreateAnnouncement)
 		}

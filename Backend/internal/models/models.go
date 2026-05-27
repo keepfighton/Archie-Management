@@ -209,7 +209,7 @@ type Project struct {
 	Currency    string   `gorm:"default:IDR" json:"currency"`
 	StartDate   FlexTime `json:"start_date"`
 	Deadline    FlexTime `json:"deadline"`
-	Status      string   `gorm:"default:open" json:"status"` // open, completed, hold, cancelled
+	Status      string   `gorm:"default:open" json:"status"` // open, in_progress, completed, hold, cancelled
 	Progress    int      `gorm:"default:0" json:"progress"`
 	Description string   `json:"description"`
 	Tasks       []Task   `json:"tasks,omitempty"`
@@ -249,16 +249,19 @@ type Task struct {
 // ─── LEAD ────────────────────────────────────────────
 type Lead struct {
 	Base
-	Name           string  `gorm:"not null" json:"name"`
-	PrimaryContact string  `json:"primary_contact"`
-	Phone          string  `json:"phone"`
-	Email          string  `json:"email"`
-	Source         string  `json:"source"`
-	Status         string  `gorm:"default:new" json:"status"` // new, qualified, discussion, negotiation, won, lost
-	OwnerID        uint    `json:"owner_id"`
-	Owner          *User   `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
-	Notes          string  `json:"notes"`
-	Labels         []Label `gorm:"many2many:lead_labels;" json:"labels,omitempty"`
+	Name            string     `gorm:"not null" json:"name"`
+	PrimaryContact  string     `json:"primary_contact"`
+	Phone           string     `json:"phone"`
+	Email           string     `json:"email"`
+	Source          string     `json:"source"`
+	Status          string     `gorm:"default:new" json:"status"` // new, qualified, discussion, negotiation, won, lost
+	EstimatedValue  float64    `json:"estimated_value"`
+	Currency        string     `gorm:"default:IDR" json:"currency"`
+	OwnerID         uint       `json:"owner_id"`
+	Owner           *User      `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Notes           string     `json:"notes"`
+	Labels          []Label    `gorm:"many2many:lead_labels;" json:"labels,omitempty"`
+	Quotations      []Quotation `gorm:"foreignKey:LeadID" json:"quotations,omitempty"`
 }
 
 // ─── INVOICE ─────────────────────────────────────────
@@ -400,14 +403,16 @@ type Expense struct {
 // ─── LEAVE ───────────────────────────────────────────
 type Leave struct {
 	Base
-	UserID    uint     `json:"user_id"`
-	User      *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	LeaveType string   `json:"leave_type"`
-	StartDate FlexTime `json:"start_date"`
-	EndDate   FlexTime `json:"end_date"`
-	Duration  int      `json:"duration"`
-	Reason    string   `json:"reason"`
-	Status    string   `gorm:"default:pending" json:"status"` // pending, approved, rejected
+	UserID       uint     `json:"user_id"`
+	User         *User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	LeaveType    string   `json:"leave_type"`
+	StartDate    FlexTime `json:"start_date"`
+	EndDate      FlexTime `json:"end_date"`
+	Duration     int      `json:"duration"`
+	Reason       string   `json:"reason"`
+	Status       string   `gorm:"default:pending" json:"status"` // pending, approved, rejected
+	ApprovedByID *uint    `json:"approved_by_id"`
+	ApprovedBy   *User    `gorm:"foreignKey:ApprovedByID" json:"approved_by,omitempty"`
 }
 
 // ─── ANNOUNCEMENT ────────────────────────────────────
@@ -510,6 +515,8 @@ type Quotation struct {
 	ValidUntil      FlexTime        `json:"valid_until"`
 	MasaBerlaku     string          `json:"masa_berlaku"`
 	ContractNo      string          `json:"contract_no"`
+	LeadID          *uint           `json:"lead_id"`
+	Lead            *Lead           `gorm:"foreignKey:LeadID" json:"lead,omitempty"`
 	Status          string          `gorm:"default:draft" json:"status"` // draft, sent, accepted, rejected, expired, converted
 	Currency        string          `gorm:"default:IDR" json:"currency"`
 	SubtotalAmount  float64         `json:"subtotal_amount"`
@@ -544,6 +551,44 @@ type QuotationItem struct {
 	DurationUnit string         `json:"duration_unit"` // day, month, year
 	Total        float64        `json:"total"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// ─── ASSET MASTER DATA ───────────────────────────────
+// type: category | status | condition
+type AssetMasterData struct {
+	Base
+	Type        string `gorm:"not null;index" json:"type"`
+	Name        string `gorm:"not null" json:"name"`
+	Description string `json:"description"`
+	Color       string `gorm:"default:#6366f1" json:"color"`
+}
+
+// ─── ASSET ─────────────────────────────────────────
+type Asset struct {
+	Base
+	AssetCode       string   `gorm:"uniqueIndex;not null" json:"asset_code"`
+	Name            string   `gorm:"not null" json:"name"`
+	Category        string   `json:"category"` // hardware, software, vehicle, furniture, office, other
+	Brand           string   `json:"brand"`
+	AssetModel      string   `json:"asset_model"`
+	SerialNumber    string   `json:"serial_number"`
+	Barcode         string   `json:"barcode"`
+	PurchaseDate    FlexTime `json:"purchase_date"`
+	PurchasePrice   float64  `json:"purchase_price"`
+	Currency        string   `gorm:"default:IDR" json:"currency"`
+	CurrentValue    float64  `gorm:"-" json:"current_value"`
+	DepreciationPct float64  `json:"depreciation_pct"`
+	Location        string   `json:"location"`
+	Condition       string   `gorm:"default:good" json:"condition"` // good, fair, poor
+	Status          string   `gorm:"default:active" json:"status"` // active, maintenance, disposed, lost
+	Notes           string   `json:"notes"`
+	FileURL         string   `json:"file_url"`
+	AssignedToID    *uint    `json:"assigned_to_id"`
+	AssignedTo      *User    `gorm:"foreignKey:AssignedToID" json:"assigned_to,omitempty"`
+	ProjectID       *uint    `json:"project_id"`
+	Project         *Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+	ExpenseID       *uint    `json:"expense_id"`
+	Expense         *Expense `gorm:"foreignKey:ExpenseID" json:"expense,omitempty"`
 }
 
 // ─── AUDIT LOG ───────────────────────────────────────

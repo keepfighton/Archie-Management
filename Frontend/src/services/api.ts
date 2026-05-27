@@ -217,6 +217,7 @@ export const teamService = {
   listLeaves: () => api.get('/team/leaves'),
   applyLeave: (data: any) => api.post('/team/leaves', data),
   updateLeaveStatus: (id: number, status: string) => api.patch(`/team/leaves/${id}/status`, { status }),
+  deleteLeave: (id: number) => api.delete(`/team/leaves/${id}`),
   listAnnouncements: () => api.get('/team/announcements'),
   createAnnouncement: (data: any) => api.post('/team/announcements', data),
 }
@@ -421,5 +422,36 @@ export const quotationPrintService = {
       const win = window.open('', '_blank')
       if (win) { win.document.write(html); win.document.close() }
     })
+  },
+}
+
+// ─── Asset Master Data (Kategori / Status / Kondisi) ─
+export const assetSettingsService = {
+  list: (type?: string) => api.get('/asset-settings', { params: type ? { type } : {} }),
+  create: (data: any) => api.post('/asset-settings', data),
+  update: (id: number, data: any) => api.put(`/asset-settings/${id}`, data),
+  delete: (id: number) => api.delete(`/asset-settings/${id}`),
+}
+
+// ─── Assets ──────────────────────────────────────────
+export const assetService = {
+  list: (params?: any) => api.get('/assets', { params }),
+  get: (id: number) => api.get(`/assets/${id}`),
+  create: (data: any) => api.post('/assets', data),
+  update: (id: number, data: any) => api.put(`/assets/${id}`, data),
+  delete: (id: number) => api.delete(`/assets/${id}`),
+  scan: (code: string) => api.get('/assets/scan', { params: { code } }),
+  export: () => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const a = document.createElement('a')
+    a.href = `${API_BASE_URL}/assets/export`
+    const headers = new Headers({ Authorization: `Bearer ${token}` })
+    fetch(`${API_BASE_URL}/assets/export`, { headers })
+      .then(r => r.blob())
+      .then(blob => {
+        a.href = URL.createObjectURL(blob)
+        a.download = 'assets.csv'
+        a.click()
+      })
   },
 }

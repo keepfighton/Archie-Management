@@ -474,8 +474,8 @@ const quotationPrintTemplate = `<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:28px 32px;}
 @media print{
-  @page{size:A4;margin:15mm 15mm 15mm 15mm;}
-  body{padding:0;}
+  @page{size:A4;margin:0;}
+  body{padding:15mm;}
   .no-print{display:none!important;}
   .page-break{page-break-before:always;}
 }
@@ -526,7 +526,7 @@ table td.tr{text-align:right;}
 <!-- HEADER -->
 <div class="header">
   <div>
-    <div class="brand">NEXONE <small>by NEXORA · Part of CBQA Global Group</small></div>
+    <div class="brand">NEXORA <small>Part of CBQA Global Group</small></div>
   </div>
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
@@ -624,7 +624,7 @@ table td.tr{text-align:right;}
 
 <!-- FOOTER -->
 <div class="doc-footer">
-  <div><span>NEXONE by NEXORA</span> · Part of CBQA Global Group · www.cbqaglobal.com</div>
+  <div><span>NEXORA</span> · Part of CBQA Global Group · www.cbqaglobal.com</div>
   <div>Dicetak: {{.PrintedAt}}</div>
 </div>
 

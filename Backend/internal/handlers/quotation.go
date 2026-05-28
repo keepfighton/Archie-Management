@@ -455,8 +455,8 @@ table td.tr{text-align:right;}
   </div>
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
-    <p>{{.QuoteNumber}}{{if .ContractNo}} &nbsp;|&nbsp; Kontrak: {{.ContractNo}}{{end}}</p>
-    {{if ne .Status "converted"}}<p style="font-weight:600;color:#c0392b;text-transform:uppercase;font-size:10px;">{{.Status}}</p>{{end}}
+    <p>{{.QuoteNumber}}</p>
+
   </div>
 </div>
 

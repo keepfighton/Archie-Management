@@ -236,6 +236,81 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 		},
 		"inc": func(i int) int { return i + 1 },
 		"sub": func(a, b float64) float64 { return a - b },
+		"terbilang": func(n float64) string {
+			x := int64(n)
+			if x == 0 {
+				return "Nol Rupiah"
+			}
+			satuan := []string{"", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan",
+				"Sepuluh", "Sebelas", "Dua Belas", "Tiga Belas", "Empat Belas", "Lima Belas", "Enam Belas",
+				"Tujuh Belas", "Delapan Belas", "Sembilan Belas"}
+			tens := []string{"", "", "Dua Puluh", "Tiga Puluh", "Empat Puluh", "Lima Puluh",
+				"Enam Puluh", "Tujuh Puluh", "Delapan Puluh", "Sembilan Puluh"}
+			var w func(int64) string
+			w = func(v int64) string {
+				if v == 0 {
+					return ""
+				}
+				if v < 20 {
+					return satuan[v]
+				}
+				if v < 100 {
+					s := tens[v/10]
+					if v%10 != 0 {
+						s += " " + satuan[v%10]
+					}
+					return s
+				}
+				if v < 200 {
+					s := "Seratus"
+					if v%100 != 0 {
+						s += " " + w(v%100)
+					}
+					return s
+				}
+				if v < 1000 {
+					s := satuan[v/100] + " Ratus"
+					if v%100 != 0 {
+						s += " " + w(v%100)
+					}
+					return s
+				}
+				if v < 2000 {
+					s := "Seribu"
+					if v%1000 != 0 {
+						s += " " + w(v%1000)
+					}
+					return s
+				}
+				if v < 1_000_000 {
+					s := w(v/1000) + " Ribu"
+					if v%1000 != 0 {
+						s += " " + w(v%1000)
+					}
+					return s
+				}
+				if v < 1_000_000_000 {
+					s := w(v/1_000_000) + " Juta"
+					if v%1_000_000 != 0 {
+						s += " " + w(v%1_000_000)
+					}
+					return s
+				}
+				if v < 1_000_000_000_000 {
+					s := w(v/1_000_000_000) + " Miliar"
+					if v%1_000_000_000 != 0 {
+						s += " " + w(v%1_000_000_000)
+					}
+					return s
+				}
+				s := w(v/1_000_000_000_000) + " Triliun"
+				if v%1_000_000_000_000 != 0 {
+					s += " " + w(v%1_000_000_000_000)
+				}
+				return s
+			}
+			return w(x) + " Rupiah"
+		},
 		"nl2li": func(s string) template.HTML {
 			result := ""
 			for _, line := range strings.Split(s, "\n") {
@@ -502,12 +577,6 @@ table td.tr{text-align:right;}
       <td class="tr">{{formatRp $item.Total}}</td>
     </tr>
     {{end}}
-    {{if .Terbilang}}
-    <tr class="terb-row">
-      <td colspan="2" style="font-weight:600;font-size:9px;color:#555;white-space:nowrap;">Terbilang</td>
-      <td colspan="4" style="font-style:italic;color:#333;">{{.Terbilang}}</td>
-    </tr>
-    {{end}}
   </tbody>
 </table>
 
@@ -527,6 +596,7 @@ table td.tr{text-align:right;}
     {{if .DiscountAmount}}<tr><td class="lbl" style="font-weight:600;">Total Setelah Diskon</td><td style="font-weight:600;">{{formatRp (sub .SubtotalAmount .DiscountAmount)}}</td></tr>{{end}}
     {{if .TaxAmount}}<tr><td class="lbl">PPN {{if .TaxPct}}{{printf "%.0f" .TaxPct}}%{{else}}10%{{end}}</td><td>{{formatRp .TaxAmount}}</td></tr>{{end}}
     <tr class="grand"><td>GRAND TOTAL</td><td>{{formatRp .TotalAmount}}</td></tr>
+    <tr><td class="lbl" style="font-size:9px;font-weight:600;">Terbilang</td><td style="font-style:italic;color:#333;font-size:9px;">{{terbilang .TotalAmount}}</td></tr>
   </table>
 </div>
 

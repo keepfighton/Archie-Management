@@ -3,7 +3,7 @@ import { clientService, leadService, projectService, quotationPrintService, quot
 
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
-import { ArrowRightLeft, Download, FileDown, Plus, Printer } from 'lucide-react'
+import { ArrowRightLeft, Download, FileDown, Pencil, Plus, Printer, Trash2 } from 'lucide-react'
 import {
   ConfirmDialog,
   EmptyState,
@@ -108,6 +108,7 @@ export default function QuotationsPage() {
   const [activeQuotation, setActiveQuotation] = useState<any>(null)
   const [activeItems, setActiveItems] = useState<any[]>([])
   const [itemsLoading, setItemsLoading] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -275,30 +276,47 @@ export default function QuotationsPage() {
     }
   }
 
+  const handleEditItem = (item: any) => {
+    setEditingItemId(item.id)
+    setItemForm({
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      duration: item.duration || 12,
+      duration_unit: item.duration_unit || 'month',
+    })
+  }
+
   const handleSaveItem = async () => {
     if (!activeQuotation) return
     if (!itemForm.description.trim()) {
       toast.error('Item description is required')
       return
     }
+    const payload = {
+      description: itemForm.description,
+      quantity: Number(itemForm.quantity),
+      unit_price: Number(itemForm.unit_price),
+      duration: Number(itemForm.duration),
+      duration_unit: itemForm.duration_unit,
+      total: Number(itemForm.quantity) * Number(itemForm.unit_price),
+    }
     try {
-      await quotationService.addItem(activeQuotation.id, {
-        description: itemForm.description,
-        quantity: Number(itemForm.quantity),
-        unit_price: Number(itemForm.unit_price),
-        duration: Number(itemForm.duration),
-        duration_unit: itemForm.duration_unit,
-        total: Number(itemForm.quantity) * Number(itemForm.unit_price),
-      })
-      toast.success('Item berhasil ditambahkan')
+      if (editingItemId) {
+        await quotationService.updateItem(activeQuotation.id, editingItemId, payload)
+        toast.success('Item berhasil diupdate')
+        setEditingItemId(null)
+      } else {
+        await quotationService.addItem(activeQuotation.id, payload)
+        toast.success('Item berhasil ditambahkan')
+      }
       setItemForm({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
-      // refresh item list di modal
       quotationService.get(activeQuotation.id)
         .then((r: any) => setActiveItems(r.data.items || []))
         .catch(() => {})
       load()
     } catch {
-      toast.error('Failed to add quotation item')
+      toast.error(editingItemId ? 'Gagal update item' : 'Gagal menambah item')
     }
   }
 
@@ -378,7 +396,7 @@ export default function QuotationsPage() {
                     <tr key={row.id}>
                       <td className="text-gray-400">{rowNumber(page, index)}</td>
                       <td className="font-medium text-blue-600">{row.quote_number}</td>
-                      <td className="text-gray-400 text-xs">r{row.revision || 1}</td>
+                      <td className="text-gray-400 text-xs">r{row.revision ?? 0}</td>
                       <td>{row.title}</td>
                       <td className="text-gray-500">{row.client?.name || '-'}</td>
                       <td className="text-gray-500 text-xs">{row.pic || '-'}</td>
@@ -460,7 +478,7 @@ export default function QuotationsPage() {
             <input className="input" value={form.quote_number} onChange={(e) => setForm({ ...form, quote_number: e.target.value })} />
           </FormField>
           <FormField label="Revision">
-            <input className="input" type="number" min={1} value={form.revision}
+            <input className="input" type="number" min={0} value={form.revision}
               onChange={(e) => setForm({ ...form, revision: Number(e.target.value) })} />
           </FormField>
 
@@ -672,7 +690,15 @@ export default function QuotationsPage() {
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setShowItemModal(false)}>Tutup</button>
-            <button className="btn btn-primary" onClick={handleSaveItem}>+ Tambah Item</button>
+            {editingItemId && (
+              <button className="btn btn-secondary" onClick={() => {
+                setEditingItemId(null)
+                setItemForm({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
+              }}>Batal Edit</button>
+            )}
+            <button className="btn btn-primary" onClick={handleSaveItem}>
+              {editingItemId ? 'Simpan Perubahan' : '+ Tambah Item'}
+            </button>
           </>
         }
       >
@@ -684,28 +710,43 @@ export default function QuotationsPage() {
           ) : activeItems.length === 0 ? (
             <p className="text-xs text-gray-400 italic">Belum ada item.</p>
           ) : (
-            <div className="rounded-lg border border-gray-200 overflow-hidden">
-              <table className="table text-xs">
+            <div className="rounded-lg border border-gray-200 overflow-x-auto">
+              <table className="table text-xs" style={{ minWidth: '600px' }}>
                 <thead>
                   <tr>
                     <th className="text-left">Product</th>
                     <th className="text-center w-12">QTY</th>
                     <th className="text-center w-16">Durasi</th>
-                    <th className="text-right w-32">Harga Satuan</th>
-                    <th className="text-right w-32">Jumlah</th>
-                    <th className="w-10"></th>
+                    <th className="text-right w-36">Harga Satuan</th>
+                    <th className="text-right w-36">Jumlah</th>
+                    <th className="text-center w-20">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {activeItems.map((item: any) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className={editingItemId === item.id ? 'bg-blue-50' : ''}>
                       <td>{item.description}</td>
                       <td className="text-center">{item.quantity}</td>
                       <td className="text-center">{item.duration ? `${item.duration} bln` : '-'}</td>
                       <td className="text-right">{fmt(item.unit_price, activeQuotation?.currency)}</td>
                       <td className="text-right font-medium">{fmt(item.total, activeQuotation?.currency)}</td>
                       <td className="text-center">
-                        <button className="btn btn-danger text-xs py-0 px-1.5" onClick={() => handleDeleteItem(item.id)}>×</button>
+                        <div className="flex gap-1 justify-center">
+                          <button
+                            className="btn btn-secondary py-0 px-1.5"
+                            title="Edit"
+                            onClick={() => handleEditItem(item)}
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            className="btn btn-danger py-0 px-1.5"
+                            title="Hapus"
+                            onClick={() => handleDeleteItem(item.id)}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -715,8 +756,10 @@ export default function QuotationsPage() {
           )}
         </div>
 
-        {/* Form tambah item baru */}
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tambah Item Baru</p>
+        {/* Form tambah / edit item */}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          {editingItemId ? 'Edit Item' : 'Tambah Item Baru'}
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <FormField label="Product / Description" required>

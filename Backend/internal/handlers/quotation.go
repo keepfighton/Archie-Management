@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -12,6 +14,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+//go:embed logo_nexora.png
+var logoNexoraBytes []byte
 
 type QuotationHandler struct{ db *gorm.DB }
 
@@ -328,10 +333,12 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 		models.Quotation
 		PrintedAt    string
 		DownloadMode bool
+		LogoBase64   string
 	}{
 		Quotation:    quotation,
 		PrintedAt:    time.Now().Format("02 January 2006 15:04"),
 		DownloadMode: c.Query("download") == "1",
+		LogoBase64:   base64.StdEncoding.EncodeToString(logoNexoraBytes),
 	}
 	_ = tmpl.Execute(c.Writer, data)
 }
@@ -526,7 +533,7 @@ table td.tr{text-align:right;}
 <!-- HEADER -->
 <div class="header">
   <div>
-    <div class="brand">NEXORA <small>Part of CBQA Global Group</small></div>
+    <div class="brand"><img src="data:image/png;base64,{{.LogoBase64}}" alt="NEXORA" style="height:48px;width:auto;display:block;"></div>
   </div>
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
@@ -624,7 +631,6 @@ table td.tr{text-align:right;}
 
 <!-- FOOTER -->
 <div class="doc-footer">
-  <div><span>NEXORA</span> · Part of CBQA Global Group · www.cbqaglobal.com</div>
   <div>Dicetak: {{.PrintedAt}}</div>
 </div>
 

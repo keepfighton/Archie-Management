@@ -1,7 +1,72 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { formatNumber, parseNumber } from '@/utils/format'
-import { X, Search, ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
+import { X, Search, ChevronLeft, ChevronRight, Inbox, Building2, Globe, Home } from 'lucide-react'
 import clsx from 'clsx'
+
+// ─── ClockIn Helpers ─────────────────────────────────
+export type WorkMode = 'WFO' | 'WFA' | 'WFH'
+
+export const WORK_MODE_CONFIG: Record<WorkMode, { label: string; icon: typeof Building2; color: string; desc: string }> = {
+  WFO: { label: 'WFO', icon: Building2, color: 'bg-blue-100 text-blue-700',    desc: 'Work From Office — lokasi dicek dalam radius 3 KM dari kantor' },
+  WFA: { label: 'WFA', icon: Globe,     color: 'bg-purple-100 text-purple-700', desc: 'Work From Anywhere — absen dari mana saja' },
+  WFH: { label: 'WFH', icon: Home,      color: 'bg-green-100 text-green-700',   desc: 'Work From Home — absen dari rumah' },
+}
+
+export function getLocationWithFallback(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('Browser tidak mendukung geolocation')); return }
+    navigator.geolocation.getCurrentPosition(resolve,
+      () => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false, timeout: 15000, maximumAge: 60000,
+        })
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    )
+  })
+}
+
+interface ClockInModalProps {
+  open: boolean
+  onClose: () => void
+  onConfirm: (mode: WorkMode) => void
+}
+export function ClockInModal({ open, onClose, onConfirm }: ClockInModalProps) {
+  const [selected, setSelected] = useState<WorkMode | null>(null)
+
+  useEffect(() => { if (open) setSelected(null) }, [open])
+
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h3 className="text-base font-semibold text-gray-800 mb-1">Pilih Mode Kerja</h3>
+        <p className="text-xs text-gray-400 mb-4">Pilih mode absen hari ini sebelum clock in</p>
+        <div className="space-y-2 mb-5">
+          {(Object.keys(WORK_MODE_CONFIG) as WorkMode[]).map(mode => {
+            const cfg = WORK_MODE_CONFIG[mode]
+            const Icon = cfg.icon
+            return (
+              <button key={mode} onClick={() => setSelected(mode)}
+                className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all
+                  ${selected === mode ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className={`mt-0.5 p-1.5 rounded-lg ${cfg.color}`}><Icon size={14} /></div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{cfg.label}</p>
+                  <p className="text-xs text-gray-400">{cfg.desc}</p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex gap-2">
+          <button className="btn btn-secondary flex-1" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary flex-1" disabled={!selected} onClick={() => selected && onConfirm(selected)}>Clock In</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export const DEFAULT_PAGE_LIMIT = 30
 

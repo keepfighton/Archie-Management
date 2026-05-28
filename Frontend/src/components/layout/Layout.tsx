@@ -17,6 +17,7 @@ import {
 import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'react-toastify'
+import { ClockInModal, WorkMode, getLocationWithFallback } from '@/components/common'
 
 type HeaderPanel = 'search' | 'quick-add' | 'locale' | 'activity' | 'notifications' | null
 
@@ -184,6 +185,7 @@ export default function Layout() {
   const [headerSearch, setHeaderSearch] = useState('')
   const [recentPages, setRecentPages] = useState<RecentVisit[]>(() => readStoredJson<RecentVisit[]>(RECENT_VISITS_KEY, []))
   const [clockLoading, setClockLoading] = useState(false)
+  const [showClockInModal, setShowClockInModal] = useState(false)
   const [activityLoading, setActivityLoading] = useState(false)
   const [activityItems, setActivityItems] = useState<AuditItem[]>([])
   const [activityFailed, setActivityFailed] = useState(false)
@@ -485,25 +487,48 @@ export default function Layout() {
     }
   }, [])
 
-  const handleClockAction = useCallback(async () => {
+  const handleClockAction = useCallback(() => {
     if (!user) return
+    if (user.clocked_in) {
+      setClockLoading(true)
+      teamService.clockOut()
+        .then(() => { toast.success(t('layout.clockOutSuccess', 'Clocked out successfully')); return dispatch(fetchMe()) })
+        .catch((err: any) => toast.error(err.response?.data?.error || t('layout.clockActionFailed', 'Unable to update time card status')))
+        .finally(() => setClockLoading(false))
+    } else {
+      setShowClockInModal(true)
+    }
+  }, [dispatch, t, user])
 
+  const handleClockInConfirm = async (mode: WorkMode) => {
+    setShowClockInModal(false)
     setClockLoading(true)
     try {
-      if (user.clocked_in) {
-        await teamService.clockOut()
-        toast.success(t('layout.clockOutSuccess', 'Clocked out successfully'))
+      let lat = 0, lng = 0, accuracy = 0
+      if (mode === 'WFO') {
+        try {
+          const pos = await getLocationWithFallback()
+          lat = pos.coords.latitude; lng = pos.coords.longitude; accuracy = pos.coords.accuracy
+        } catch {
+          toast.error('Izin lokasi diperlukan untuk mode WFO. Aktifkan lokasi di browser lalu coba lagi.')
+          setClockLoading(false)
+          return
+        }
       } else {
-        await teamService.clockIn()
-        toast.success(t('layout.clockInSuccess', 'Clocked in successfully'))
+        try {
+          const pos = await getLocationWithFallback()
+          lat = pos.coords.latitude; lng = pos.coords.longitude; accuracy = pos.coords.accuracy
+        } catch { /* lokasi opsional untuk WFA/WFH */ }
       }
+      await teamService.clockIn({ work_mode: mode, latitude: lat, longitude: lng, location_accuracy: accuracy })
+      toast.success(t('layout.clockInSuccess', 'Clocked in successfully') + ` (${mode})`)
       await dispatch(fetchMe())
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || t('layout.clockActionFailed', 'Unable to update time card status'))
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || t('layout.clockActionFailed', 'Unable to update time card status'))
     } finally {
       setClockLoading(false)
     }
-  }, [dispatch, t, user])
+  }
 
   const formatLocaleLabel = useCallback((option: LocaleOption) => (
     t(option.labelKey, option.fallbackLabel)
@@ -1265,6 +1290,12 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <ClockInModal
+        open={showClockInModal}
+        onClose={() => setShowClockInModal(false)}
+        onConfirm={handleClockInConfirm}
+      />
     </div>
   )
 }

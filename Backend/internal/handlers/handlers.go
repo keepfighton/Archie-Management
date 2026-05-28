@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -2989,11 +2990,43 @@ func (h *TeamHandler) ResetPassword(c *gin.Context) {
 	})
 }
 
+// koordinat titik pusat kantor — South Quarter Tower A, TB Simatupang, Jakarta Selatan
+// 6°17'37"S, 106°46'52"E
+const (
+	officeLat  = -6.2936
+	officeLng  = 106.7811
+	wfoRadiusM = 3000.0 // 3 km
+)
+
+// haversineM menghitung jarak dua koordinat dalam meter.
+func haversineM(lat1, lng1, lat2, lng2 float64) float64 {
+	const R = 6371000
+	toRad := func(d float64) float64 { return d * math.Pi / 180 }
+	dLat := toRad(lat2 - lat1)
+	dLng := toRad(lng2 - lng1)
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*math.Sin(dLng/2)*math.Sin(dLng/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
 func (h *TeamHandler) ListTimeCards(c *gin.Context) {
 	var cards []models.TimeCard
 	q := h.db.Preload("User").Preload("Project")
 	if pid := c.Query("project_id"); pid != "" {
 		q = q.Where("project_id = ?", pid)
+	}
+	if mode := c.Query("work_mode"); mode != "" {
+		q = q.Where("work_mode = ?", mode)
+	}
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		if t, err := time.Parse("2006-01-02", dateFrom); err == nil {
+			q = q.Where("in_date >= ?", t)
+		}
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		if t, err := time.Parse("2006-01-02", dateTo); err == nil {
+			q = q.Where("in_date < ?", t.AddDate(0, 0, 1))
+		}
 	}
 	q.Order("in_date desc").Find(&cards)
 	c.JSON(http.StatusOK, gin.H{"data": cards})
@@ -3008,12 +3041,51 @@ func (h *TeamHandler) ClockIn(c *gin.Context) {
 		return
 	}
 	var req struct {
-		ProjectID *uint  `json:"project_id"`
-		Note      string `json:"note"`
+		ProjectID        *uint   `json:"project_id"`
+		Note             string  `json:"note"`
+		WorkMode         string  `json:"work_mode"`
+		Latitude         float64 `json:"latitude"`
+		Longitude        float64 `json:"longitude"`
+		LocationAccuracy float64 `json:"location_accuracy"`
 	}
 	c.ShouldBindJSON(&req)
+
+	if req.WorkMode == "" {
+		req.WorkMode = "WFO"
+	}
+
+	var distanceM float64
+	if req.Latitude != 0 || req.Longitude != 0 {
+		distanceM = haversineM(req.Latitude, req.Longitude, officeLat, officeLng)
+	}
+
+	if req.WorkMode == "WFO" {
+		if req.Latitude == 0 && req.Longitude == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Lokasi diperlukan untuk mode WFO. Pastikan izin lokasi browser sudah diaktifkan."})
+			return
+		}
+		if distanceM > wfoRadiusM {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":      fmt.Sprintf("Anda berada %.0f meter dari kantor. Mode WFO hanya diizinkan dalam radius 3 KM.", distanceM),
+				"distance_m": distanceM,
+			})
+			return
+		}
+	}
+
 	now := time.Now()
-	card := models.TimeCard{UserID: userID, InTime: now, InDate: now, ProjectID: req.ProjectID, Note: req.Note}
+	card := models.TimeCard{
+		UserID:           userID,
+		InTime:           now,
+		InDate:           now,
+		ProjectID:        req.ProjectID,
+		Note:             req.Note,
+		WorkMode:         req.WorkMode,
+		Latitude:         req.Latitude,
+		Longitude:        req.Longitude,
+		DistanceM:        distanceM,
+		LocationAccuracy: req.LocationAccuracy,
+	}
 	if err := h.db.Create(&card).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

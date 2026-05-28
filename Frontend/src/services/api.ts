@@ -212,7 +212,14 @@ export const teamService = {
     api.post(`/team/members/${id}/reset-password`, data ?? {}),
   deleteMember: (id: number) => api.delete(`/team/members/${id}`),
   listTimeCards: (params?: any) => api.get('/team/timecards', { params }),
-  clockIn: () => api.post('/team/timecards/clock-in'),
+  clockIn: (data: {
+    work_mode: 'WFO' | 'WFA' | 'WFH'
+    latitude?: number
+    longitude?: number
+    location_accuracy?: number
+    project_id?: number
+    note?: string
+  }) => api.post('/team/timecards/clock-in', data),
   clockOut: () => api.post('/team/timecards/clock-out'),
   listLeaves: () => api.get('/team/leaves'),
   applyLeave: (data: any) => api.post('/team/leaves', data),

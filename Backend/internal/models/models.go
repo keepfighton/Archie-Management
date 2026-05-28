@@ -437,8 +437,13 @@ type TimeCard struct {
 	InTime    time.Time  `json:"in_time"`
 	OutDate   *time.Time `json:"out_date"`
 	OutTime   *time.Time `json:"out_time"`
-	Duration  float64    `json:"duration"` // in hours
-	Note      string     `json:"note"`
+	Duration         float64    `json:"duration"` // in hours
+	Note             string     `json:"note"`
+	WorkMode         string     `gorm:"default:WFO" json:"work_mode"`        // WFO, WFA, WFH
+	Latitude         float64    `json:"latitude"`
+	Longitude        float64    `json:"longitude"`
+	DistanceM        float64    `json:"distance_m"`        // jarak dari titik kantor (meter)
+	LocationAccuracy float64    `json:"location_accuracy"` // akurasi GPS browser (meter)
 }
 
 // ─── FILE ────────────────────────────────────────────

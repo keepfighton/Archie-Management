@@ -8,6 +8,8 @@ import {
   Clock,
   CreditCard,
   FolderKanban,
+  MapPin,
+  RefreshCw,
   TrendingUp,
   Users,
   Wallet,
@@ -18,7 +20,7 @@ import { toast } from 'react-toastify'
 import { RootState, AppDispatch } from '@/store'
 import { fetchMe, canRead } from '@/store/slices/authSlice'
 import { dashboardService, taskService, projectService, teamService } from '@/services/api'
-import { Loading, StatusBadge, ProgressBar, rowNumber } from '@/components/common'
+import { Loading, StatusBadge, ProgressBar, rowNumber, ClockInModal, WorkMode, getLocationWithFallback } from '@/components/common'
 import { dashboardItem, findNavigationItemByMenu, navGroups } from '@/config/navigation'
 import { formatIDR } from '@/utils/format'
 import { useLocale } from '@/contexts/LocaleContext'
@@ -198,6 +200,38 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<DashboardProject[]>([])
   const [loading, setLoading] = useState(true)
   const [clockLoading, setClockLoading] = useState(false)
+  const [showClockInModal, setShowClockInModal] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [storedLocation, setStoredLocation] = useState<{ lat: number; lng: number; accuracy: number; distM: number } | null>(null)
+
+  // South Quarter Tower A, TB Simatupang — 6°17'37"S, 106°46'52"E
+  const OFFICE_LAT = -6.2936
+  const OFFICE_LNG = 106.7811
+
+  const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000
+    const toRad = (d: number) => (d * Math.PI) / 180
+    const dLat = toRad(lat2 - lat1)
+    const dLng = toRad(lng2 - lng1)
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  const handleRefreshLocation = async () => {
+    setLocationLoading(true)
+    try {
+      const pos = await getLocationWithFallback()
+      const distM = haversineM(pos.coords.latitude, pos.coords.longitude, OFFICE_LAT, OFFICE_LNG)
+      setStoredLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, distM })
+      const distStr = distM >= 1000 ? `${(distM / 1000).toFixed(1)} km` : `${Math.round(distM)} m`
+      toast.success(`Lokasi tersimpan — ${distStr} dari kantor`)
+    } catch {
+      toast.error('Gagal mendapatkan lokasi. Aktifkan izin lokasi di browser.')
+    } finally {
+      setLocationLoading(false)
+    }
+  }
 
   const hasAccess = useCallback((menu: string) => (
     canRead(permissions, user?.role, menu)
@@ -269,18 +303,45 @@ export default function DashboardPage() {
     void loadData()
   }, [loadData])
 
-  const handleClock = async () => {
+  const handleClock = () => {
     if (!canViewTimecards) return
+    if (user?.clocked_in) {
+      setClockLoading(true)
+      teamService.clockOut()
+        .then(() => {
+          toast.success(t('dashboard.clockOutSuccess', 'Clocked out successfully!'))
+          return dispatch(fetchMe()).unwrap()
+        })
+        .then(() => loadData())
+        .catch((err: any) => toast.error(err.response?.data?.error || t('dashboard.clockActionFailed', 'Clock action failed')))
+        .finally(() => setClockLoading(false))
+    } else {
+      setShowClockInModal(true)
+    }
+  }
 
+  const handleClockInConfirm = async (mode: WorkMode) => {
+    setShowClockInModal(false)
     setClockLoading(true)
     try {
-      if (user?.clocked_in) {
-        await teamService.clockOut()
-        toast.success(t('dashboard.clockOutSuccess', 'Clocked out successfully!'))
+      let lat = 0, lng = 0, accuracy = 0
+      if (mode === 'WFO') {
+        try {
+          const pos = await getLocationWithFallback()
+          lat = pos.coords.latitude; lng = pos.coords.longitude; accuracy = pos.coords.accuracy
+        } catch {
+          toast.error('Izin lokasi diperlukan untuk mode WFO. Aktifkan lokasi di browser lalu coba lagi.')
+          setClockLoading(false)
+          return
+        }
       } else {
-        await teamService.clockIn()
-        toast.success(t('dashboard.clockInSuccess', 'Clocked in successfully!'))
+        try {
+          const pos = await getLocationWithFallback()
+          lat = pos.coords.latitude; lng = pos.coords.longitude; accuracy = pos.coords.accuracy
+        } catch { /* lokasi opsional untuk WFA/WFH */ }
       }
+      await teamService.clockIn({ work_mode: mode, latitude: lat, longitude: lng, location_accuracy: accuracy })
+      toast.success(t('dashboard.clockInSuccess', 'Clocked in successfully!') + ` (${mode})`)
       await dispatch(fetchMe()).unwrap()
       await loadData()
     } catch (err: any) {
@@ -462,20 +523,7 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {showAttendanceCard ? (
-                <button
-                  onClick={handleClock}
-                  disabled={clockLoading}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/12 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/20 disabled:opacity-60"
-                >
-                  <Clock size={14} />
-                  {clockLoading
-                    ? t('dashboard.updating', 'Updating...')
-                    : user?.clocked_in
-                      ? t('dashboard.clockOut', 'Clock Out')
-                      : t('dashboard.clockIn', 'Clock In')}
-                </button>
-              ) : null}
+              {null}
             </div>
 
             {visibleSummaryTiles.length > 0 ? (
@@ -569,6 +617,29 @@ export default function DashboardPage() {
                 <div className="rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 p-5 border border-purple-200">
                   <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">Quick action</p>
                   <div className="mt-4 flex flex-col gap-3">
+                    {!user?.clocked_in && (
+                      <button
+                        onClick={handleRefreshLocation}
+                        disabled={locationLoading}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-purple-300 bg-white px-4 py-2 text-xs font-medium text-purple-700 transition hover:bg-purple-50 disabled:opacity-60"
+                      >
+                        <RefreshCw size={13} className={locationLoading ? 'animate-spin' : ''} />
+                        {locationLoading ? 'Mengambil lokasi...' : 'Refresh Lokasi'}
+                      </button>
+                    )}
+                    {!user?.clocked_in && storedLocation && (
+                      <div className="flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
+                        <MapPin size={12} className="shrink-0 text-green-500" />
+                        <span>
+                          Lokasi tersimpan ✓{' '}
+                          <span className="text-green-500">
+                            ({storedLocation.distM >= 1000
+                              ? `${(storedLocation.distM / 1000).toFixed(1)} km`
+                              : `${Math.round(storedLocation.distM)} m`} dari kantor)
+                          </span>
+                        </span>
+                      </div>
+                    )}
                     <button
                       onClick={handleClock}
                       disabled={clockLoading}
@@ -961,6 +1032,12 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : null}
+
+      <ClockInModal
+        open={showClockInModal}
+        onClose={() => setShowClockInModal(false)}
+        onConfirm={handleClockInConfirm}
+      />
     </div>
   )
 }

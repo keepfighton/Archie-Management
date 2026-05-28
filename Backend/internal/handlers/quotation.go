@@ -504,8 +504,8 @@ table td.tr{text-align:right;}
     {{end}}
     {{if .Terbilang}}
     <tr class="terb-row">
-      <td colspan="5" style="font-style:italic;color:#555;">Terbilang</td>
-      <td>#{{.Terbilang}}#</td>
+      <td colspan="2" style="font-weight:600;font-size:9px;color:#555;white-space:nowrap;">Terbilang</td>
+      <td colspan="4" style="font-style:italic;color:#333;">{{.Terbilang}}</td>
     </tr>
     {{end}}
   </tbody>

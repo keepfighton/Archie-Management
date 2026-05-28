@@ -430,6 +430,17 @@ export const quotationPrintService = {
       if (win) { win.document.write(html); win.document.close() }
     })
   },
+  openDownload: (id: number) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const baseURL = API_BASE_URL
+    return fetch(`${baseURL}/quotations/${id}/pdf?download=1`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (res) => {
+      const html = await res.text()
+      const win = window.open('', '_blank')
+      if (win) { win.document.write(html); win.document.close() }
+    })
+  },
 }
 
 // ─── Asset Master Data (Kategori / Status / Kondisi) ─

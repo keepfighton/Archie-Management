@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cbqa/backend/internal/models"
@@ -235,15 +236,27 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 		},
 		"inc": func(i int) int { return i + 1 },
 		"sub": func(a, b float64) float64 { return a - b },
+		"nl2li": func(s string) template.HTML {
+			result := ""
+			for _, line := range strings.Split(s, "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" {
+					result += "<li>" + template.HTMLEscapeString(line) + "</li>"
+				}
+			}
+			return template.HTML(result)
+		},
 	}).Parse(quotationPrintTemplate))
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	data := struct {
 		models.Quotation
-		PrintedAt string
+		PrintedAt    string
+		DownloadMode bool
 	}{
-		Quotation: quotation,
-		PrintedAt: time.Now().Format("02 January 2006 15:04"),
+		Quotation:    quotation,
+		PrintedAt:    time.Now().Format("02 January 2006 15:04"),
+		DownloadMode: c.Query("download") == "1",
 	}
 	_ = tmpl.Execute(c.Writer, data)
 }
@@ -441,9 +454,9 @@ table td.tr{text-align:right;}
     <div class="brand">NEXONE <small>by NEXORA · Part of CBQA Global Group</small></div>
   </div>
   <div class="doc-heading">
-    <h1>Quotation{{if gt .Revision 1}} (Revision {{.Revision}}){{end}}</h1>
+    <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}{{if .ContractNo}} &nbsp;|&nbsp; Kontrak: {{.ContractNo}}{{end}}</p>
-    <p style="font-weight:600;color:#c0392b;text-transform:uppercase;font-size:10px;">{{.Status}}</p>
+    {{if ne .Status "converted"}}<p style="font-weight:600;color:#c0392b;text-transform:uppercase;font-size:10px;">{{.Status}}</p>{{end}}
   </div>
 </div>
 
@@ -498,6 +511,14 @@ table td.tr{text-align:right;}
   </tbody>
 </table>
 
+{{if .ScopeSummary}}
+<!-- SCOPE SUMMARY -->
+<div class="section-label">SCOPE OF WORK</div>
+<div class="keter" style="margin-bottom:10px;">
+  <ul style="margin:4px 0 0 16px;padding:0;line-height:1.8;">{{nl2li .ScopeSummary}}</ul>
+</div>
+{{end}}
+
 <!-- TOTALS -->
 <div class="bot">
   <table class="tot-tbl">
@@ -510,7 +531,6 @@ table td.tr{text-align:right;}
 </div>
 
 {{if .Notes}}<div class="keter"><strong>Keterangan:</strong><br>{{.Notes}}</div>{{end}}
-{{if .ScopeSummary}}<div class="keter"><strong>Scope:</strong> {{.ScopeSummary}}</div>{{end}}
 {{if .PaymentTerms}}<div class="keter"><strong>Payment Terms:</strong> {{.PaymentTerms}}</div>{{end}}
 {{if .AcceptanceNotes}}<div class="keter"><strong>Acceptance:</strong> {{.AcceptanceNotes}}</div>{{end}}
 
@@ -602,6 +622,14 @@ Hal-hal yang belum cukup diatur dalam Perjanjian ini, namun Para Pihak memandang
 </div>
 </div>
 
+{{if .DownloadMode}}
+<div class="no-print" style="position:fixed;bottom:24px;right:24px;z-index:999;">
+  <button onclick="window.print()" style="background:#1a3c7a;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);">
+    ⬇ Download / Cetak PDF
+  </button>
+</div>
+{{else}}
 <script>window.onload=function(){window.print()}</script>
+{{end}}
 </body>
 </html>`

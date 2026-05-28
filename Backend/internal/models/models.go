@@ -510,7 +510,7 @@ type Deliverable struct {
 type Quotation struct {
 	Base
 	QuoteNumber     string          `json:"quote_number"`
-	Revision        int             `json:"revision" gorm:"default:1"`
+	Revision        int             `json:"revision" gorm:"default:0"`
 	Title           string          `json:"title"`
 	ClientID        uint            `json:"client_id"`
 	Client          *Client         `gorm:"foreignKey:ClientID" json:"client,omitempty"`

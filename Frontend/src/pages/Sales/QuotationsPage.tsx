@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { clientService, leadService, projectService, quotationPrintService, quotationService } from '@/services/api'
+
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
-import { ArrowRightLeft, FileDown, Plus, Printer } from 'lucide-react'
+import { ArrowRightLeft, Download, FileDown, Plus, Printer } from 'lucide-react'
 import {
   ConfirmDialog,
   EmptyState,
@@ -23,9 +24,47 @@ const STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted
 
 const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString('id-ID')}`
 
+const SATUAN = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan',
+  'Sepuluh', 'Sebelas', 'Dua Belas', 'Tiga Belas', 'Empat Belas', 'Lima Belas', 'Enam Belas',
+  'Tujuh Belas', 'Delapan Belas', 'Sembilan Belas']
+function terbilangIDR(n: number): string {
+  const angka = Math.round(n)
+  if (angka === 0) return 'Nol Rupiah'
+  const words = (x: number): string => {
+    if (x < 20) return SATUAN[x]
+    if (x < 100) return SATUAN[Math.floor(x / 10) + 8] + (x % 10 ? ' ' + SATUAN[x % 10] : '') // offset trick
+    if (x < 200) return 'Seratus' + (x % 100 ? ' ' + words(x % 100) : '')
+    if (x < 1000) return SATUAN[Math.floor(x / 100)] + ' Ratus' + (x % 100 ? ' ' + words(x % 100) : '')
+    if (x < 2000) return 'Seribu' + (x % 1000 ? ' ' + words(x % 1000) : '')
+    if (x < 1_000_000) return words(Math.floor(x / 1000)) + ' Ribu' + (x % 1000 ? ' ' + words(x % 1000) : '')
+    if (x < 1_000_000_000) return words(Math.floor(x / 1_000_000)) + ' Juta' + (x % 1_000_000 ? ' ' + words(x % 1_000_000) : '')
+    if (x < 1_000_000_000_000) return words(Math.floor(x / 1_000_000_000)) + ' Miliar' + (x % 1_000_000_000 ? ' ' + words(x % 1_000_000_000) : '')
+    return words(Math.floor(x / 1_000_000_000_000)) + ' Triliun' + (x % 1_000_000_000_000 ? ' ' + words(x % 1_000_000_000_000) : '')
+  }
+  // fix puluhan: offset trick doesn't work for 20-99, redo properly
+  const proper = (x: number): string => {
+    if (x === 0) return ''
+    if (x < 12) return SATUAN[x]
+    if (x < 20) return SATUAN[x]
+    if (x < 100) {
+      const tens = ['', '', 'Dua Puluh', 'Tiga Puluh', 'Empat Puluh', 'Lima Puluh',
+        'Enam Puluh', 'Tujuh Puluh', 'Delapan Puluh', 'Sembilan Puluh']
+      return tens[Math.floor(x / 10)] + (x % 10 ? ' ' + SATUAN[x % 10] : '')
+    }
+    if (x < 200) return 'Seratus' + (x % 100 ? ' ' + proper(x % 100) : '')
+    if (x < 1000) return SATUAN[Math.floor(x / 100)] + ' Ratus' + (x % 100 ? ' ' + proper(x % 100) : '')
+    if (x < 2000) return 'Seribu' + (x % 1000 ? ' ' + proper(x % 1000) : '')
+    if (x < 1_000_000) return proper(Math.floor(x / 1000)) + ' Ribu' + (x % 1000 ? ' ' + proper(x % 1000) : '')
+    if (x < 1_000_000_000) return proper(Math.floor(x / 1_000_000)) + ' Juta' + (x % 1_000_000 ? ' ' + proper(x % 1_000_000) : '')
+    if (x < 1_000_000_000_000) return proper(Math.floor(x / 1_000_000_000)) + ' Miliar' + (x % 1_000_000_000 ? ' ' + proper(x % 1_000_000_000) : '')
+    return proper(Math.floor(x / 1_000_000_000_000)) + ' Triliun' + (x % 1_000_000_000_000 ? ' ' + proper(x % 1_000_000_000_000) : '')
+  }
+  return proper(angka).trim() + ' Rupiah'
+}
+
 const emptyForm = () => ({
   quote_number: '',
-  revision: 1,
+  revision: 0,
   title: '',
   lead_id: '',
   client_id: '',
@@ -67,6 +106,8 @@ export default function QuotationsPage() {
   const [showItemModal, setShowItemModal] = useState(false)
   const [editItem, setEditItem] = useState<any>(null)
   const [activeQuotation, setActiveQuotation] = useState<any>(null)
+  const [activeItems, setActiveItems] = useState<any[]>([])
+  const [itemsLoading, setItemsLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -121,7 +162,7 @@ export default function QuotationsPage() {
     setEditItem(row)
     setForm({
       quote_number: row.quote_number,
-      revision: row.revision || 1,
+      revision: row.revision ?? 0,
       title: row.title,
       lead_id: String(row.lead_id || ''),
       client_id: String(row.client_id || ''),
@@ -157,6 +198,12 @@ export default function QuotationsPage() {
   const taxAmt = form.tax_pct ? afterDiscount * Number(form.tax_pct) / 100 : 0
   const grandTotal = afterDiscount + taxAmt
 
+  useEffect(() => {
+    if (showModal) {
+      setForm((prev: any) => ({ ...prev, terbilang: terbilangIDR(grandTotal) }))
+    }
+  }, [grandTotal, showModal])
+
   const handleSave = async () => {
     if (!form.quote_number || !form.title || !form.client_id) {
       toast.error('Quote number, title, and client are required')
@@ -169,7 +216,7 @@ export default function QuotationsPage() {
         lead_id: form.lead_id ? Number(form.lead_id) : null,
         client_id: Number(form.client_id),
         project_id: form.project_id ? Number(form.project_id) : null,
-        revision: Number(form.revision) || 1,
+        revision: Number(form.revision),
         subtotal_amount: subtotal,
         discount_pct: Number(form.discount_pct) || 0,
         tax_pct: Number(form.tax_pct) || 0,
@@ -208,7 +255,24 @@ export default function QuotationsPage() {
   const openAddItem = (row: any) => {
     setActiveQuotation(row)
     setItemForm({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
+    setActiveItems([])
+    setItemsLoading(true)
     setShowItemModal(true)
+    quotationService.get(row.id)
+      .then((r: any) => setActiveItems(r.data.items || []))
+      .catch(() => {})
+      .finally(() => setItemsLoading(false))
+  }
+
+  const handleDeleteItem = async (itemId: number) => {
+    if (!activeQuotation) return
+    try {
+      await quotationService.deleteItem(activeQuotation.id, itemId)
+      setActiveItems(prev => prev.filter((i: any) => i.id !== itemId))
+      load()
+    } catch {
+      toast.error('Gagal menghapus item')
+    }
   }
 
   const handleSaveItem = async () => {
@@ -226,8 +290,12 @@ export default function QuotationsPage() {
         duration_unit: itemForm.duration_unit,
         total: Number(itemForm.quantity) * Number(itemForm.unit_price),
       })
-      toast.success('Item added to quotation')
-      setShowItemModal(false)
+      toast.success('Item berhasil ditambahkan')
+      setItemForm({ description: '', quantity: 1, unit_price: 0, duration: 12, duration_unit: 'month' })
+      // refresh item list di modal
+      quotationService.get(activeQuotation.id)
+        .then((r: any) => setActiveItems(r.data.items || []))
+        .catch(() => {})
       load()
     } catch {
       toast.error('Failed to add quotation item')
@@ -329,6 +397,16 @@ export default function QuotationsPage() {
                             }}
                           >
                             <Printer size={12} />
+                          </button>
+                          <button
+                            className="btn btn-secondary text-xs py-0.5 px-2"
+                            title="Download PDF"
+                            onClick={async () => {
+                              try { await quotationPrintService.openDownload(row.id) }
+                              catch (e: any) { toast.error(e?.message || 'Failed to open download') }
+                            }}
+                          >
+                            <Download size={12} />
                           </button>
                           <button className="btn btn-secondary text-xs py-0.5 px-2" title="Add item" onClick={() => openAddItem(row)}>
                             +Item
@@ -565,8 +643,8 @@ export default function QuotationsPage() {
 
           {/* SCOPE / NOTES */}
           <div className="col-span-2">
-            <FormField label="Scope Summary">
-              <textarea className="input" rows={2} value={form.scope_summary}
+            <FormField label="Scope Summary" hint="Tulis tiap poin di baris baru untuk tampilan poin per poin di dokumen">
+              <textarea className="input" rows={5} value={form.scope_summary}
                 onChange={(e) => setForm({ ...form, scope_summary: e.target.value })} />
             </FormField>
           </div>
@@ -589,14 +667,56 @@ export default function QuotationsPage() {
       <Modal
         open={showItemModal}
         onClose={() => setShowItemModal(false)}
-        title={`Add Item — ${activeQuotation?.quote_number || ''}`}
+        title={`Kelola Item — ${activeQuotation?.quote_number || ''}`}
+        size="lg"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setShowItemModal(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleSaveItem}>Save Item</button>
+            <button className="btn btn-secondary" onClick={() => setShowItemModal(false)}>Tutup</button>
+            <button className="btn btn-primary" onClick={handleSaveItem}>+ Tambah Item</button>
           </>
         }
       >
+        {/* Daftar item yang sudah ada */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Item Saat Ini</p>
+          {itemsLoading ? (
+            <p className="text-xs text-gray-400">Memuat item...</p>
+          ) : activeItems.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">Belum ada item.</p>
+          ) : (
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <table className="table text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left">Product</th>
+                    <th className="text-center w-12">QTY</th>
+                    <th className="text-center w-16">Durasi</th>
+                    <th className="text-right w-32">Harga Satuan</th>
+                    <th className="text-right w-32">Jumlah</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeItems.map((item: any) => (
+                    <tr key={item.id}>
+                      <td>{item.description}</td>
+                      <td className="text-center">{item.quantity}</td>
+                      <td className="text-center">{item.duration ? `${item.duration} bln` : '-'}</td>
+                      <td className="text-right">{fmt(item.unit_price, activeQuotation?.currency)}</td>
+                      <td className="text-right font-medium">{fmt(item.total, activeQuotation?.currency)}</td>
+                      <td className="text-center">
+                        <button className="btn btn-danger text-xs py-0 px-1.5" onClick={() => handleDeleteItem(item.id)}>×</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Form tambah item baru */}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tambah Item Baru</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <FormField label="Product / Description" required>

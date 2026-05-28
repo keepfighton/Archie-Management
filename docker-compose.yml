@@ -58,11 +58,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.sambernyawa-api.rule=Host(`sambernyawa.nexoratech.co`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.sambernyawa-api.entrypoints=websecure"
-      - "traefik.http.routers.sambernyawa-api.tls.certresolver=myresolver"
-      - "traefik.http.routers.sambernyawa-api.service=sambernyawa-api"
-      - "traefik.http.services.sambernyawa-api.loadbalancer.server.port=8080"
+
       - "traefik.http.routers.nexone-nexora-api.rule=Host(`nexone.nexoratech.co`) && PathPrefix(`/api`)"
       - "traefik.http.routers.nexone-nexora-api.entrypoints=websecure"
       - "traefik.http.routers.nexone-nexora-api.tls.certresolver=myresolver"
@@ -88,11 +84,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
-      - "traefik.http.routers.sambernyawa.rule=Host(`sambernyawa.nexoratech.co`)"
-      - "traefik.http.routers.sambernyawa.entrypoints=websecure"
-      - "traefik.http.routers.sambernyawa.tls.certresolver=myresolver"
-      - "traefik.http.routers.sambernyawa.service=sambernyawa"
-      - "traefik.http.services.sambernyawa.loadbalancer.server.port=80"
+
       - "traefik.http.routers.nexone-nexora.rule=Host(`nexone.nexoratech.co`)"
       - "traefik.http.routers.nexone-nexora.entrypoints=websecure"
       - "traefik.http.routers.nexone-nexora.tls.certresolver=myresolver"

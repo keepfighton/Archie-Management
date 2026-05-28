@@ -3,7 +3,7 @@ import { clientService, leadService, projectService, quotationPrintService, quot
 
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
-import { ArrowRightLeft, Download, FileDown, Pencil, Plus, Printer, Trash2 } from 'lucide-react'
+import { ArrowRightLeft, Download, FileDown, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   ConfirmDialog,
   EmptyState,
@@ -395,7 +395,17 @@ export default function QuotationsPage() {
                   quotations.map((row, index) => (
                     <tr key={row.id}>
                       <td className="text-gray-400">{rowNumber(page, index)}</td>
-                      <td className="font-medium text-blue-600">{row.quote_number}</td>
+                      <td>
+                        <button
+                          className="font-medium text-blue-600 hover:underline text-left"
+                          onClick={async () => {
+                            try { await quotationPrintService.openPrint(row.id) }
+                            catch (e: any) { toast.error(e?.message || 'Failed to open print') }
+                          }}
+                        >
+                          {row.quote_number}
+                        </button>
+                      </td>
                       <td className="text-gray-400 text-xs">r{row.revision ?? 0}</td>
                       <td>{row.title}</td>
                       <td className="text-gray-500">{row.client?.name || '-'}</td>
@@ -406,16 +416,6 @@ export default function QuotationsPage() {
                       <td><StatusBadge status={row.status} /></td>
                       <td>
                         <div className="flex gap-1">
-                          <button
-                            className="btn btn-secondary text-xs py-0.5 px-2"
-                            title="Print quotation"
-                            onClick={async () => {
-                              try { await quotationPrintService.openPrint(row.id) }
-                              catch (e: any) { toast.error(e?.message || 'Failed to open print') }
-                            }}
-                          >
-                            <Printer size={12} />
-                          </button>
                           <button
                             className="btn btn-secondary text-xs py-0.5 px-2"
                             title="Download PDF"

@@ -587,14 +587,6 @@ table td.tr{text-align:right;}
   </tbody>
 </table>
 
-{{if .ScopeSummary}}
-<!-- SCOPE SUMMARY -->
-<div class="section-label">SCOPE OF WORK</div>
-<div class="keter" style="margin-bottom:10px;">
-  <ul style="margin:4px 0 0 16px;padding:0;line-height:1.8;">{{nl2li .ScopeSummary}}</ul>
-</div>
-{{end}}
-
 <!-- TOTALS -->
 <div class="bot">
   <table class="tot-tbl">
@@ -606,6 +598,14 @@ table td.tr{text-align:right;}
     <tr><td class="lbl" style="font-size:9px;font-weight:600;">Terbilang</td><td style="font-style:italic;color:#333;font-size:9px;">{{terbilang .TotalAmount}}</td></tr>
   </table>
 </div>
+
+{{if .ScopeSummary}}
+<!-- SCOPE SUMMARY -->
+<div class="section-label">SCOPE OF WORK</div>
+<div class="keter" style="margin-bottom:10px;">
+  <ul style="margin:4px 0 0 16px;padding:0;line-height:1.8;">{{nl2li .ScopeSummary}}</ul>
+</div>
+{{end}}
 
 {{if .Notes}}<div class="keter"><strong>Keterangan:</strong><br>{{.Notes}}</div>{{end}}
 {{if .PaymentTerms}}<div class="keter"><strong>Payment Terms:</strong> {{.PaymentTerms}}</div>{{end}}

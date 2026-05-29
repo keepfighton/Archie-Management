@@ -73,6 +73,7 @@ export const authService = {
 // ─── Dashboard ───────────────────────────────────────
 export const dashboardService = {
   getStats: (params?: any) => api.get('/dashboard', { params }),
+  getFunnelStats: () => api.get('/dashboard/funnel'),
 }
 
 // ─── Clients ─────────────────────────────────────────

@@ -208,6 +208,51 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+func (h *DashboardHandler) GetFunnelStats(c *gin.Context) {
+	type StatusCount struct {
+		Status string `json:"status"`
+		Count  int64  `json:"count"`
+	}
+	var result struct {
+		LeadsCount        int64         `json:"leads_count"`
+		LeadsValue        float64       `json:"leads_value"`
+		ProposalsCount    int64         `json:"proposals_count"`
+		ProposalsValue    float64       `json:"proposals_value"`
+		NegotiationsCount int64         `json:"negotiations_count"`
+		NegotiationsValue float64       `json:"negotiations_value"`
+		WonCount          int64         `json:"won_count"`
+		WonValue          float64       `json:"won_value"`
+		ProjectsCount     int64         `json:"projects_count"`
+		ProjectsValue     float64       `json:"projects_value"`
+		LeadsByStatus     []StatusCount `json:"leads_by_status"`
+		ProposalsByStatus []StatusCount `json:"proposals_by_status"`
+	}
+
+	h.db.Model(&models.Lead{}).Count(&result.LeadsCount)
+	h.db.Model(&models.Lead{}).Select("COALESCE(SUM(estimated_value),0)").Scan(&result.LeadsValue)
+
+	h.db.Model(&models.Quotation{}).Count(&result.ProposalsCount)
+	h.db.Model(&models.Quotation{}).Select("COALESCE(SUM(total_amount),0)").Scan(&result.ProposalsValue)
+
+	h.db.Model(&models.Lead{}).Where("status = ?", "negotiation").Count(&result.NegotiationsCount)
+	h.db.Model(&models.Quotation{}).
+		Joins("JOIN leads ON leads.id = quotations.lead_id AND leads.deleted_at IS NULL").
+		Where("leads.status = ?", "negotiation").
+		Select("COALESCE(SUM(quotations.total_amount),0)").Scan(&result.NegotiationsValue)
+
+	h.db.Model(&models.Quotation{}).Where("status = ?", "converted").Count(&result.WonCount)
+	h.db.Model(&models.Quotation{}).Where("status = ?", "converted").
+		Select("COALESCE(SUM(total_amount),0)").Scan(&result.WonValue)
+
+	h.db.Model(&models.Project{}).Count(&result.ProjectsCount)
+	h.db.Model(&models.Project{}).Select("COALESCE(SUM(price),0)").Scan(&result.ProjectsValue)
+
+	h.db.Model(&models.Lead{}).Select("status, COUNT(*) as count").Group("status").Scan(&result.LeadsByStatus)
+	h.db.Model(&models.Quotation{}).Select("status, COUNT(*) as count").Group("status").Scan(&result.ProposalsByStatus)
+
+	c.JSON(http.StatusOK, result)
+}
+
 // ─── CLIENT ──────────────────────────────────────────
 
 type ClientHandler struct{ db *gorm.DB }

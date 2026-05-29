@@ -68,6 +68,7 @@ func (s *Server) setupRoutes() {
 		// Dashboard
 		dashH := handlers.NewDashboardHandler(s.db)
 		protected.GET("/dashboard", dashH.GetStats)
+		protected.GET("/dashboard/funnel", dashH.GetFunnelStats)
 
 		// Clients
 		clientH := handlers.NewClientHandler(s.db)

@@ -3,7 +3,7 @@ import { expenseService, contractService, projectService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown } from 'lucide-react'
 import {
-  PageHeader, Toolbar, SearchInput, Pagination,
+  PageHeader, Toolbar, SearchInput,
   Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput,
   rowNumber,
 } from '@/components/common'
@@ -128,11 +128,11 @@ export default function ExpensesPage() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-400 mb-1">Total Records</p>
-          <p className="text-xl font-semibold text-gray-900">{filtered.length}</p>
+          <p className="text-xs text-gray-400 mb-1">{search ? 'Filtered Records' : 'Total Records'}</p>
+          <p className="text-xl font-semibold text-gray-900">{filtered.length}{!search && total > filtered.length ? ` / ${total}` : ''}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-400 mb-1">Total Amount</p>
+          <p className="text-xs text-gray-400 mb-1">{search ? 'Filtered Amount' : 'Total Amount'}</p>
           <p className="text-xl font-semibold text-red-500">IDR {totalAmount.toLocaleString()}</p>
         </div>
       </div>

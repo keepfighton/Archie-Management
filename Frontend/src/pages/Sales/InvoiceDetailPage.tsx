@@ -168,6 +168,9 @@ export default function InvoiceDetailPage() {
 
   const handleAddPayment = async () => {
     if (!paymentForm.amount || paymentForm.amount <= 0) { toast.error('Amount is required'); return }
+    if (invoice && Number(paymentForm.amount) > invoice.due_amount + 0.01) {
+      toast.error(`Payment (${Number(paymentForm.amount).toLocaleString()}) melebihi sisa tagihan (${invoice.due_amount.toLocaleString()})`); return
+    }
     if (!paymentForm.payment_date) { toast.error('Payment date is required'); return }
     setSavingPayment(true)
     try {

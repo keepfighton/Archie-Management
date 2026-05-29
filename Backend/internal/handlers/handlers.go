@@ -1857,7 +1857,7 @@ type InvoiceHandler struct{ db *gorm.DB }
 
 func NewInvoiceHandler(db *gorm.DB) *InvoiceHandler { return &InvoiceHandler{db: db} }
 
-func (h *InvoiceHandler) applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
+func applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
 	if subtotal < 0 {
 		subtotal = 0
 	}
@@ -1894,6 +1894,17 @@ func (h *InvoiceHandler) applyInvoiceTotals(invoice *models.Invoice, subtotal, p
 	default:
 		invoice.Status = "not_paid"
 	}
+}
+
+func recalcInvoiceDB(db *gorm.DB, invoiceID uint) {
+	var invoice models.Invoice
+	db.First(&invoice, invoiceID)
+	var subtotal float64
+	db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
+	var paidAmount float64
+	db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
+	applyInvoiceTotals(&invoice, subtotal, paidAmount)
+	db.Save(&invoice)
 }
 
 func (h *InvoiceHandler) hydrateInvoiceSubtotal(invoice *models.Invoice) {
@@ -1945,7 +1956,7 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 	if subtotal == 0 {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
-	h.applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
+	applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
 	if err := h.db.Create(&invoice).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2001,12 +2012,7 @@ func (h *InvoiceHandler) Update(c *gin.Context) {
 		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
 	}
 
-	paidAmount := invoice.PaidAmount
-	if paymentTotals.Count > 0 {
-		paidAmount = paymentTotals.Total
-	}
-
-	h.applyInvoiceTotals(&invoice, subtotal, paidAmount)
+	applyInvoiceTotals(&invoice, subtotal, paymentTotals.Total)
 	h.db.Save(&invoice)
 	recordAudit(h.db, c, "update", "invoice", invoice.ID, invoice.InvoiceNumber)
 	c.JSON(http.StatusOK, invoice)
@@ -2264,14 +2270,7 @@ func (h *InvoiceHandler) DeletePayment(c *gin.Context) {
 }
 
 func (h *InvoiceHandler) recalcInvoice(invoiceID uint) {
-	var invoice models.Invoice
-	h.db.First(&invoice, invoiceID)
-	var subtotal float64
-	h.db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
-	var paidAmount float64
-	h.db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
-	h.applyInvoiceTotals(&invoice, subtotal, paidAmount)
-	h.db.Save(&invoice)
+	recalcInvoiceDB(h.db, invoiceID)
 }
 
 func (h *InvoiceHandler) Summary(c *gin.Context) {
@@ -2343,6 +2342,7 @@ func (h *PaymentHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete payment"})
 		return
 	}
+	recalcInvoiceDB(h.db, payment.InvoiceID)
 	recordAudit(h.db, c, "DELETE", "payment", id, fmt.Sprintf("payment #%d", id))
 	c.JSON(http.StatusOK, gin.H{"message": "Payment deleted"})
 }

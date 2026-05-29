@@ -1857,6 +1857,10 @@ type InvoiceHandler struct{ db *gorm.DB }
 
 func NewInvoiceHandler(db *gorm.DB) *InvoiceHandler { return &InvoiceHandler{db: db} }
 
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
 func applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
 	if subtotal < 0 {
 		subtotal = 0
@@ -1889,7 +1893,7 @@ func applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
 		invoice.Status = "fully_paid"
 	case paidAmount > 0:
 		invoice.Status = "partially_paid"
-	case !invoice.DueDate.IsZero() && invoice.DueDate.Time.Before(time.Now()):
+	case !invoice.DueDate.IsZero() && invoice.DueDate.Time.Before(startOfDay(time.Now())):
 		invoice.Status = "overdue"
 	default:
 		invoice.Status = "not_paid"
@@ -1925,6 +1929,11 @@ func (h *InvoiceHandler) hydrateInvoiceSubtotal(invoice *models.Invoice) {
 }
 
 func (h *InvoiceHandler) List(c *gin.Context) {
+	// Auto-mark past-due invoices on every list call (lazy overdue detection)
+	h.db.Model(&models.Invoice{}).
+		Where("status = 'not_paid' AND due_date < ? AND deleted_at IS NULL", startOfDay(time.Now())).
+		Update("status", "overdue")
+
 	var q PaginationQuery
 	c.ShouldBindQuery(&q)
 	var invoices []models.Invoice
@@ -2300,7 +2309,9 @@ func (h *PaymentHandler) List(c *gin.Context) {
 	var payments []models.Payment
 	var total int64
 	q := c.Query("q")
-	query := h.db.Preload("Invoice.Client").Order("payment_date desc")
+	month := c.Query("month")
+	year := c.Query("year")
+	query := h.db.Preload("Invoice.Client").Order("COALESCE(payment_date, created_at) desc")
 	needsInvoiceJoin := c.Query("client_id") != "" || q != ""
 	if needsInvoiceJoin {
 		query = query.Joins("JOIN invoices ON invoices.id = payments.invoice_id")
@@ -2312,6 +2323,12 @@ func (h *PaymentHandler) List(c *gin.Context) {
 		query = query.Joins("LEFT JOIN clients ON clients.id = invoices.client_id").
 			Where("invoices.invoice_number ILIKE ? OR clients.name ILIKE ? OR payments.payment_method ILIKE ? OR payments.note ILIKE ?",
 				"%"+q+"%", "%"+q+"%", "%"+q+"%", "%"+q+"%")
+	}
+	if year != "" {
+		query = query.Where("EXTRACT(YEAR FROM COALESCE(payment_date, payments.created_at)) = ?", year)
+	}
+	if month != "" {
+		query = query.Where("EXTRACT(MONTH FROM COALESCE(payment_date, payments.created_at)) = ?", month)
 	}
 	query.Find(&payments)
 	total = int64(len(payments))
@@ -2506,6 +2523,51 @@ func (h *OrderHandler) Delete(c *gin.Context) {
 	}
 	h.db.Delete(&order)
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
+func (h *OrderHandler) ConvertToInvoice(c *gin.Context) {
+	id, ok := mustGetID(c)
+	if !ok {
+		return
+	}
+	var order models.Order
+	if err := h.db.Preload("Client").First(&order, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	d := time.Now()
+	invoiceNumber := fmt.Sprintf("INV-%04d%02d-%04d", d.Year(), d.Month(), id)
+
+	// check duplicate
+	var existing models.Invoice
+	if h.db.Where("invoice_number = ?", invoiceNumber).First(&existing).Error == nil {
+		invoiceNumber = fmt.Sprintf("INV-%04d%02d-%d", d.Year(), d.Month(), time.Now().UnixMilli()%10000)
+	}
+
+	dueDate := d.AddDate(0, 1, 0)
+	invoice := models.Invoice{
+		InvoiceNumber:  invoiceNumber,
+		ClientID:       order.ClientID,
+		ProjectID:      order.ProjectID,
+		BillDate:       models.FlexTime{Time: d},
+		DueDate:        models.FlexTime{Time: dueDate},
+		Status:         "not_paid",
+		Currency:       order.Currency,
+		TotalAmount:    order.Amount,
+		TaxAmount:      0,
+		DiscountAmount: 0,
+		PaidAmount:     0,
+		DueAmount:      order.Amount,
+	}
+	if err := h.db.Create(&invoice).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create invoice"})
+		return
+	}
+	// link order ↔ invoice via many2many
+	h.db.Exec("INSERT INTO order_invoices (order_id, invoice_id) VALUES (?, ?) ON CONFLICT DO NOTHING", order.ID, invoice.ID)
+	recordAudit(h.db, c, "CONVERT", "order", id, order.OrderNumber)
+	c.JSON(http.StatusCreated, invoice)
 }
 
 // ─── EVENT ───────────────────────────────────────────

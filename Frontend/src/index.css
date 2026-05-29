@@ -33,6 +33,7 @@
   .btn-primary { @apply bg-primary text-white shadow-sm shadow-primary/15 hover:-translate-y-[1px] hover:bg-primary-900 hover:shadow-md hover:shadow-primary/20; }
   .btn-secondary { @apply border border-gray-200 bg-white text-gray-700 shadow-sm hover:-translate-y-[1px] hover:bg-gray-50 hover:shadow-md; }
   .btn-danger { @apply bg-danger text-white shadow-sm shadow-red-200 hover:-translate-y-[1px] hover:bg-red-700 hover:shadow-md; }
+  .btn-success { @apply bg-emerald-600 text-white shadow-sm shadow-emerald-200 hover:-translate-y-[1px] hover:bg-emerald-700 hover:shadow-md; }
   .btn-sm { @apply min-h-[2rem] rounded-lg px-3 py-2 text-xs; }
 
   .card { @apply rounded-2xl border border-gray-200/90 bg-white shadow-sm shadow-slate-200/60; }

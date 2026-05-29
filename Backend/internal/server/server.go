@@ -233,6 +233,7 @@ func (s *Server) setupRoutes() {
 			orders.GET("/:id", orderH.Get)
 			orders.PUT("/:id", orderH.Update)
 			orders.DELETE("/:id", orderH.Delete)
+			orders.POST("/:id/convert-to-invoice", orderH.ConvertToInvoice)
 		}
 
 		// Events

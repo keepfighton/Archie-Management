@@ -332,6 +332,12 @@ export default function InvoiceDetailPage() {
           <h2 className="text-sm font-semibold text-gray-700">Payments</h2>
           <button className="btn btn-primary text-xs" onClick={openAddPayment}><Plus size={11} /> Record payment</button>
         </div>
+        {invoice.due_amount > 0 && invoice.status !== 'draft' && (
+          <div className="mx-5 mt-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-xs text-amber-800 flex items-center gap-2">
+            <span className="font-semibold">Sisa tagihan: {fmt(invoice.due_amount, invoice.currency)}</span>
+            <span className="text-amber-600">— Klik <strong>Record payment</strong> untuk mencatat pembayaran. Status invoice akan otomatis berubah ke <strong>Fully Paid</strong> setelah lunas.</span>
+          </div>
+        )}
         <table className="table">
           <thead>
             <tr>

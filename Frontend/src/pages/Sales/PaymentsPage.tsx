@@ -4,25 +4,42 @@ import { toast } from 'react-toastify'
 import { FileDown, Printer, Trash2 } from 'lucide-react'
 import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog, rowNumber } from '@/components/common'
 
+const MONTHS = [
+  { value: '', label: 'All Months' },
+  { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
+  { value: '4', label: 'April' }, { value: '5', label: 'May' }, { value: '6', label: 'June' },
+  { value: '7', label: 'July' }, { value: '8', label: 'August' }, { value: '9', label: 'September' },
+  { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' },
+]
+
+const currentYear = new Date().getFullYear()
+const YEARS = Array.from({ length: 5 }, (_, i) => String(currentYear - i))
+
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
+  const [month, setMonth] = useState('')
+  const [year, setYear] = useState(String(currentYear))
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const load = useCallback((q = '') => {
+  const load = useCallback((q = '', m = month, y = year) => {
     setLoading(true)
-    paymentService.list(q ? { q } : undefined)
+    const params: any = {}
+    if (q) params.q = q
+    if (m) params.month = m
+    if (y) params.year = y
+    paymentService.list(Object.keys(params).length ? params : undefined)
       .then(r => { setPayments(r.data.data || []); setTotal(r.data.total || 0) })
       .catch(() => toast.error('Failed to load payments'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [month, year])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load('', month, year) }, [month, year])
 
   useEffect(() => {
-    const timer = setTimeout(() => load(search), 300)
+    const timer = setTimeout(() => load(search, month, year), 300)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -49,17 +66,28 @@ export default function PaymentsPage() {
 
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">Total Payments</p>
-          <p className="text-xl font-semibold text-gray-900">{total}</p>
+          <p className="text-xs text-gray-400 mb-1">{(month || year !== String(currentYear)) ? 'Filtered Payments' : 'Total Payments'}</p>
+          <p className="text-xl font-semibold text-gray-900">{payments.length}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">Total Received</p>
+          <p className="text-xs text-gray-400 mb-1">{(month || year !== String(currentYear)) ? 'Filtered Received' : 'Total Received'}</p>
           <p className="text-xl font-semibold text-green-600">{fmt(totalAmount)}</p>
         </div>
       </div>
 
       <Toolbar
-        left={<span className="text-xs text-gray-400">{payments.length} records</span>}
+        left={
+          <div className="flex gap-2 items-center">
+            <select className="input text-xs py-1 h-8" value={year} onChange={e => setYear(e.target.value)}>
+              <option value="">All Years</option>
+              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select className="input text-xs py-1 h-8" value={month} onChange={e => setMonth(e.target.value)}>
+              {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <span className="text-xs text-gray-400">{payments.length} records</span>
+          </div>
+        }
         right={
           <>
             <button className="btn btn-secondary"><FileDown size={12} />Excel</button>

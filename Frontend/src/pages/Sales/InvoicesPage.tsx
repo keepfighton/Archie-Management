@@ -3,7 +3,7 @@ import { invoiceService, clientService, projectService, invoicePDFService } from
 import { toISODate } from '@/utils/format'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { toast } from 'react-toastify'
-import { Plus, Filter, FileDown, Printer } from 'lucide-react'
+import { Plus, Filter, FileDown, Printer, CreditCard } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
   StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
@@ -36,6 +36,9 @@ export default function InvoicesPage() {
     status: 'draft', currency: 'IDR', subtotal_amount: '', tax_amount: '', discount_amount: '',
     paid_amount: '0', due_amount: '', notes: '',
   })
+  const [payInvoice, setPayInvoice] = useState<any>(null)
+  const [payForm, setPayForm] = useState<any>({ amount: '', payment_method: 'transfer', payment_date: '', note: '' })
+  const [paying, setPaying] = useState(false)
 
   const load = (q = search, overridePage?: number) => {
     setLoading(true)
@@ -139,6 +142,36 @@ export default function InvoicesPage() {
     } catch { toast.error('Failed to delete') }
   }
 
+  const openMarkAsPaid = (inv: any) => {
+    setPayInvoice(inv)
+    setPayForm({
+      amount: inv.due_amount || inv.total_amount,
+      payment_method: 'transfer',
+      payment_date: new Date().toISOString().split('T')[0],
+      note: '',
+    })
+  }
+
+  const handleMarkAsPaid = async () => {
+    if (!payInvoice) return
+    if (!payForm.amount || Number(payForm.amount) <= 0) { toast.error('Amount is required'); return }
+    setPaying(true)
+    try {
+      await invoiceService.addPayment(payInvoice.id, {
+        amount: Number(payForm.amount),
+        payment_method: payForm.payment_method,
+        payment_date: toISODate(payForm.payment_date),
+        note: payForm.note,
+        currency: payInvoice.currency,
+      })
+      toast.success('Payment recorded!')
+      setPayInvoice(null)
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to record payment')
+    } finally { setPaying(false) }
+  }
+
   const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString()}`
   const subtotalAmount = Number(form.subtotal_amount) || 0
   const taxAmount = Number(form.tax_amount) || 0
@@ -209,6 +242,13 @@ export default function InvoicesPage() {
                           >
                             <Printer size={12} />
                           </button>
+                          {inv.status !== 'fully_paid' && inv.status !== 'draft' && (
+                            <button
+                              title="Record Payment"
+                              className="btn btn-success text-xs py-0.5 px-2"
+                              onClick={() => openMarkAsPaid(inv)}
+                            ><CreditCard size={12} /></button>
+                          )}
                           <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={() => openEdit(inv)}>Edit</button>
                           <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(inv.id)}>×</button>
                         </div>
@@ -236,9 +276,17 @@ export default function InvoicesPage() {
             <input className="input" value={form.invoice_number} onChange={e => setForm({ ...form, invoice_number: e.target.value })} />
           </FormField>
           <FormField label="Status">
-            <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}
-            </select>
+            {form.status === 'draft' ? (
+              <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                <option value="draft">Draft</option>
+                <option value="not_paid">Issued (Not Paid)</option>
+              </select>
+            ) : (
+              <div className="input bg-gray-50 text-gray-500 text-xs flex items-center gap-2">
+                <span className="font-medium">{form.status.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
+                <span className="text-gray-400">— otomatis dari payment</span>
+              </div>
+            )}
           </FormField>
           <FormField label="Client" required>
             <select className="input" value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}>
@@ -304,6 +352,47 @@ export default function InvoicesPage() {
 
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} />
       <ManageLabelsModal open={showManageLabels} onClose={() => setShowManageLabels(false)} />
+
+      <Modal
+        open={!!payInvoice}
+        onClose={() => setPayInvoice(null)}
+        title="Record Payment"
+        size="sm"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setPayInvoice(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleMarkAsPaid} disabled={paying}>{paying ? 'Saving...' : 'Record Payment'}</button>
+          </>
+        }
+      >
+        {payInvoice && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
+              <span className="font-semibold">{payInvoice.invoice_number}</span>
+              <span className="text-blue-500 mx-1">·</span>
+              <span>Due: {fmt(payInvoice.due_amount, payInvoice.currency)}</span>
+            </div>
+            <FormField label="Amount" required>
+              <PriceInput value={payForm.amount} onChange={v => setPayForm({ ...payForm, amount: v })} />
+            </FormField>
+            <FormField label="Payment Method">
+              <select className="input" value={payForm.payment_method} onChange={e => setPayForm({ ...payForm, payment_method: e.target.value })}>
+                <option value="transfer">Bank Transfer</option>
+                <option value="cash">Cash</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="check">Check</option>
+                <option value="other">Other</option>
+              </select>
+            </FormField>
+            <FormField label="Payment Date">
+              <input className="input" type="date" value={payForm.payment_date} onChange={e => setPayForm({ ...payForm, payment_date: e.target.value })} />
+            </FormField>
+            <FormField label="Note">
+              <input className="input" value={payForm.note} onChange={e => setPayForm({ ...payForm, note: e.target.value })} placeholder="Optional note..." />
+            </FormField>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

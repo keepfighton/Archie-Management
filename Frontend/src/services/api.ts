@@ -237,6 +237,7 @@ export const orderService = {
   create: (data: any) => api.post('/orders', data),
   update: (id: number, data: any) => api.put(`/orders/${id}`, data),
   delete: (id: number) => api.delete(`/orders/${id}`),
+  convertToInvoice: (id: number) => api.post(`/orders/${id}/convert-to-invoice`),
 }
 
 // ─── Expenses ────────────────────────────────────────

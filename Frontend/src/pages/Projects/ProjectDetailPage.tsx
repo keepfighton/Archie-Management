@@ -44,6 +44,7 @@ export default function ProjectDetailPage() {
   // Timesheet
   const [timecards, setTimecards] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
+  const [kanbanColumns, setKanbanColumns] = useState<any[]>([])
 
   // Task modal
   const [showTaskModal, setShowTaskModal] = useState(false)
@@ -51,6 +52,7 @@ export default function ProjectDetailPage() {
   const [savingTask, setSavingTask] = useState(false)
   const [taskForm, setTaskForm] = useState<any>({
     title: '', status: 'todo', priority: 'medium', start_date: '', deadline: '', description: '',
+    assigned_to_id: '', kanban_column_id: '',
   })
 
   const load = async () => {
@@ -59,13 +61,14 @@ export default function ProjectDetailPage() {
       const pRes = await projectService.get(projectId)
       setProject(pRes.data)
 
-      const [tRes, tlRes, mRes, dRes, tcRes, membersRes] = await Promise.allSettled([
+      const [tRes, tlRes, mRes, dRes, tcRes, membersRes, colRes] = await Promise.allSettled([
         projectService.getTasks(projectId),
         projectService.getTimeline(projectId),
         milestoneService.list(projectId),
         deliverableService.list(projectId),
         teamService.listTimeCards({ project_id: projectId }),
         teamService.listMembers({ limit: 200 }),
+        taskService.listKanbanColumns(),
       ])
 
       setTasks(tRes.status === 'fulfilled' ? tRes.value.data.data || [] : [])
@@ -74,8 +77,9 @@ export default function ProjectDetailPage() {
       setDeliverables(dRes.status === 'fulfilled' ? dRes.value.data.data || [] : [])
       setTimecards(tcRes.status === 'fulfilled' ? tcRes.value.data.data || [] : [])
       setMembers(membersRes.status === 'fulfilled' ? membersRes.value.data.data || [] : [])
+      setKanbanColumns(colRes.status === 'fulfilled' ? (colRes.value.data.data || colRes.value.data || []) : [])
 
-      if ([tRes, tlRes, mRes, dRes, tcRes, membersRes].some(r => r.status === 'rejected')) {
+      if ([tRes, tlRes, mRes, dRes, tcRes, membersRes, colRes].some(r => r.status === 'rejected')) {
         toast.warn('Project opened, but some related data failed to load')
       }
     } catch {
@@ -142,10 +146,17 @@ export default function ProjectDetailPage() {
     if (!taskForm.title.trim()) { toast.error('Title is required'); return }
     setSavingTask(true)
     try {
-      await taskService.create({ ...taskForm, project_id: projectId, start_date: toISODate(taskForm.start_date), deadline: toISODate(taskForm.deadline) })
+      await taskService.create({
+        ...taskForm,
+        project_id: projectId,
+        start_date: toISODate(taskForm.start_date),
+        deadline: toISODate(taskForm.deadline),
+        assigned_to_id: taskForm.assigned_to_id ? Number(taskForm.assigned_to_id) : null,
+        kanban_column_id: taskForm.kanban_column_id ? Number(taskForm.kanban_column_id) : null,
+      })
       toast.success('Task created!')
       setShowTaskModal(false)
-      setTaskForm({ title: '', status: 'todo', priority: 'medium', start_date: '', deadline: '', description: '' })
+      setTaskForm({ title: '', status: 'todo', priority: 'medium', start_date: '', deadline: '', description: '', assigned_to_id: '', kanban_column_id: '' })
       const res = await projectService.getTasks(projectId)
       setTasks(res.data.data || [])
     } catch { toast.error('Failed to create task') }
@@ -468,6 +479,7 @@ export default function ProjectDetailPage() {
               <option value="todo">To Do</option>
               <option value="in_progress">In Progress</option>
               <option value="done">Done</option>
+              <option value="expired">Expired</option>
             </select>
           </FormField>
           <FormField label="Priority">
@@ -475,6 +487,18 @@ export default function ProjectDetailPage() {
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
+            </select>
+          </FormField>
+          <FormField label="Assign To">
+            <select className="input" value={taskForm.assigned_to_id} onChange={e => setTaskForm({ ...taskForm, assigned_to_id: e.target.value })}>
+              <option value="">Unassigned</option>
+              {members.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Kanban Column">
+            <select className="input" value={taskForm.kanban_column_id} onChange={e => setTaskForm({ ...taskForm, kanban_column_id: e.target.value })}>
+              <option value="">Select column</option>
+              {kanbanColumns.map((col: any) => <option key={col.id} value={col.id}>{col.title}</option>)}
             </select>
           </FormField>
           <FormField label="Start Date">

@@ -289,11 +289,6 @@ export default function TasksPage() {
     [allBoardTasks]
   )
 
-  const availableFormColumns = useMemo(
-    () => kanbanColumns.filter(column => column.status === form.status),
-    [kanbanColumns, form.status]
-  )
-
   const selectedColumnTaskCount = useMemo(
     () => columnToDelete ? (boardTasks[String(columnToDelete.id)] || []).length : 0,
     [boardTasks, columnToDelete]
@@ -1266,7 +1261,7 @@ export default function TasksPage() {
               onChange={e => setForm(current => ({ ...current, kanban_column_id: e.target.value }))}
             >
               <option value="">Select column</option>
-              {availableFormColumns.map(column => (
+              {kanbanColumns.map(column => (
                 <option key={column.id} value={column.id}>{column.title}</option>
               ))}
             </select>

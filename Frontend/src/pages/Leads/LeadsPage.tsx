@@ -121,6 +121,20 @@ export default function LeadsPage() {
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Name is required'); return }
     if (form.email && !isValidEmail(form.email)) { toast.error('Invalid email format'); return }
+
+    // Warning jika mengubah status dari Won (yang sudah converted) ke status lain
+    if (editItem && editItem.converted_client_id && editItem.status === 'won' && form.status !== 'won') {
+      if (!window.confirm(
+        `⚠️ WARNING: Lead ini sudah dikonversi ke Client!\n\n` +
+        `Jika Anda mengubah status dari "Won" ke "${form.status}", maka:\n` +
+        `- Link ke Client akan dihapus\n` +
+        `- Lead bisa dikonversi ulang nanti\n\n` +
+        `Apakah Anda yakin ingin melanjutkan?`
+      )) {
+        return
+      }
+    }
+
     setSaving(true)
     try {
       if (editItem) {
@@ -148,10 +162,18 @@ export default function LeadsPage() {
   }
 
   const handleConvert = async (lead: any) => {
+    // Check if status is won
+    if (lead.status !== 'won') {
+      toast.warning('Lead harus berstatus "Won" sebelum dikonversi ke Client. Drag lead ke kolom "Won" terlebih dahulu.')
+      return
+    }
     if (!window.confirm(`Convert "${lead.name}" menjadi Client?`)) return
     try {
       const res = await leadService.convert(lead.id)
       toast.success(`Lead berhasil dikonversi ke Client!`)
+      // Reload data BEFORE navigate to update UI
+      load()
+      loadAll()
       navigate(`/clients/${res.data.id}`)
     } catch { toast.error('Gagal mengkonversi lead') }
   }
@@ -231,7 +253,18 @@ export default function LeadsPage() {
                           <td>
                             <div className="flex gap-1">
                               <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={() => openEdit(l)}>Edit</button>
-                              <button className="btn btn-secondary text-xs py-0.5 px-2 text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleConvert(l)} title="Convert to Client">→ Client</button>
+                              {!l.converted_client_id && l.status === 'won' && (
+                                <button
+                                  className="btn btn-secondary text-xs py-0.5 px-2 text-green-600 border-green-200 hover:bg-green-50"
+                                  onClick={() => handleConvert(l)}
+                                  title="Convert to Client"
+                                >
+                                  → Client
+                                </button>
+                              )}
+                              {l.converted_client_id && (
+                                <span className="text-xs text-gray-400 px-2">✓ Client</span>
+                              )}
                               <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(l.id)}>×</button>
                             </div>
                           </td>
@@ -275,11 +308,16 @@ export default function LeadsPage() {
                             >
                               <div className="flex items-start justify-between gap-1">
                                 <p className="font-medium text-gray-800">{lead.name}</p>
-                                <button
-                                  onClick={e => { e.stopPropagation(); handleConvert(lead) }}
-                                  className="text-green-600 hover:text-green-700 text-xs shrink-0"
-                                  title="Convert to Client"
-                                >→ Client</button>
+                                {!lead.converted_client_id && lead.status === 'won' && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); handleConvert(lead) }}
+                                    className="text-green-600 hover:text-green-700 text-xs shrink-0"
+                                    title="Convert to Client"
+                                  >→ Client</button>
+                                )}
+                                {lead.converted_client_id && (
+                                  <span className="text-xs text-gray-400">✓ Client</span>
+                                )}
                               </div>
                               {lead.primary_contact && <p className="text-gray-400 mt-0.5">{lead.primary_contact}</p>}
                               {lead.email && <p className="text-gray-400">{lead.email}</p>}

@@ -1750,6 +1750,10 @@ func (h *LeadHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
+
+	oldStatus := lead.Status
+	oldConvertedClientID := lead.ConvertedClientID
+
 	if err := c.ShouldBindJSON(&lead); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -1777,6 +1781,14 @@ func (h *LeadHandler) Update(c *gin.Context) {
 			return
 		}
 	}
+
+	// ALWAYS force clear converted_client_id if status changed and was converted
+	if oldStatus != lead.Status && oldConvertedClientID != nil {
+		// Force update converted_client_id to NULL via direct SQL
+		h.db.Exec("UPDATE leads SET converted_client_id = NULL WHERE id = ?", id)
+		lead.ConvertedClientID = nil
+	}
+
 	h.db.Save(&lead)
 	recordAudit(h.db, c, "update", "lead", lead.ID, lead.Name)
 	c.JSON(http.StatusOK, lead)
@@ -1788,7 +1800,27 @@ func (h *LeadHandler) UpdateStatus(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	c.ShouldBindJSON(&req)
-	h.db.Model(&models.Lead{}).Where("id = ?", id).Update("status", req.Status)
+
+	// Get current lead to check old status
+	var lead models.Lead
+	if err := h.db.First(&lead, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"})
+		return
+	}
+
+	oldStatus := lead.Status
+	oldConvertedClientID := lead.ConvertedClientID
+
+	// Update status
+	lead.Status = req.Status
+
+	// If status changed from "won" to something else, clear converted_client_id
+	if oldStatus == "won" && req.Status != "won" && oldConvertedClientID != nil {
+		lead.ConvertedClientID = nil
+		log.Printf("Lead %d: Status changed from 'won' to '%s' (drag), clearing converted_client_id", lead.ID, req.Status)
+	}
+
+	h.db.Save(&lead)
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated"})
 }
 

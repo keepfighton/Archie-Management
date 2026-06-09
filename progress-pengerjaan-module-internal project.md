@@ -39,10 +39,10 @@ Module menggunakan user terdaftar NEXONE untuk owner, member, dan assignee, teta
 | Report dan export | Selesai untuk laporan inti |
 | Permission per application role | Selesai untuk permission menu inti |
 | Automated test lengkap | Sebagian - test dasar tersedia |
-| UAT dan release hardening | Release candidate siap |
-| Production deployment | Belum |
+| UAT dan release hardening | Selesai |
+| Production deployment | Selesai |
 
-Estimasi progress fungsional saat ini: **98%** (release validation lulus; commit, push, dan production deployment belum dilakukan).
+Estimasi progress fungsional saat ini: **100% untuk scope rilis saat ini** (commit, push, migration, deployment, dan smoke test production selesai).
 
 ---
 
@@ -728,3 +728,6 @@ Module Internal Project dapat dinyatakan selesai apabila:
 - **Timesheet member filter:** pilihan user kini dimuat dari anggota project yang dipilih dan dapat digunakan oleh pemegang permission Project maupun Timesheet.
 - **Release validation:** backend test, frontend ESLint, production build, Linux backend build, Docker Compose config, dan `git diff --check` lulus.
 - **Release safety:** upload runtime, Docker override lokal, dan dokumen Word pribadi dikecualikan dari Git.
+- **Production deployment:** release `25fe2a1` dibangun dan dijalankan pada `https://nexone.nexoratech.co`.
+- **Database safety:** backup PostgreSQL terkompresi dibuat dan diverifikasi sebelum container aplikasi diganti.
+- **Production smoke test:** frontend, login, Internal Project list, Monitoring, dan My Tasks merespons HTTP 200; seluruh tabel baru tersedia dan log backend bersih.

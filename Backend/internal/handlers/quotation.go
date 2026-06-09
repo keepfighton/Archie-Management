@@ -343,6 +343,19 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 	_ = tmpl.Execute(c.Writer, data)
 }
 
+func (h *QuotationHandler) resolveClientID(quotation *models.Quotation) uint {
+	if quotation.ClientID != nil && *quotation.ClientID > 0 {
+		return *quotation.ClientID
+	}
+	if quotation.LeadID != nil {
+		var lead models.Lead
+		if err := h.db.First(&lead, *quotation.LeadID).Error; err == nil && lead.ConvertedClientID != nil {
+			return *lead.ConvertedClientID
+		}
+	}
+	return 0
+}
+
 func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 	id, ok := mustGetID(c)
 	if !ok {
@@ -354,10 +367,29 @@ func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
+	clientID := h.resolveClientID(&quotation)
+	if clientID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Lead belum dikonversi ke Client"})
+		return
+	}
+	var payload struct {
+		InvoiceNumber  string          `json:"invoice_number"`
+		BillDate       models.FlexTime `json:"bill_date"`
+		DueDate        models.FlexTime `json:"due_date"`
+		Status         string          `json:"status"`
+		SubtotalAmount float64         `json:"subtotal_amount"`
+		TaxAmount      float64         `json:"tax_amount"`
+		DiscountAmount float64         `json:"discount_amount"`
+		TotalAmount    float64         `json:"total_amount"`
+		PaidAmount     float64         `json:"paid_amount"`
+		DueAmount      float64         `json:"due_amount"`
+		Notes          string          `json:"notes"`
+	}
+	_ = c.ShouldBindJSON(&payload)
 
 	invoice := models.Invoice{
 		InvoiceNumber:  fmt.Sprintf("INV-%d-%d", time.Now().Year(), time.Now().Unix()%10000),
-		ClientID:       quotation.ClientID,
+		ClientID:       clientID,
 		ProjectID:      quotation.ProjectID,
 		BillDate:       quotation.IssueDate,
 		DueDate:        quotation.ValidUntil,
@@ -369,6 +401,19 @@ func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 		TotalAmount:    quotation.TotalAmount,
 		DueAmount:      quotation.TotalAmount,
 		Notes:          quotation.Notes,
+	}
+	if payload.InvoiceNumber != "" {
+		invoice.InvoiceNumber = payload.InvoiceNumber
+		invoice.BillDate = payload.BillDate
+		invoice.DueDate = payload.DueDate
+		invoice.Status = payload.Status
+		invoice.SubtotalAmount = payload.SubtotalAmount
+		invoice.TaxAmount = payload.TaxAmount
+		invoice.DiscountAmount = payload.DiscountAmount
+		invoice.TotalAmount = payload.TotalAmount
+		invoice.PaidAmount = payload.PaidAmount
+		invoice.DueAmount = payload.DueAmount
+		invoice.Notes = payload.Notes
 	}
 
 	err := h.db.Transaction(func(tx *gorm.DB) error {
@@ -417,10 +462,15 @@ func (h *QuotationHandler) ConvertToOrder(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
+	clientID := h.resolveClientID(&quotation)
+	if clientID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Lead belum dikonversi ke Client"})
+		return
+	}
 
 	order := models.Order{
 		OrderNumber: fmt.Sprintf("ORD-%d-%d", time.Now().Year(), time.Now().Unix()%10000),
-		ClientID:    quotation.ClientID,
+		ClientID:    clientID,
 		ProjectID:   quotation.ProjectID,
 		OrderDate:   quotation.IssueDate,
 		Amount:      quotation.TotalAmount,
@@ -449,11 +499,16 @@ func (h *QuotationHandler) ConvertToContract(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
+	clientID := h.resolveClientID(&quotation)
+	if clientID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Lead belum dikonversi ke Client"})
+		return
+	}
 
 	contract := models.Contract{
 		ContractNumber: fmt.Sprintf("CTR-%d-%d", time.Now().Year(), time.Now().Unix()%10000),
 		Title:          quotation.Title,
-		ClientID:       quotation.ClientID,
+		ClientID:       clientID,
 		ProjectID:      quotation.ProjectID,
 		ContractDate:   quotation.IssueDate,
 		ValidUntil:     quotation.ValidUntil,

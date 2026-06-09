@@ -111,6 +111,7 @@ export const projectService = {
   patchStatus: (id: number, status: string) => api.patch(`/projects/${id}/status`, { status }),
   getTasks: (id: number) => api.get(`/projects/${id}/tasks`),
   getTimeline: (id: number) => api.get(`/projects/${id}/timeline`),
+  getKanbanColumns: (id: number) => api.get(`/projects/${id}/kanban-columns`),
 }
 
 // ─── Tasks ───────────────────────────────────────────
@@ -154,6 +155,7 @@ export const leadService = {
     api.patch(`/leads/${id}/status`, { status }),
   delete: (id: number) => api.delete(`/leads/${id}`),
   convert: (id: number) => api.post(`/leads/${id}/convert`),
+  rollback: (id: number) => api.post(`/leads/${id}/rollback`),
 }
 
 // ─── Invoices ────────────────────────────────────────
@@ -253,6 +255,7 @@ export const fileService = {
   list: (params?: any) => api.get('/files', { params }),
   upload: (formData: FormData) =>
     api.post('/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  download: (id: number) => api.get(`/files/${id}/download`, { responseType: 'blob' }),
   createFolder: (data: any) => api.post('/files/folder', data),
   delete: (id: number) => api.delete(`/files/${id}`),
   toggleFavorite: (id: number) => api.patch(`/files/${id}/favorite`),
@@ -403,7 +406,7 @@ export const quotationService = {
   addItem: (id: number, data: any) => api.post(`/quotations/${id}/items`, data),
   updateItem: (id: number, itemId: number, data: any) => api.put(`/quotations/${id}/items/${itemId}`, data),
   deleteItem: (id: number, itemId: number) => api.delete(`/quotations/${id}/items/${itemId}`),
-  convertToInvoice: (id: number) => api.post(`/quotations/${id}/convert-to-invoice`),
+  convertToInvoice: (id: number, data?: any) => api.post(`/quotations/${id}/convert-to-invoice`, data),
   convertToOrder: (id: number) => api.post(`/quotations/${id}/convert-to-order`),
   convertToContract: (id: number) => api.post(`/quotations/${id}/convert-to-contract`),
 }

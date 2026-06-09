@@ -81,7 +81,7 @@ interface ModalProps {
   title: string
   children: ReactNode
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
   useEffect(() => {
@@ -104,7 +104,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
   }, [open, onClose])
 
   if (!open) return null
-  const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }
+  const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-6xl' }
   const titleId = `modal-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
   return (

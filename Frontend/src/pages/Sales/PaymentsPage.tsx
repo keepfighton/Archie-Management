@@ -1,45 +1,71 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { paymentService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { FileDown, Printer, Trash2 } from 'lucide-react'
-import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog, rowNumber } from '@/components/common'
+import { PageHeader, Toolbar, SearchInput, Loading, EmptyState, ConfirmDialog, Pagination } from '@/components/common'
 
-const MONTHS = [
-  { value: '', label: 'All Months' },
-  { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
-  { value: '4', label: 'April' }, { value: '5', label: 'May' }, { value: '6', label: 'June' },
-  { value: '7', label: 'July' }, { value: '8', label: 'August' }, { value: '9', label: 'September' },
-  { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' },
-]
-
-const currentYear = new Date().getFullYear()
-const YEARS = Array.from({ length: 5 }, (_, i) => String(currentYear - i))
+const PAGE_SIZE = 30
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [month, setMonth] = useState('')
-  const [year, setYear] = useState(String(currentYear))
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const load = useCallback((q = '', m = month, y = year) => {
+  const load = (q = search, overridePage = page) => {
     setLoading(true)
-    const params: any = {}
+    const params: any = { page: overridePage, limit: PAGE_SIZE }
     if (q) params.q = q
-    if (m) params.month = m
-    if (y) params.year = y
-    paymentService.list(Object.keys(params).length ? params : undefined)
+    paymentService.list(params)
       .then(r => { setPayments(r.data.data || []); setTotal(r.data.total || 0) })
       .catch(() => toast.error('Failed to load payments'))
       .finally(() => setLoading(false))
-  }, [month, year])
+  }
 
-  useEffect(() => { load('', month, year) }, [month, year])
+  const handleExportExcel = () => {
+    // Export semua payments ke CSV
+    const headers = ['Invoice Number', 'Client', 'Amount', 'Currency', 'Payment Method', 'Payment Date', 'Note']
+    const rows = payments.map(p => [
+      p.invoice?.invoice_number || '-',
+      p.invoice?.client?.name || '-',
+      p.amount || 0,
+      p.invoice?.currency || 'IDR',
+      p.payment_method || '-',
+      p.payment_date ? new Date(p.payment_date).toLocaleDateString('id-ID') : '-',
+      p.note || '-'
+    ])
+
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `Payments_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    toast.success('Payments exported to CSV!')
+  }
+
+  const handlePrint = () => {
+    setTimeout(() => {
+      window.print()
+    }, 100)
+  }
+
+  useEffect(() => { load(search) }, [page])
 
   useEffect(() => {
-    const timer = setTimeout(() => load(search, month, year), 300)
+    const timer = setTimeout(() => {
+      if (page === 1) {
+        load(search, 1)
+      } else {
+        setPage(1)
+      }
+    }, 300)
     return () => clearTimeout(timer)
   }, [search])
 
@@ -57,65 +83,147 @@ export default function PaymentsPage() {
       })
   }
 
-  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n).toLocaleString()}`
+  const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n).toLocaleString('id-ID')}`
   const totalAmount = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
 
   return (
-    <div className="p-5">
-      <PageHeader title="Payments" />
+    <>
+      <style>{`
+        @media print {
+          /* Simple approach - just show what we need */
+          @page {
+            margin: 1.5cm;
+          }
+
+          /* Hide navigation and non-essential elements */
+          .no-print,
+          nav,
+          aside,
+          button,
+          .sidebar {
+            display: none !important;
+          }
+
+          /* Show print header */
+          .print-header {
+            display: block !important;
+          }
+
+          /* Clean body */
+          body {
+            margin: 0;
+            padding: 0;
+          }
+
+          /* Make table visible and full width */
+          table {
+            width: 100% !important;
+            border-collapse: collapse;
+          }
+
+          th, td {
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            font-size: 11px;
+          }
+
+          th {
+            background: #f0f0f0 !important;
+            font-weight: bold;
+          }
+        }
+
+        .print-header {
+          display: none;
+          text-align: center;
+          margin-bottom: 20px;
+          padding-bottom: 10px;
+          border-bottom: 2px solid #333;
+        }
+        .print-header h1 {
+          font-size: 20px;
+          font-weight: bold;
+          margin: 0 0 5px 0;
+        }
+        .print-header p {
+          font-size: 11px;
+          color: #666;
+          margin: 3px 0;
+        }
+      `}</style>
+      <div className="p-5">
+        <div className="print-header">
+          <h1>Payment Records</h1>
+          <p>PT NEXORA TECH • Printed on {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p style={{ marginTop: '8px', fontWeight: 600 }}>Total Received: {fmt(totalAmount)}</p>
+        </div>
+        <PageHeader title="Payments" />
 
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">{(month || year !== String(currentYear)) ? 'Filtered Payments' : 'Total Payments'}</p>
-          <p className="text-xl font-semibold text-gray-900">{payments.length}</p>
+          <p className="text-xs text-gray-400 mb-1">Total Payments</p>
+          <p className="text-xl font-semibold text-gray-900">{total}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">{(month || year !== String(currentYear)) ? 'Filtered Received' : 'Total Received'}</p>
+          <p className="text-xs text-gray-400 mb-1">Total Received</p>
           <p className="text-xl font-semibold text-green-600">{fmt(totalAmount)}</p>
         </div>
       </div>
 
-      <Toolbar
-        left={
-          <div className="flex gap-2 items-center">
-            <select className="input text-xs py-1 h-8" value={year} onChange={e => setYear(e.target.value)}>
-              <option value="">All Years</option>
-              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select className="input text-xs py-1 h-8" value={month} onChange={e => setMonth(e.target.value)}>
-              {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-            <span className="text-xs text-gray-400">{payments.length} records</span>
-          </div>
-        }
-        right={
-          <>
-            <button className="btn btn-secondary"><FileDown size={12} />Excel</button>
-            <button className="btn btn-secondary"><Printer size={12} />Print</button>
-            <SearchInput value={search} onChange={setSearch} placeholder="Invoice, client, method..." />
-          </>
-        }
-      />
+      <div className="no-print">
+        <Toolbar
+          left={<span className="text-xs text-gray-400">{payments.length} records</span>}
+          right={
+            <>
+              <button
+                className="btn btn-secondary"
+                onClick={handleExportExcel}
+                disabled={payments.length === 0}
+                title="Export to Excel (CSV)"
+              >
+                <FileDown size={12} />Excel
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handlePrint}
+                title="Print payments list"
+              >
+                <Printer size={12} />Print
+              </button>
+              <SearchInput value={search} onChange={setSearch} placeholder="Invoice, client, method..." />
+            </>
+          }
+        />
+      </div>
 
       <div className="table-container">
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th className="w-16">No.</th><th>Invoice #</th><th>Client</th><th>Amount</th><th>Method</th><th>Date</th><th>Note</th><th>Actions</th></tr>
+              <tr>
+                <th className="w-14">No.</th>
+                <th>Invoice #</th>
+                <th>Client</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>Date</th>
+                <th>Note</th>
+                <th className="no-print">Actions</th>
+              </tr>
             </thead>
             <tbody>
               {payments.length === 0
                 ? <tr><td colSpan={8}><EmptyState /></td></tr>
                 : payments.map((p, index) => (
                   <tr key={p.id}>
-                    <td className="text-gray-400">{rowNumber(1, index, payments.length || 1)}</td>
+                    <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                     <td className="font-medium text-blue-600">{p.invoice?.invoice_number || '-'}</td>
                     <td className="text-gray-500">{p.invoice?.client?.name || '-'}</td>
                     <td className="whitespace-nowrap font-medium text-green-600">{fmt(p.amount, p.currency)}</td>
                     <td className="text-gray-500 capitalize">{p.payment_method || '-'}</td>
                     <td className="text-gray-400 whitespace-nowrap">{p.payment_date ? new Date(p.payment_date).toLocaleDateString('id') : '-'}</td>
                     <td className="text-gray-400">{p.note || '-'}</td>
-                    <td>
+                    <td className="no-print">
                       <button
                         className="btn btn-danger text-xs py-0.5 px-2"
                         title="Delete payment"
@@ -130,6 +238,11 @@ export default function PaymentsPage() {
             </tbody>
           </table>
         )}
+        {!loading && (
+          <div className="no-print">
+            <Pagination page={page} total={total} limit={PAGE_SIZE} onChange={setPage} />
+          </div>
+        )}
       </div>
 
       <ConfirmDialog
@@ -139,6 +252,7 @@ export default function PaymentsPage() {
         onConfirm={handleDelete}
         onClose={() => setDeleteId(null)}
       />
-    </div>
+      </div>
+    </>
   )
 }

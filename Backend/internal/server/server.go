@@ -110,6 +110,7 @@ func (s *Server) setupRoutes() {
 			projects.DELETE("/:id", projectH.Delete)
 			projects.GET("/:id/tasks", projectH.GetTasks)
 			projects.GET("/:id/timeline", projectH.GetTimeline)
+			projects.GET("/:id/kanban-columns", projectH.GetKanbanColumns)
 			projects.PATCH("/:id/status", projectH.PatchStatus)
 
 			// Milestones
@@ -158,6 +159,7 @@ func (s *Server) setupRoutes() {
 			leads.PATCH("/:id/status", leadH.UpdateStatus)
 			leads.DELETE("/:id", leadH.Delete)
 			leads.POST("/:id/convert", leadH.ConvertToClient)
+			leads.POST("/:id/rollback", leadH.RollbackConversion)
 			leads.GET("/:id/quotations", leadH.GetQuotations)
 		}
 

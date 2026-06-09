@@ -5,8 +5,7 @@ import { toast } from 'react-toastify'
 import { Plus, FileDown, FileText } from 'lucide-react'
 import {
   PageHeader, Toolbar, SearchInput,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput,
-  rowNumber,
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput
 } from '@/components/common'
 
 export default function OrdersPage() {
@@ -61,6 +60,16 @@ export default function OrdersPage() {
     finally { setSaving(false) }
   }
 
+  const handleConvertToInvoice = async (id: number) => {
+    try {
+      await orderService.convertToInvoice(id)
+      toast.success('Invoice created from order!')
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to convert to invoice')
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteId) return
     try {
@@ -68,15 +77,6 @@ export default function OrdersPage() {
       toast.success('Order deleted')
       load()
     } catch { toast.error('Failed to delete') }
-  }
-
-  const handleConvertToInvoice = async (id: number) => {
-    try {
-      await orderService.convertToInvoice(id)
-      toast.success('Invoice created from order!')
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error || 'Failed to create invoice')
-    }
   }
 
   return (
@@ -98,18 +98,17 @@ export default function OrdersPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th className="w-16">No.</th><th>Order #</th><th>Client</th><th>Order Date</th><th>Amount</th><th>Status</th><th></th></tr>
+              <tr><th>Order #</th><th>Client</th><th>Order Date</th><th>Amount</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
-                ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                : filtered.map((o, index) => (
+                ? <tr><td colSpan={6}><EmptyState /></td></tr>
+                : filtered.map(o => (
                   <tr key={o.id}>
-                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
                     <td className="font-medium text-blue-600">{o.order_number}</td>
                     <td className="text-gray-500">{o.client?.name || '-'}</td>
                     <td className="text-gray-400 whitespace-nowrap">{o.order_date ? new Date(o.order_date).toLocaleDateString('id') : '-'}</td>
-                    <td className="whitespace-nowrap font-medium">{o.currency} {Number(o.amount).toLocaleString()}</td>
+                    <td className="whitespace-nowrap font-medium">{o.currency} {Number(o.amount).toLocaleString('id-ID')}</td>
                     <td><StatusBadge status={o.status} /></td>
                     <td>
                       <div className="flex gap-1">

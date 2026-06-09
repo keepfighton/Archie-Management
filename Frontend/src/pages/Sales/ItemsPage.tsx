@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { itemService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, Search } from 'lucide-react'
-import { PageHeader, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput, rowNumber } from '@/components/common'
+import { PageHeader, Modal, FormField, ConfirmDialog, Loading, EmptyState, PriceInput, Pagination } from '@/components/common'
+
+const PAGE_SIZE = 30
 
 export default function ItemsPage() {
   const [items, setItems] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -27,10 +30,12 @@ export default function ItemsPage() {
 
   useEffect(() => { load() }, [])
   useEffect(() => {
-    if (!search) { setFiltered(items); return }
+    if (!search) { setFiltered(items); setPage(1); return }
     const q = search.toLowerCase()
     setFiltered(items.filter(i => i.title?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q)))
+    setPage(1)
   }, [search, items])
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const openAdd = () => {
     setEditItem(null)
@@ -94,14 +99,14 @@ export default function ItemsPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th className="w-16">No.</th><th>Title</th><th>Category</th><th>Unit</th><th>Rate</th><th>Currency</th><th></th></tr>
+              <tr><th className="w-14">No.</th><th>Title</th><th>Category</th><th>Unit</th><th>Rate</th><th>Currency</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
                 ? <tr><td colSpan={7}><EmptyState /></td></tr>
-                : filtered.map((item, index) => (
+                : paginated.map((item, index) => (
                   <tr key={item.id}>
-                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
+                    <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                     <td>
                       <div>
                         <p className="font-medium">{item.title}</p>
@@ -110,7 +115,7 @@ export default function ItemsPage() {
                     </td>
                     <td className="text-gray-500">{item.category || '-'}</td>
                     <td className="text-gray-400">{item.unit_type || '-'}</td>
-                    <td className="font-medium whitespace-nowrap">{Number(item.rate).toLocaleString()}</td>
+                    <td className="font-medium whitespace-nowrap">{Number(item.rate).toLocaleString('id-ID')}</td>
                     <td className="text-gray-400">{item.currency}</td>
                     <td>
                       <div className="flex gap-1">
@@ -124,6 +129,7 @@ export default function ItemsPage() {
             </tbody>
           </table>
         )}
+        {!loading && <Pagination page={page} total={filtered.length} limit={PAGE_SIZE} onChange={setPage} />}
       </div>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Item' : 'Add Item'}
@@ -141,7 +147,21 @@ export default function ItemsPage() {
             </FormField>
           </div>
           <FormField label="Category">
-            <input className="input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} placeholder="e.g. Service, Product" />
+            <select
+              className="input"
+              value={form.category}
+              onChange={e => setForm({ ...form, category: e.target.value })}
+            >
+              <option value="">Select category...</option>
+              <option value="Travel">Travel</option>
+              <option value="Office">Office</option>
+              <option value="Software">Software</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Training">Training</option>
+              <option value="Meals">Meals</option>
+              <option value="Other">Other</option>
+            </select>
           </FormField>
           <FormField label="Unit Type">
             <input className="input" value={form.unit_type} onChange={e => setForm({ ...form, unit_type: e.target.value })} placeholder="e.g. hour, pcs, day" />

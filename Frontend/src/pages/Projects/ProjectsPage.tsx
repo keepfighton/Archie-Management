@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { projectService, clientService, clusterService, teamService } from '@/services/api'
+import { projectService, clientService, clusterService, teamService, contractService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
 import { toast } from 'react-toastify'
@@ -17,6 +17,7 @@ export default function ProjectsPage() {
   const [clients, setClients] = useState<any[]>([])
   const [clusters, setClusters] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
+  const [contracts, setContracts] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -28,7 +29,7 @@ export default function ProjectsPage() {
   const [showManageLabels, setShowManageLabels] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [form, setForm] = useState<any>({
-    title: '', cluster_id: '', pic_id: '', client_id: '', price: '', currency: 'IDR',
+    title: '', cluster_id: '', pic_id: '', client_id: '', contract_id: '', price: '', currency: 'IDR',
     start_date: '', deadline: '', status: 'open', description: ''
   })
   const [editItem, setEditItem] = useState<any>(null)
@@ -53,11 +54,12 @@ export default function ProjectsPage() {
     clientService.list({ limit: 100 }).then(r => setClients(r.data.data || []))
     clusterService.list({ limit: 500 }).then(r => setClusters(r.data.data || []))
     teamService.listMembers({ limit: 500 }).then(r => setMembers(r.data.data || []))
+    contractService.list({ limit: 500 }).then(r => setContracts(r.data.data || []))
   }, [])
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ title: '', cluster_id: '', pic_id: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
+    setForm({ title: '', cluster_id: '', pic_id: '', client_id: '', contract_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
     setShowModal(true)
   }
 
@@ -65,7 +67,7 @@ export default function ProjectsPage() {
     if (searchParams.get('compose') !== 'new') return
 
     setEditItem(null)
-    setForm({ title: '', cluster_id: '', pic_id: '', client_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
+    setForm({ title: '', cluster_id: '', pic_id: '', client_id: '', contract_id: '', price: '', currency: 'IDR', start_date: '', deadline: '', status: 'open', description: '' })
     setShowModal(true)
 
     const nextParams = new URLSearchParams(searchParams)
@@ -80,6 +82,7 @@ export default function ProjectsPage() {
       cluster_id: p.cluster_id ? String(p.cluster_id) : '',
       pic_id: p.pic_id ? String(p.pic_id) : '',
       client_id: String(p.client_id || ''),
+      contract_id: String(p.contract_id || ''),
       price: p.price,
       currency: p.currency,
       start_date: p.start_date?.split('T')[0] || '',
@@ -99,6 +102,7 @@ export default function ProjectsPage() {
         cluster_id: form.cluster_id ? Number(form.cluster_id) : null,
         pic_id: form.pic_id ? Number(form.pic_id) : null,
         client_id: Number(form.client_id) || 0,
+        contract_id: form.contract_id ? Number(form.contract_id) : null,
         price: Number(form.price) || 0,
         start_date: toISODate(form.start_date),
         deadline: toISODate(form.deadline),
@@ -272,9 +276,30 @@ export default function ProjectsPage() {
             </FormField>
           </div>
           <FormField label="Client">
-            <select className="input" value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })}>
+            <select className="input" value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value, contract_id: '' })}>
               <option value="">Select client...</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Contract">
+            <select className="input" value={form.contract_id} onChange={e => {
+              const contractId = e.target.value
+              const contract = contracts.find(item => String(item.id) === contractId)
+              setForm({
+                ...form,
+                contract_id: contractId,
+                client_id: contract ? String(contract.client_id) : form.client_id,
+                title: contract?.title || form.title,
+                price: contract?.amount ?? form.price,
+                currency: contract?.currency || form.currency,
+                start_date: contract?.contract_date?.split('T')[0] || form.start_date,
+                deadline: contract?.valid_until?.split('T')[0] || form.deadline,
+              })
+            }}>
+              <option value="">Without contract</option>
+              {contracts
+                .filter(contract => !form.client_id || String(contract.client_id) === String(form.client_id))
+                .map(contract => <option key={contract.id} value={contract.id}>{contract.contract_number} - {contract.title}</option>)}
             </select>
           </FormField>
           <FormField label="Cluster">

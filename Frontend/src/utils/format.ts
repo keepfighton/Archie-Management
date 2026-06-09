@@ -26,3 +26,22 @@ export function parseNumber(formatted: string): number {
 export function formatIDR(value: number): string {
   return 'IDR' + Math.round(value).toLocaleString('id-ID')
 }
+
+export function terbilangIDR(value: number): string {
+  const words = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas']
+  const spell = (input: number): string => {
+    const n = Math.floor(Math.abs(input))
+    if (n < 12) return words[n]
+    if (n < 20) return `${spell(n - 10)} belas`
+    if (n < 100) return `${spell(Math.floor(n / 10))} puluh ${spell(n % 10)}`.trim()
+    if (n < 200) return `seratus ${spell(n - 100)}`.trim()
+    if (n < 1000) return `${spell(Math.floor(n / 100))} ratus ${spell(n % 100)}`.trim()
+    if (n < 2000) return `seribu ${spell(n - 1000)}`.trim()
+    if (n < 1_000_000) return `${spell(Math.floor(n / 1000))} ribu ${spell(n % 1000)}`.trim()
+    if (n < 1_000_000_000) return `${spell(Math.floor(n / 1_000_000))} juta ${spell(n % 1_000_000)}`.trim()
+    if (n < 1_000_000_000_000) return `${spell(Math.floor(n / 1_000_000_000))} miliar ${spell(n % 1_000_000_000)}`.trim()
+    return `${spell(Math.floor(n / 1_000_000_000_000))} triliun ${spell(n % 1_000_000_000_000)}`.trim()
+  }
+  const result = spell(value).replace(/\s+/g, ' ').trim()
+  return result ? `${result.charAt(0).toUpperCase()}${result.slice(1)} rupiah` : 'Nol rupiah'
+}

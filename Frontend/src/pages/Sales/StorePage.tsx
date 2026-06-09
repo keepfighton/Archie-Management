@@ -97,7 +97,7 @@ export default function StorePage() {
                   {item.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>}
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-800">
-                      {item.currency} {Number(item.rate).toLocaleString()}
+                      {item.currency} {Number(item.rate).toLocaleString('id-ID')}
                       {item.unit_type && <span className="font-normal text-gray-400 text-xs">/{item.unit_type}</span>}
                     </span>
                     <div className="flex gap-1">

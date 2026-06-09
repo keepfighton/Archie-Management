@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { leadService, clientService } from '@/services/api'
+import { leadService, clientService, teamService } from '@/services/api'
 import { ManageLabelsModal } from '@/components/common/ManageLabelsModal'
-import { isValidEmail } from '@/utils/format'
+import { isValidEmail, formatNumber } from '@/utils/format'
 import { toast } from 'react-toastify'
-import { Plus, Filter, FileDown } from 'lucide-react'
+import { Plus, Filter } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import {
   PageHeader, Toolbar, SearchInput, Pagination,
-  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput,
-  DEFAULT_PAGE_LIMIT, rowNumber,
+  StatusBadge, Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput
 } from '@/components/common'
 
 const VIEWS = [{ key: 'list', label: 'List' }, { key: 'kanban', label: 'Kanban' }]
@@ -22,6 +21,7 @@ const PIPELINE_COLORS: Record<string, string> = {
   new: 'bg-gray-100', qualified: 'bg-purple-50', discussion: 'bg-blue-50',
   negotiation: 'bg-yellow-50', won: 'bg-green-50', lost: 'bg-red-50',
 }
+const PAGE_SIZE = 30
 
 export default function LeadsPage() {
   const navigate = useNavigate()
@@ -40,8 +40,10 @@ export default function LeadsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>({
-    name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', estimated_value: 0, currency: 'IDR',
+    name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', estimated_value: 0, notes: '', owner_id: null,
   })
+
+  const [members, setMembers] = useState<any[]>([])
 
   // Client combobox state
   const [clients, setClients] = useState<any[]>([])
@@ -62,7 +64,7 @@ export default function LeadsPage() {
 
   const load = (overridePage?: number) => {
     setLoading(true)
-    const params: any = { page: overridePage ?? page, limit: DEFAULT_PAGE_LIMIT, q: search }
+    const params: any = { page: overridePage ?? page, limit: PAGE_SIZE, q: search }
     if (statusFilter) params.status = statusFilter
     leadService.list(params)
       .then(r => { setLeads(r.data.data || []); setTotal(r.data.total || 0) })
@@ -74,17 +76,28 @@ export default function LeadsPage() {
     leadService.list({ limit: 300 }).then(r => setAllLeads(r.data.data || [])).catch(() => {})
   }
 
+  useEffect(() => {
+    const urlStatus = searchParams.get('status')
+    if (urlStatus && urlStatus !== statusFilter) {
+      setStatusFilter(urlStatus)
+      setPage(1)
+    }
+  }, [])
+
   useEffect(() => { load() }, [page, search, statusFilter])
   useEffect(() => { loadAll() }, [])
   useEffect(() => {
     clientService.list({ limit: 500 })
       .then(r => setClients(r.data.data || []))
       .catch(() => {})
+    teamService.listMembers({ limit: 200 })
+      .then(r => setMembers(r.data.data || []))
+      .catch(() => {})
   }, [])
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', estimated_value: 0, currency: 'IDR' })
+    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', owner_id: null })
     setClientSearch('')
     setSelectedClientId(null)
     setClientContacts([])
@@ -96,7 +109,7 @@ export default function LeadsPage() {
     if (searchParams.get('compose') !== 'new') return
 
     setEditItem(null)
-    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', estimated_value: 0, currency: 'IDR' })
+    setForm({ name: '', primary_contact: '', phone: '', email: '', source: '', status: 'new', notes: '', owner_id: null })
     setClientSearch('')
     setSelectedClientId(null)
     setClientContacts([])
@@ -110,7 +123,7 @@ export default function LeadsPage() {
 
   const openEdit = (l: any) => {
     setEditItem(l)
-    setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, notes: l.notes || '', estimated_value: l.estimated_value || 0, currency: l.currency || 'IDR' })
+    setForm({ name: l.name, primary_contact: l.primary_contact || '', phone: l.phone || '', email: l.email || '', source: l.source || '', status: l.status, estimated_value: l.estimated_value || 0, notes: l.notes || '', owner_id: l.owner_id || null })
     setClientSearch(l.name)
     setSelectedClientId(null)
     setClientContacts([])
@@ -148,7 +161,7 @@ export default function LeadsPage() {
       setPage(1)
       load(1)
       loadAll()
-    } catch (e: any) { toast.error(e?.response?.data?.error || 'Failed to save lead') }
+    } catch { toast.error('Failed to save lead') }
     finally { setSaving(false) }
   }
 
@@ -174,9 +187,11 @@ export default function LeadsPage() {
       // Reload data BEFORE navigate to update UI
       load()
       loadAll()
-      navigate(`/clients/${res.data.id}`)
+      // Optional: navigate to client (user can click back to see updated list)
+      setTimeout(() => navigate(`/clients/${res.data.id}`), 500)
     } catch { toast.error('Gagal mengkonversi lead') }
   }
+
 
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return
@@ -221,10 +236,7 @@ export default function LeadsPage() {
               </select>
             }
             right={
-              <>
-                <button className="btn btn-secondary"><FileDown size={12} />Excel</button>
-                <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} />
-              </>
+              <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} />
             }
           />
           <div className="table-container">
@@ -232,22 +244,20 @@ export default function LeadsPage() {
               <>
                 <table className="table">
                   <thead>
-                    <tr><th className="w-16">No.</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Source</th><th className="text-right">Estimasi Nilai</th><th>Status</th><th>Owner</th><th></th></tr>
+                    <tr><th className="w-14">No.</th><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Source</th><th>Estimated Value</th><th>Status</th><th>Owner</th><th></th></tr>
                   </thead>
                   <tbody>
                     {leads.length === 0
                       ? <tr><td colSpan={10}><EmptyState /></td></tr>
                       : leads.map((l, index) => (
                         <tr key={l.id}>
-                          <td className="text-gray-400">{rowNumber(page, index)}</td>
+                          <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                           <td className="font-medium">{l.name}</td>
                           <td className="text-gray-500">{l.primary_contact || '-'}</td>
                           <td className="text-gray-500">{l.email || '-'}</td>
                           <td className="text-gray-500">{l.phone || '-'}</td>
                           <td className="text-gray-400">{l.source || '-'}</td>
-                          <td className="text-right text-sm font-medium text-gray-700">
-                            {l.estimated_value ? `${l.currency || 'IDR'} ${Number(l.estimated_value).toLocaleString('id-ID')}` : '-'}
-                          </td>
+                          <td className="text-gray-600 whitespace-nowrap">{l.estimated_value ? formatNumber(l.estimated_value) : '-'}</td>
                           <td><StatusBadge status={l.status} /></td>
                           <td className="text-gray-400">{l.owner?.name || '-'}</td>
                           <td>
@@ -273,7 +283,7 @@ export default function LeadsPage() {
                     }
                   </tbody>
                 </table>
-                <Pagination page={page} total={total} limit={DEFAULT_PAGE_LIMIT} onChange={setPage} />
+                <Pagination page={page} total={total} limit={PAGE_SIZE} onChange={setPage} />
               </>
             )}
           </div>
@@ -316,7 +326,7 @@ export default function LeadsPage() {
                                   >→ Client</button>
                                 )}
                                 {lead.converted_client_id && (
-                                  <span className="text-xs text-gray-400">✓ Client</span>
+                                  <span className="text-gray-400 text-xs shrink-0">✓ Client</span>
                                 )}
                               </div>
                               {lead.primary_contact && <p className="text-gray-400 mt-0.5">{lead.primary_contact}</p>}
@@ -450,16 +460,15 @@ export default function LeadsPage() {
               {PIPELINE.map(s => <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>)}
             </select>
           </FormField>
-          <FormField label="Mata Uang">
-            <select className="input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>
-              {['IDR', 'USD', 'EUR', 'SGD'].map(c => <option key={c} value={c}>{c}</option>)}
+          <FormField label="Estimated Value">
+            <PriceInput value={form.estimated_value || 0} onChange={v => setForm({ ...form, estimated_value: v })} />
+          </FormField>
+          <FormField label="Owner">
+            <select className="input" value={form.owner_id || ''} onChange={e => setForm({ ...form, owner_id: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">— Unassigned —</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </FormField>
-          <div className="col-span-2">
-            <FormField label="Estimasi Nilai">
-              <PriceInput value={form.estimated_value} onChange={(v: number) => setForm({ ...form, estimated_value: v })} />
-            </FormField>
-          </div>
           <div className="col-span-2">
             <FormField label="Notes">
               <textarea className="input" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Notes..." />

@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react'
-import { expenseService, contractService, projectService } from '@/services/api'
+import { expenseService, contractService, projectService, itemService } from '@/services/api'
 import { toast } from 'react-toastify'
 import { Plus, Filter, FileDown } from 'lucide-react'
 import {
-  PageHeader, Toolbar, SearchInput,
-  Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput,
-  rowNumber,
+  PageHeader, Toolbar, SearchInput, Pagination,
+  Modal, FormField, ConfirmDialog, Loading, EmptyState, ViewTabs, PriceInput
 } from '@/components/common'
 
 const VIEWS = [{ key: 'expenses', label: 'Expenses' }, { key: 'recurring', label: 'Recurring' }]
 const CATEGORIES = ['Travel', 'Office', 'Software', 'Hardware', 'Marketing', 'Training', 'Meals', 'Other']
+const PAGE_SIZE = 30
 
 export default function ExpensesPage() {
   const [view, setView] = useState('expenses')
   const [expenses, setExpenses] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -24,10 +25,11 @@ export default function ExpensesPage() {
   const [saving, setSaving] = useState(false)
   const [contracts, setContracts] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
+  const [items, setItems] = useState<any[]>([])
   const [form, setForm] = useState<any>({
     date: new Date().toISOString().split('T')[0], category: '', title: '',
     description: '', amount: '', tax: '0', second_tax: '0', is_recurring: false,
-    contract_id: '', client_id: '', project_id: '',
+    contract_id: '', client_id: '', project_id: '', item_id: '',
   })
 
   useEffect(() => {
@@ -36,6 +38,9 @@ export default function ExpensesPage() {
       .catch(() => {})
     projectService.list({ limit: 999 })
       .then(r => setProjects(r.data.data || []))
+      .catch(() => {})
+    itemService.list()
+      .then(r => setItems(r.data.data || []))
       .catch(() => {})
   }, [])
 
@@ -49,16 +54,18 @@ export default function ExpensesPage() {
 
   useEffect(() => { load() }, [view])
   useEffect(() => {
-    if (!search) { setFiltered(expenses); return }
+    if (!search) { setFiltered(expenses); setPage(1); return }
     const q = search.toLowerCase()
     setFiltered(expenses.filter(e => e.title?.toLowerCase().includes(q) || e.category?.toLowerCase().includes(q)))
+    setPage(1)
   }, [search, expenses])
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const totalAmount = filtered.reduce((sum, e) => sum + (e.total || 0), 0)
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ date: new Date().toISOString().split('T')[0], category: '', title: '', description: '', amount: '', tax: '0', second_tax: '0', is_recurring: view === 'recurring', contract_id: '', client_id: '', project_id: '' })
+    setForm({ date: new Date().toISOString().split('T')[0], category: '', title: '', description: '', amount: '', tax: '0', second_tax: '0', is_recurring: view === 'recurring', contract_id: '', client_id: '', project_id: '', item_id: '' })
     setShowModal(true)
   }
 
@@ -66,7 +73,7 @@ export default function ExpensesPage() {
     setEditItem(e)
     const taxPct = e.amount > 0 ? Math.round((e.tax / e.amount) * 10000) / 100 : 0
     const secondTaxPct = e.amount > 0 ? Math.round((e.second_tax / e.amount) * 10000) / 100 : 0
-    setForm({ date: e.date?.split('T')[0] || '', category: e.category || '', title: e.title, description: e.description || '', amount: e.amount, tax: taxPct, second_tax: secondTaxPct, is_recurring: e.is_recurring, contract_id: e.contract_id || '', client_id: e.client_id || '', project_id: e.project_id || '' })
+    setForm({ date: e.date?.split('T')[0] || '', category: e.category || '', title: e.title, description: e.description || '', amount: e.amount, tax: taxPct, second_tax: secondTaxPct, is_recurring: e.is_recurring, contract_id: e.contract_id || '', client_id: e.client_id || '', project_id: e.project_id || '', item_id: '' })
     setShowModal(true)
   }
 
@@ -123,16 +130,16 @@ export default function ExpensesPage() {
         }
       />
 
-      <ViewTabs tabs={VIEWS} active={view} onChange={v => { setView(v); setSearch('') }} />
+      <ViewTabs tabs={VIEWS} active={view} onChange={v => { setView(v); setSearch(''); setPage(1) }} />
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <p className="text-xs text-gray-400 mb-1">{search ? 'Filtered Records' : 'Total Records'}</p>
-          <p className="text-xl font-semibold text-gray-900">{filtered.length}{!search && total > filtered.length ? ` / ${total}` : ''}</p>
+          <p className="text-xl font-semibold text-gray-900">{filtered.length}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-400 mb-1">{search ? 'Filtered Amount' : 'Total Amount'}</p>
+          <p className="text-xs text-gray-400 mb-1">Total Amount</p>
           <p className="text-xl font-semibold text-red-500">IDR {totalAmount.toLocaleString()}</p>
         </div>
       </div>
@@ -151,14 +158,14 @@ export default function ExpensesPage() {
         {loading ? <Loading /> : (
           <table className="table">
             <thead>
-              <tr><th className="w-16">No.</th><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
+              <tr><th className="w-14">No.</th><th>Date</th><th>Contract</th><th>Client</th><th>Category</th><th>Title</th><th>Amount</th><th>Tax</th><th>Total</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.length === 0
                 ? <tr><td colSpan={10}><EmptyState /></td></tr>
-                : filtered.map((e, index) => (
+                : paginated.map((e, index) => (
                   <tr key={e.id}>
-                    <td className="text-gray-400">{rowNumber(1, index, filtered.length || 1)}</td>
+                    <td className="text-gray-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                     <td className="text-gray-400 whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString('id') : '-'}</td>
                     <td className="text-sm">{e.contract ? `${e.contract.contract_number}` : '-'}</td>
                     <td className="text-sm text-gray-500">{e.client?.name || '-'}</td>
@@ -186,6 +193,7 @@ export default function ExpensesPage() {
             </tbody>
           </table>
         )}
+        {!loading && <Pagination page={page} total={filtered.length} limit={PAGE_SIZE} onChange={setPage} />}
       </div>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Expense' : 'Add Expense'} size="lg"
@@ -231,6 +239,37 @@ export default function ExpensesPage() {
           <FormField label="Date">
             <input className="input" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
           </FormField>
+          <div className="col-span-2">
+            <FormField label="Item (Optional - Auto-fill)" hint="Select from master data or fill manually below">
+              <select
+                className="input"
+                value={form.item_id}
+                onChange={e => {
+                  const itemId = e.target.value
+                  setForm({ ...form, item_id: itemId })
+                  if (itemId) {
+                    const selectedItem = items.find(i => String(i.id) === itemId)
+                    if (selectedItem) {
+                      setForm({
+                        ...form,
+                        item_id: itemId,
+                        category: selectedItem.category || '',
+                        title: selectedItem.title || '',
+                        amount: selectedItem.rate || '',
+                      })
+                    }
+                  }
+                }}
+              >
+                <option value="">— Select item or fill manually —</option>
+                {items.map(item => (
+                  <option key={item.id} value={item.id}>
+                    [{item.category || 'No Category'}] {item.title} - {Number(item.rate).toLocaleString('id-ID')}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
           <FormField label="Category">
             <select className="input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               <option value="">Select category...</option>

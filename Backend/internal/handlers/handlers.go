@@ -80,6 +80,14 @@ func recalcProjectProgress(db *gorm.DB, projectID uint) {
 	if projectID == 0 {
 		return
 	}
+	progress := calculateProjectProgress(db, projectID)
+	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
+}
+
+func calculateProjectProgress(db *gorm.DB, projectID uint) int {
+	if projectID == 0 {
+		return 0
+	}
 	var stats struct {
 		Total int64
 		Done  int64
@@ -89,11 +97,10 @@ func recalcProjectProgress(db *gorm.DB, projectID uint) {
 		Where("project_id = ? AND deleted_at IS NULL", projectID).
 		Scan(&stats)
 
-	progress := 0
 	if stats.Total > 0 {
-		progress = int(stats.Done * 100 / stats.Total)
+		return int(stats.Done * 100 / stats.Total)
 	}
-	db.Model(&models.Project{}).Where("id = ?", projectID).Update("progress", progress)
+	return 0
 }
 
 // syncSequence aligns the PostgreSQL id sequence with the actual MAX(id) in the table.
@@ -549,12 +556,18 @@ func (h *ProjectHandler) List(c *gin.Context) {
 	c.ShouldBindQuery(&q)
 	var projects []models.Project
 	var total int64
-	query := h.db.Model(&models.Project{}).Preload("Client").Preload("Cluster").Preload("Pic").Preload("Labels")
+	query := h.db.Model(&models.Project{}).Preload("Client").Preload("Contract").Preload("Cluster").Preload("Pic").Preload("Labels")
 	if q.Q != "" {
 		query = query.Where("title ILIKE ?", "%"+q.Q+"%")
 	}
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if contractID := c.Query("contract_id"); contractID != "" {
+		query = query.Where("contract_id = ?", contractID)
+	}
+	if clientID := c.Query("client_id"); clientID != "" {
+		query = query.Where("client_id = ?", clientID)
 	}
 	if clusterID := c.Query("cluster_id"); clusterID != "" {
 		if clusterID == "none" {
@@ -565,6 +578,13 @@ func (h *ProjectHandler) List(c *gin.Context) {
 	}
 	query.Count(&total)
 	query.Order("id asc").Scopes(paginate(q)).Find(&projects)
+	for i := range projects {
+		progress := calculateProjectProgress(h.db, projects[i].ID)
+		if projects[i].Progress != progress {
+			h.db.Model(&models.Project{}).Where("id = ?", projects[i].ID).Update("progress", progress)
+			projects[i].Progress = progress
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{"data": projects, "total": total})
 }
 
@@ -586,9 +606,14 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 func (h *ProjectHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var project models.Project
-	if err := h.db.Preload("Client").Preload("Cluster").Preload("Pic").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
+	if err := h.db.Preload("Client").Preload("Contract").Preload("Cluster").Preload("Pic").Preload("Tasks").Preload("Labels").Preload("Members").First(&project, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
+	}
+	progress := calculateProjectProgress(h.db, project.ID)
+	if project.Progress != progress {
+		h.db.Model(&models.Project{}).Where("id = ?", project.ID).Update("progress", progress)
+		project.Progress = progress
 	}
 	c.JSON(http.StatusOK, project)
 }
@@ -627,6 +652,12 @@ func (h *ProjectHandler) GetTimeline(c *gin.Context) {
 	var tasks []models.Task
 	h.db.Where("project_id = ?", id).Order("updated_at desc").Limit(20).Find(&tasks)
 	c.JSON(http.StatusOK, gin.H{"data": tasks})
+}
+
+func (h *ProjectHandler) GetKanbanColumns(c *gin.Context) {
+	var columns []models.TaskKanbanColumn
+	h.db.Order("position asc, id asc").Find(&columns)
+	c.JSON(http.StatusOK, gin.H{"data": columns})
 }
 
 func (h *ProjectHandler) PatchStatus(c *gin.Context) {
@@ -1817,7 +1848,6 @@ func (h *LeadHandler) UpdateStatus(c *gin.Context) {
 	// If status changed from "won" to something else, clear converted_client_id
 	if oldStatus == "won" && req.Status != "won" && oldConvertedClientID != nil {
 		lead.ConvertedClientID = nil
-		log.Printf("Lead %d: Status changed from 'won' to '%s' (drag), clearing converted_client_id", lead.ID, req.Status)
 	}
 
 	h.db.Save(&lead)
@@ -1847,40 +1877,41 @@ func (h *LeadHandler) ConvertToClient(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"})
 		return
 	}
-
-	var client models.Client
-	if err := h.db.Transaction(func(tx *gorm.DB) error {
-		client = models.Client{
-			Name:    lead.Name,
-			Type:    "company",
-			Email:   lead.Email,
-			Phone:   lead.Phone,
-			Needs:   lead.Notes,
-			OwnerID: getUserID(c),
-		}
-		if err := tx.Create(&client).Error; err != nil {
-			return err
-		}
-
-		if strings.TrimSpace(lead.PrimaryContact) != "" {
-			contact := models.Contact{
-				ClientID: client.ID,
-				Name:     lead.PrimaryContact,
-				Email:    lead.Email,
-				Phone:    lead.Phone,
-			}
-			if err := tx.Create(&contact).Error; err != nil {
-				return err
-			}
-		}
-
-		recordAudit(tx, c, "convert", "lead", lead.ID, lead.Name+" → Client")
-		return tx.Delete(&lead).Error
-	}); err != nil {
+	client := models.Client{
+		Name:    lead.Name,
+		Email:   lead.Email,
+		Phone:   lead.Phone,
+		OwnerID: getUserID(c),
+	}
+	if err := h.db.Create(&client).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.db.Model(&lead).Updates(map[string]any{"status": "won", "converted_client_id": client.ID})
+	recordAudit(h.db, c, "convert", "lead", lead.ID, lead.Name+" → Client")
 	c.JSON(http.StatusCreated, client)
+}
+
+func (h *LeadHandler) RollbackConversion(c *gin.Context) {
+	id, _ := getID(c)
+	var lead models.Lead
+	if err := h.db.First(&lead, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lead not found"})
+		return
+	}
+	if lead.ConvertedClientID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Lead belum pernah dikonversi"})
+		return
+	}
+	if err := h.db.Model(&lead).Select("status", "converted_client_id").Updates(map[string]any{
+		"status":              "new",
+		"converted_client_id": nil,
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	recordAudit(h.db, c, "rollback", "lead", lead.ID, lead.Name+" rollback to New")
+	c.JSON(http.StatusOK, gin.H{"message": "Lead berhasil di-rollback ke New"})
 }
 
 // ─── INVOICE ─────────────────────────────────────────
@@ -1936,7 +1967,13 @@ func recalcInvoiceDB(db *gorm.DB, invoiceID uint) {
 	var invoice models.Invoice
 	db.First(&invoice, invoiceID)
 	var subtotal float64
-	db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
+	var itemCount int64
+	db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Count(&itemCount)
+	if itemCount > 0 {
+		db.Model(&models.InvoiceItem{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(total), 0)").Scan(&subtotal)
+	} else {
+		subtotal = invoice.SubtotalAmount
+	}
 	var paidAmount float64
 	db.Model(&models.Payment{}).Where("invoice_id = ?", invoiceID).Select("COALESCE(SUM(amount), 0)").Scan(&paidAmount)
 	applyInvoiceTotals(&invoice, subtotal, paidAmount)
@@ -1970,7 +2007,7 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 	c.ShouldBindQuery(&q)
 	var invoices []models.Invoice
 	var total int64
-	query := h.db.Model(&models.Invoice{}).Preload("Client").Preload("Project").Preload("Labels")
+	query := h.db.Model(&models.Invoice{}).Preload("Client").Preload("Project").Preload("ParentInvoice").Preload("Payments").Preload("Labels")
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -2009,7 +2046,7 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 func (h *InvoiceHandler) Get(c *gin.Context) {
 	id, _ := getID(c)
 	var invoice models.Invoice
-	if err := h.db.Preload("Client").Preload("Project").Preload("Items").Preload("Payments").First(&invoice, id).Error; err != nil {
+	if err := h.db.Preload("Client").Preload("Project").Preload("Project.Contract").Preload("Items").Preload("Payments").First(&invoice, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}

@@ -93,11 +93,13 @@ func Migrate(db *gorm.DB) error {
 		return err
 	}
 
-	// Sync all table sequences to prevent ID gaps
-	tables := []string{"projects", "internal_projects", "internal_project_members", "internal_project_columns", "internal_tasks", "internal_task_assignees", "internal_time_logs", "internal_subtasks", "internal_task_comments", "internal_task_comment_mentions", "internal_task_attachments", "internal_task_reference_links", "internal_task_activities", "notifications", "tasks", "clients", "leads", "invoices", "team_members", "leave_requests"}
+	// Sync table sequences after imports or manual data restoration.
+	tables := []string{"projects", "internal_projects", "internal_project_members", "internal_project_columns", "internal_tasks", "internal_task_assignees", "internal_time_logs", "internal_subtasks", "internal_task_comments", "internal_task_comment_mentions", "internal_task_attachments", "internal_task_reference_links", "internal_task_activities", "notifications", "tasks", "clients", "leads", "invoices", "users", "leaves"}
 	for _, table := range tables {
 		s := fmt.Sprintf(`DO $$ BEGIN PERFORM setval(pg_get_serial_sequence('%s', 'id'), COALESCE((SELECT MAX(id) FROM %s), 0) + 1, false); END $$;`, table, table)
-		db.Exec(s)
+		if err := db.Exec(s).Error; err != nil {
+			return fmt.Errorf("failed to sync %s sequence: %w", table, err)
+		}
 	}
 
 	// Recalculate progress for all projects based on their tasks

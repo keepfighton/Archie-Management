@@ -65,6 +65,12 @@ func (s *Server) setupRoutes() {
 		protected.POST("/auth/logout", authH.Logout)
 		protected.PUT("/auth/change-password", authH.ChangePassword)
 
+		// Personal notifications
+		notificationH := handlers.NewNotificationHandler(s.db)
+		protected.GET("/notifications", notificationH.List)
+		protected.PATCH("/notifications/read-all", notificationH.MarkAllRead)
+		protected.PATCH("/notifications/:id/read", notificationH.MarkRead)
+
 		// Dashboard
 		dashH := handlers.NewDashboardHandler(s.db)
 		protected.GET("/dashboard", dashH.GetStats)
@@ -127,6 +133,68 @@ func (s *Server) setupRoutes() {
 			projects.POST("/:id/deliverables", deliverableH.Create)
 			projects.PUT("/:id/deliverables/:did", deliverableH.Update)
 			projects.DELETE("/:id/deliverables/:did", deliverableH.Delete)
+		}
+
+		// Internal Projects (isolated from client projects)
+		internalProjectH := handlers.NewInternalProjectHandler(s.db)
+		internalDashboardRead := middleware.RequirePermission(s.db, "internal-project.dashboard", false)
+		internalProjectsRead := middleware.RequirePermission(s.db, "internal-project.projects", false)
+		internalProjectsEdit := middleware.RequirePermission(s.db, "internal-project.projects", true)
+		internalTimesheetRead := middleware.RequirePermission(s.db, "internal-project.timesheet", false)
+		internalTimesheetEdit := middleware.RequirePermission(s.db, "internal-project.timesheet", true)
+		internalReportsRead := middleware.RequirePermission(s.db, "internal-project.reports", false)
+		internalMembersRead := middleware.RequireAnyPermission(s.db, "internal-project.projects", "internal-project.timesheet")
+		internalFilterOptionsRead := middleware.RequireAnyPermission(s.db,
+			"internal-project.dashboard", "internal-project.projects", "internal-project.timesheet", "internal-project.reports")
+		internalProjects := protected.Group("/internal-projects")
+		{
+			internalProjects.GET("/dashboard", internalDashboardRead, internalProjectH.Dashboard)
+			internalProjects.GET("/time-summary", internalDashboardRead, internalProjectH.GetTimeSummary)
+			internalProjects.GET("/reports/export", internalReportsRead, internalProjectH.ExportInternalProjectCSV)
+			internalProjects.GET("/reports/summary", internalReportsRead, internalProjectH.PrintInternalProjectSummary)
+			internalProjects.GET("", internalFilterOptionsRead, internalProjectH.List)
+			internalProjects.POST("", internalProjectsEdit, internalProjectH.Create)
+			internalProjects.GET("/:id", internalProjectsRead, internalProjectH.Get)
+			internalProjects.PUT("/:id", internalProjectsEdit, internalProjectH.Update)
+			internalProjects.DELETE("/:id", internalProjectsEdit, internalProjectH.Delete)
+			internalProjects.GET("/:id/members", internalMembersRead, internalProjectH.ListMembers)
+			internalProjects.POST("/:id/members", internalProjectsEdit, internalProjectH.AddMember)
+			internalProjects.DELETE("/:id/members/:userId", internalProjectsEdit, internalProjectH.RemoveMember)
+			internalProjects.GET("/:id/tasks", internalProjectsRead, internalProjectH.ListTasks)
+			internalProjects.POST("/:id/tasks", internalProjectsEdit, internalProjectH.CreateTask)
+			internalProjects.PUT("/:id/tasks/:taskId", internalProjectsEdit, internalProjectH.UpdateTask)
+			internalProjects.PATCH("/:id/tasks/:taskId/move", internalProjectsEdit, internalProjectH.MoveTask)
+			internalProjects.DELETE("/:id/tasks/:taskId", internalProjectsEdit, internalProjectH.DeleteTask)
+			// Time tracking
+			internalProjects.GET("/:id/time-logs", internalTimesheetRead, internalProjectH.GetProjectTimeLogs)
+			internalProjects.GET("/tasks/:id/clock-in", internalTimesheetEdit, internalProjectH.ClockIn)
+			internalProjects.POST("/tasks/:id/clock-in", internalTimesheetEdit, internalProjectH.ClockIn)
+			internalProjects.GET("/tasks/:id/clock-out", internalTimesheetEdit, internalProjectH.ClockOut)
+			internalProjects.POST("/tasks/:id/clock-out", internalTimesheetEdit, internalProjectH.ClockOut)
+			internalProjects.GET("/tasks/:id/time-logs", internalTimesheetRead, internalProjectH.GetTimeLogs)
+			internalProjects.POST("/tasks/:id/time-logs", internalTimesheetEdit, internalProjectH.CreateManualTimeLog)
+			internalProjects.DELETE("/tasks/:id/time-logs/:logId", internalTimesheetEdit, internalProjectH.DeleteTimeLog)
+			internalProjects.GET("/my-time-logs", internalTimesheetRead, internalProjectH.GetMyTimeLogs)
+			internalProjects.GET("/my-active-log", internalTimesheetRead, internalProjectH.GetActiveLog)
+			internalProjects.GET("/my-tasks", internalProjectsRead, internalProjectH.GetMyTasks)
+			// Subtasks
+			internalProjects.GET("/tasks/:id/subtasks", internalProjectsRead, internalProjectH.ListSubtasks)
+			internalProjects.POST("/tasks/:id/subtasks", internalProjectsEdit, internalProjectH.CreateSubtask)
+			internalProjects.PUT("/tasks/:id/subtasks/:subtaskId", internalProjectsEdit, internalProjectH.UpdateSubtask)
+			internalProjects.PATCH("/tasks/:id/subtasks/:subtaskId/toggle", internalProjectsEdit, internalProjectH.ToggleSubtaskStatus)
+			internalProjects.DELETE("/tasks/:id/subtasks/:subtaskId", internalProjectsEdit, internalProjectH.DeleteSubtask)
+			internalProjects.PATCH("/tasks/:id/subtasks/reorder", internalProjectsEdit, internalProjectH.ReorderSubtasks)
+			// Task collaboration
+			internalProjects.GET("/tasks/:id/comments", internalProjectsRead, internalProjectH.ListTaskComments)
+			internalProjects.POST("/tasks/:id/comments", internalProjectsEdit, internalProjectH.CreateTaskComment)
+			internalProjects.DELETE("/tasks/:id/comments/:commentId", internalProjectsEdit, internalProjectH.DeleteTaskComment)
+			internalProjects.GET("/tasks/:id/attachments", internalProjectsRead, internalProjectH.ListTaskAttachments)
+			internalProjects.POST("/tasks/:id/attachments", internalProjectsEdit, internalProjectH.CreateTaskAttachment)
+			internalProjects.DELETE("/tasks/:id/attachments/:attachmentId", internalProjectsEdit, internalProjectH.DeleteTaskAttachment)
+			internalProjects.GET("/tasks/:id/links", internalProjectsRead, internalProjectH.ListTaskReferenceLinks)
+			internalProjects.POST("/tasks/:id/links", internalProjectsEdit, internalProjectH.CreateTaskReferenceLink)
+			internalProjects.DELETE("/tasks/:id/links/:linkId", internalProjectsEdit, internalProjectH.DeleteTaskReferenceLink)
+			internalProjects.GET("/tasks/:id/activities", internalProjectsRead, internalProjectH.ListTaskActivities)
 		}
 
 		// Tasks

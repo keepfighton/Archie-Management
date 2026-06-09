@@ -55,6 +55,40 @@ export const dashboardItem: NavLeaf = {
 
 export const navGroups: NavGroupDef[] = [
   {
+    id: 'internal-project',
+    label: 'Internal Project',
+    items: [
+      {
+        id: 'internal-project-dashboard',
+        to: '/internal-project/dashboard',
+        icon: LayoutDashboard,
+        label: 'Monitoring',
+        menu: 'internal-project.dashboard',
+      },
+      {
+        id: 'internal-project-projects',
+        to: '/internal-project/projects',
+        icon: FolderKanban,
+        label: 'Project',
+        menu: 'internal-project.projects',
+      },
+      {
+        id: 'internal-project-timesheet',
+        to: '/internal-project/timesheet',
+        icon: Clock,
+        label: 'Timesheet',
+        menu: 'internal-project.timesheet',
+      },
+      {
+        id: 'internal-project-reports',
+        to: '/internal-project/reports',
+        icon: BarChart2,
+        label: 'Report',
+        menu: 'internal-project.reports',
+      },
+    ],
+  },
+  {
     id: 'business',
     label: 'Business & Sales',
     items: [

@@ -8,7 +8,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
 import Layout from '@/components/layout/Layout'
-import ProtectedRoute from '@/components/common/ProtectedRoute'
+import ProtectedRoute, { PermissionRoute } from '@/components/common/ProtectedRoute'
 
 import LoginPage from '@/pages/Auth/LoginPage'
 import ForgotPasswordPage from '@/pages/Auth/ForgotPasswordPage'
@@ -20,6 +20,12 @@ import ClientDetailPage from '@/pages/Clients/ClientDetailPage'
 import ClustersPage from '@/pages/Projects/ClustersPage'
 import ProjectsPage from '@/pages/Projects/ProjectsPage'
 import ProjectDetailPage from '@/pages/Projects/ProjectDetailPage'
+import InternalProjectsPage from '@/pages/InternalProjects/InternalProjectsPage'
+import InternalProjectDetailPage from '@/pages/InternalProjects/InternalProjectDetailPage'
+import InternalProjectDashboardPage from '@/pages/InternalProjects/InternalProjectDashboardPage'
+import TimesheetPage from '@/pages/InternalProjects/TimesheetPage'
+import InternalProjectReportsPage from '@/pages/InternalProjects/InternalProjectReportsPage'
+import InternalProjectMyTasksPage from '@/pages/InternalProjects/InternalProjectMyTasksPage'
 import TasksPage from '@/pages/Tasks/TasksPage'
 import LeadsPage from '@/pages/Leads/LeadsPage'
 import InvoicesPage from '@/pages/Sales/InvoicesPage'
@@ -85,6 +91,12 @@ function AppShell() {
         <Route path="clusters" element={<ClustersPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
+        <Route path="internal-project/projects" element={<PermissionRoute menu="internal-project.projects"><InternalProjectsPage /></PermissionRoute>} />
+        <Route path="internal-project/projects/:id" element={<PermissionRoute menu="internal-project.projects"><InternalProjectDetailPage /></PermissionRoute>} />
+        <Route path="internal-project/my-tasks" element={<PermissionRoute menu="internal-project.projects"><InternalProjectMyTasksPage /></PermissionRoute>} />
+        <Route path="internal-project/dashboard" element={<PermissionRoute menu="internal-project.dashboard"><InternalProjectDashboardPage /></PermissionRoute>} />
+        <Route path="internal-project/timesheet" element={<PermissionRoute menu="internal-project.timesheet"><TimesheetPage /></PermissionRoute>} />
+        <Route path="internal-project/reports" element={<PermissionRoute menu="internal-project.reports"><InternalProjectReportsPage /></PermissionRoute>} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="sales/invoices" element={<InvoicesPage />} />

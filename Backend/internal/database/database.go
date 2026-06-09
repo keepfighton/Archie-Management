@@ -45,6 +45,18 @@ func Migrate(db *gorm.DB) error {
 		&models.Contact{},
 		&models.Cluster{},
 		&models.Project{},
+		&models.InternalProject{},
+		&models.InternalProjectMember{},
+		&models.InternalProjectColumn{},
+		&models.InternalTask{},
+		&models.InternalTaskAssignee{},
+		&models.InternalTimeLog{},
+		&models.InternalSubtask{},
+		&models.InternalTaskComment{},
+		&models.InternalTaskCommentMention{},
+		&models.InternalTaskAttachment{},
+		&models.InternalTaskReferenceLink{},
+		&models.InternalTaskActivity{},
 		&models.TaskKanbanColumn{},
 		&models.Task{},
 		&models.Lead{},
@@ -59,6 +71,7 @@ func Migrate(db *gorm.DB) error {
 		&models.Expense{},
 		&models.Leave{},
 		&models.Announcement{},
+		&models.Notification{},
 		&models.TimeCard{},
 		&models.File{},
 		&models.Todo{},
@@ -81,7 +94,7 @@ func Migrate(db *gorm.DB) error {
 	}
 
 	// Sync all table sequences to prevent ID gaps
-	tables := []string{"projects", "tasks", "clients", "leads", "invoices", "team_members", "leave_requests"}
+	tables := []string{"projects", "internal_projects", "internal_project_members", "internal_project_columns", "internal_tasks", "internal_task_assignees", "internal_time_logs", "internal_subtasks", "internal_task_comments", "internal_task_comment_mentions", "internal_task_attachments", "internal_task_reference_links", "internal_task_activities", "notifications", "tasks", "clients", "leads", "invoices", "team_members", "leave_requests"}
 	for _, table := range tables {
 		s := fmt.Sprintf(`DO $$ BEGIN PERFORM setval(pg_get_serial_sequence('%s', 'id'), COALESCE((SELECT MAX(id) FROM %s), 0) + 1, false); END $$;`, table, table)
 		db.Exec(s)
@@ -99,7 +112,86 @@ func Migrate(db *gorm.DB) error {
 		), 0)
 	`)
 
+	if err := seedInternalProjectColumns(db); err != nil {
+		return err
+	}
+
 	return seedTaskKanbanColumns(db)
+}
+
+func seedInternalProjectColumns(db *gorm.DB) error {
+	type columnDefinition struct {
+		Key      string
+		Label    string
+		Color    string
+		Position int
+	}
+	definitions := []columnDefinition{
+		{Key: "backlog", Label: "Backlog", Color: "slate", Position: 1},
+		{Key: "todo", Label: "To Do", Color: "blue", Position: 2},
+		{Key: "development", Label: "Development", Color: "yellow", Position: 3},
+		{Key: "review", Label: "Review", Color: "purple", Position: 4},
+		{Key: "uat", Label: "UAT", Color: "cyan", Position: 5},
+		{Key: "deploy_to_production", Label: "Deploy To Production", Color: "orange", Position: 6},
+		{Key: "done", Label: "Done", Color: "green", Position: 7},
+	}
+
+	var projects []models.InternalProject
+	if err := db.Find(&projects).Error; err != nil {
+		return err
+	}
+
+	for _, project := range projects {
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			var developmentColumn models.InternalProjectColumn
+			err := tx.Where("project_id = ? AND key = ?", project.ID, "development").First(&developmentColumn).Error
+			if err == gorm.ErrRecordNotFound {
+				var legacyColumn models.InternalProjectColumn
+				if legacyErr := tx.Where("project_id = ? AND key = ?", project.ID, "in_progress").First(&legacyColumn).Error; legacyErr == nil {
+					if updateErr := tx.Model(&legacyColumn).Updates(map[string]any{
+						"key": "development", "label": "Development", "color": "yellow", "position": 3,
+					}).Error; updateErr != nil {
+						return updateErr
+					}
+					if updateErr := tx.Model(&models.InternalTask{}).
+						Where("project_id = ? AND column_id = ?", project.ID, legacyColumn.ID).
+						Update("status", "development").Error; updateErr != nil {
+						return updateErr
+					}
+				}
+			} else if err != nil {
+				return err
+			}
+
+			for _, definition := range definitions {
+				var column models.InternalProjectColumn
+				err := tx.Where("project_id = ? AND key = ?", project.ID, definition.Key).First(&column).Error
+				if err == gorm.ErrRecordNotFound {
+					column = models.InternalProjectColumn{
+						ProjectID: project.ID, Key: definition.Key, Label: definition.Label,
+						Color: definition.Color, Position: definition.Position,
+					}
+					if err := tx.Create(&column).Error; err != nil {
+						return err
+					}
+					continue
+				}
+				if err != nil {
+					return err
+				}
+				if err := tx.Model(&column).Updates(map[string]any{
+					"label": definition.Label, "color": definition.Color, "position": definition.Position,
+				}).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func seedTaskKanbanColumns(db *gorm.DB) error {

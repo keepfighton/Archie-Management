@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RootState, AppDispatch } from '@/store'
 import { fetchMe, logoutAsync, canEdit, canRead } from '@/store/slices/authSlice'
 import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
-import { auditService, teamService } from '@/services/api'
+import { auditService, notificationService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
 import { useLocale } from '@/contexts/LocaleContext'
 import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
@@ -35,6 +35,16 @@ type AnnouncementItem = {
   start_date?: string
   end_date?: string
   created_by?: { name?: string }
+}
+
+type PersonalNotification = {
+  id: number
+  type: string
+  title: string
+  message?: string
+  link?: string
+  created_at: string
+  read_at?: string | null
 }
 
 type AuditItem = {
@@ -191,6 +201,7 @@ export default function Layout() {
   const [activityFailed, setActivityFailed] = useState(false)
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
+  const [personalNotifications, setPersonalNotifications] = useState<PersonalNotification[]>([])
   const [lastAnnouncementsSeenAt, setLastAnnouncementsSeenAt] = useState(() => readStoredValue(ANNOUNCEMENTS_SEEN_KEY, ''))
   const [isDesktop, setIsDesktop] = useState(() => (
     typeof window !== 'undefined'
@@ -202,6 +213,10 @@ export default function Layout() {
   const desktopSearchInputRef = useRef<HTMLInputElement>(null)
 
   const titleMap = [
+    { key: '/internal-project/reports', translationKey: 'page.internalProjectReports', fallback: 'Internal Project Reports' },
+    { key: '/internal-project/my-tasks', translationKey: 'page.internalProjectMyTasks', fallback: 'My Internal Tasks' },
+    { key: '/internal-project/projects', translationKey: 'page.internalProjects', fallback: 'Internal Projects' },
+    { key: '/internal-project/dashboard', translationKey: 'page.internalProjectDashboard', fallback: 'Internal Project Monitoring' },
     { key: '/dashboard', translationKey: 'page.dashboard', fallback: 'Dashboard' },
     { key: '/events', translationKey: 'page.events', fallback: 'Events' },
     { key: '/clients', translationKey: 'page.clients', fallback: 'Clients' },
@@ -320,6 +335,9 @@ export default function Layout() {
       return !Number.isNaN(createdAt) && createdAt > seenAt
     }).length
   }, [activeAnnouncements, lastAnnouncementsSeenAt])
+  const activePersonalNotifications = useMemo(() => personalNotifications.slice(0, 8), [personalNotifications])
+  const unreadPersonalNotifications = useMemo(() => personalNotifications.filter(item => !item.read_at).length, [personalNotifications])
+  const unreadNotifications = unreadAnnouncements + unreadPersonalNotifications
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
@@ -487,6 +505,40 @@ export default function Layout() {
     }
   }, [])
 
+  const loadPersonalNotifications = useCallback(async () => {
+    setNotificationsLoading(true)
+    try {
+      const response = await notificationService.list()
+      setPersonalNotifications(response.data.data || [])
+    } catch {
+      setPersonalNotifications([])
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }, [])
+
+  const handlePersonalNotification = async (item: PersonalNotification) => {
+    if (!item.read_at) {
+      try {
+        await notificationService.markRead(item.id)
+        setPersonalNotifications(current => current.map(notification => notification.id === item.id ? { ...notification, read_at: new Date().toISOString() } : notification))
+      } catch {
+        // Navigation remains available even if read-state update fails.
+      }
+    }
+    handleNavigate(item.link || '/internal-project/projects')
+  }
+
+  const markAllPersonalNotificationsRead = async () => {
+    try {
+      await notificationService.markAllRead()
+      const readAt = new Date().toISOString()
+      setPersonalNotifications(current => current.map(item => ({ ...item, read_at: item.read_at || readAt })))
+    } catch {
+      toast.error(t('layout.notificationReadFailed', 'Failed to update notifications'))
+    }
+  }
+
   const handleClockAction = useCallback(() => {
     if (!user) return
     if (user.clocked_in) {
@@ -552,12 +604,14 @@ export default function Layout() {
     }
     if (activePanel === 'notifications') {
       void loadAnnouncements(true)
+      void loadPersonalNotifications()
     }
-  }, [activePanel, activityFailed, activityItems.length, activityLoading, loadActivity, loadAnnouncements])
+  }, [activePanel, activityFailed, activityItems.length, activityLoading, loadActivity, loadAnnouncements, loadPersonalNotifications])
 
   useEffect(() => {
     void loadAnnouncements()
-  }, [loadAnnouncements])
+    void loadPersonalNotifications()
+  }, [loadAnnouncements, loadPersonalNotifications])
 
   const handleSearchSubmit = () => {
     if (moduleMatches[0]) {
@@ -636,9 +690,9 @@ export default function Layout() {
         aria-expanded={isActive}
       >
         <Icon size={16} />
-        {panel === 'notifications' && unreadAnnouncements > 0 && (
+        {panel === 'notifications' && unreadNotifications > 0 && (
           <span className="absolute right-1.5 top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-            {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+            {unreadNotifications > 9 ? '9+' : unreadNotifications}
           </span>
         )}
       </button>
@@ -1000,14 +1054,14 @@ export default function Layout() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{t('layout.notifications', 'Notifications')}</p>
-                    <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Latest company announcements.')}</p>
+                    <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Assignments, reminders, mentions, and announcements.')}</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleNavigate('/team/announcements')}
+                    onClick={() => void markAllPersonalNotificationsRead()}
                     className="text-xs font-medium text-primary"
                   >
-                    {t('layout.viewAll', 'View all')}
+                    {t('layout.markAllRead', 'Mark all read')}
                   </button>
                 </div>
 
@@ -1016,13 +1070,30 @@ export default function Layout() {
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                       {t('layout.loadingNotifications', 'Loading notifications...')}
                     </div>
-                  ) : activeAnnouncements.length === 0 ? (
+                  ) : activePersonalNotifications.length === 0 && activeAnnouncements.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                      {t('layout.noAnnouncements', 'No announcements available.')}
+                      {t('layout.noNotifications', 'No notifications available.')}
                     </div>
-                  ) : activeAnnouncements.map(item => (
+                  ) : <>
+                    {activePersonalNotifications.map(item => (
+                      <button
+                        key={`notification-${item.id}`}
+                        onClick={() => void handlePersonalNotification(item)}
+                        className={`block w-full rounded-xl border px-3 py-3 text-left transition-colors hover:bg-slate-50 ${item.read_at ? 'border-gray-100' : 'border-blue-100 bg-blue-50/40'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">{item.title}</p>
+                            {item.message && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.message}</p>}
+                          </div>
+                          {!item.read_at && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />}
+                        </div>
+                        <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
+                      </button>
+                    ))}
+                    {activeAnnouncements.map(item => (
                     <button
-                      key={item.id}
+                      key={`announcement-${item.id}`}
                       onClick={() => handleNavigate('/team/announcements')}
                       className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50"
                     >
@@ -1042,7 +1113,8 @@ export default function Layout() {
                         {item.created_by?.name ? ` · ${item.created_by.name}` : ''}
                       </p>
                     </button>
-                  ))}
+                    ))}
+                  </>}
                 </div>
               </div>
             )}
@@ -1257,7 +1329,7 @@ export default function Layout() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{t('layout.notifications', 'Notifications')}</p>
-                  <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Latest company announcements.')}</p>
+                  <p className="text-xs text-gray-400">{t('layout.notificationsDescription', 'Assignments, reminders, mentions, and announcements.')}</p>
                 </div>
                 <button type="button" onClick={closePanels} className="text-xs font-medium text-gray-500">{t('layout.close', 'Close')}</button>
               </div>
@@ -1266,13 +1338,24 @@ export default function Layout() {
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                     {t('layout.loadingNotifications', 'Loading notifications...')}
                   </div>
-                ) : activeAnnouncements.length === 0 ? (
+                ) : activePersonalNotifications.length === 0 && activeAnnouncements.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
-                    {t('layout.noAnnouncements', 'No announcements available.')}
+                    {t('layout.noNotifications', 'No notifications available.')}
                   </div>
-                ) : activeAnnouncements.map(item => (
+                ) : <>
+                  {activePersonalNotifications.map(item => (
+                    <button
+                      key={`notification-${item.id}`}
+                      onClick={() => void handlePersonalNotification(item)}
+                      className={`block w-full rounded-xl border px-3 py-3 text-left ${item.read_at ? 'border-gray-100' : 'border-blue-100 bg-blue-50/40'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-gray-700">{item.title}</p>{item.message && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.message}</p>}</div>{!item.read_at && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />}</div>
+                      <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
+                    </button>
+                  ))}
+                  {activeAnnouncements.map(item => (
                   <button
-                    key={item.id}
+                    key={`announcement-${item.id}`}
                     onClick={() => handleNavigate('/team/announcements')}
                     className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left"
                   >
@@ -1280,7 +1363,8 @@ export default function Layout() {
                     {item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>}
                     <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
                   </button>
-                ))}
+                  ))}
+                </>}
               </div>
             </div>
           </div>

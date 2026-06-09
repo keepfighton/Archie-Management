@@ -114,6 +114,80 @@ export const projectService = {
   getKanbanColumns: (id: number) => api.get(`/projects/${id}/kanban-columns`),
 }
 
+// ─── Internal Projects ──────────────────────────────
+export const internalProjectService = {
+  dashboard: (params?: any) => api.get('/internal-projects/dashboard', { params }),
+  getTimeSummary: (params?: { project_id?: string; user_id?: string }) =>
+    api.get('/internal-projects/time-summary', { params }),
+  list: (params?: any) => api.get('/internal-projects', { params }),
+  get: (id: number) => api.get(`/internal-projects/${id}`),
+  create: (data: any) => api.post('/internal-projects', data),
+  update: (id: number, data: any) => api.put(`/internal-projects/${id}`, data),
+  delete: (id: number) => api.delete(`/internal-projects/${id}`),
+  listMembers: (id: number) => api.get(`/internal-projects/${id}/members`),
+  addMember: (id: number, userId: number) => api.post(`/internal-projects/${id}/members`, { user_id: userId }),
+  removeMember: (id: number, userId: number) => api.delete(`/internal-projects/${id}/members/${userId}`),
+  listTasks: (id: number, params?: any) => api.get(`/internal-projects/${id}/tasks`, { params }),
+  createTask: (id: number, data: any) => api.post(`/internal-projects/${id}/tasks`, data),
+  updateTask: (id: number, taskId: number, data: any) => api.put(`/internal-projects/${id}/tasks/${taskId}`, data),
+  moveTask: (id: number, taskId: number, data: { column_id: number; position: number }) =>
+    api.patch(`/internal-projects/${id}/tasks/${taskId}/move`, data),
+  deleteTask: (id: number, taskId: number) => api.delete(`/internal-projects/${id}/tasks/${taskId}`),
+  // Time tracking
+  clockIn: (taskId: number) => api.post(`/internal-projects/tasks/${taskId}/clock-in`),
+  clockOut: (taskId: number) => api.post(`/internal-projects/tasks/${taskId}/clock-out`),
+  getActiveLog: () => api.get('/internal-projects/my-active-log'),
+  getTimeLogs: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/time-logs`),
+  createManualTimeLog: (taskId: number, data: { clock_in: string; clock_out: string }) =>
+    api.post(`/internal-projects/tasks/${taskId}/time-logs`, data),
+  deleteTimeLog: (taskId: number, logId: number) => api.delete(`/internal-projects/tasks/${taskId}/time-logs/${logId}`),
+  getMyTimeLogs: (params?: { from?: string; to?: string }) => api.get('/internal-projects/my-time-logs', { params }),
+  getProjectTimeLogs: (projectId: number, params?: { from?: string; to?: string; user_id?: string }) =>
+    api.get(`/internal-projects/${projectId}/time-logs`, { params }),
+  getMyTasks: (params?: { limit?: number; include_done?: boolean }) => api.get('/internal-projects/my-tasks', { params }),
+  // Subtasks
+  listSubtasks: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/subtasks`),
+  createSubtask: (taskId: number, data: { title: string; description?: string }) =>
+    api.post(`/internal-projects/tasks/${taskId}/subtasks`, data),
+  toggleSubtask: (taskId: number, subtaskId: number) =>
+    api.patch(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/toggle`),
+  deleteSubtask: (taskId: number, subtaskId: number) =>
+    api.delete(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}`),
+  // Task collaboration
+  listTaskComments: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/comments`),
+  createTaskComment: (taskId: number, data: { body: string; mentioned_user_ids: number[] }) =>
+    api.post(`/internal-projects/tasks/${taskId}/comments`, data),
+  deleteTaskComment: (taskId: number, commentId: number) =>
+    api.delete(`/internal-projects/tasks/${taskId}/comments/${commentId}`),
+  listTaskAttachments: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/attachments`),
+  createTaskAttachment: (taskId: number, fileId: number) =>
+    api.post(`/internal-projects/tasks/${taskId}/attachments`, { file_id: fileId }),
+  deleteTaskAttachment: (taskId: number, attachmentId: number) =>
+    api.delete(`/internal-projects/tasks/${taskId}/attachments/${attachmentId}`),
+  listTaskLinks: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/links`),
+  createTaskLink: (taskId: number, data: { title: string; url: string }) =>
+    api.post(`/internal-projects/tasks/${taskId}/links`, data),
+  deleteTaskLink: (taskId: number, linkId: number) =>
+    api.delete(`/internal-projects/tasks/${taskId}/links/${linkId}`),
+  listTaskActivities: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/activities`),
+  exportReportCSV: (type: 'tasks' | 'timesheet', params?: { project_id?: string; user_id?: string; from?: string; to?: string }) =>
+    api.get('/internal-projects/reports/export', { params: { type, ...params }, responseType: 'blob' }),
+  openReportSummary: async (params?: { project_id?: string; user_id?: string; from?: string; to?: string }) => {
+    const reportWindow = window.open('', '_blank')
+    if (!reportWindow) throw new Error('Popup blocked')
+    reportWindow.document.write('<p style="font-family:Arial;padding:24px">Preparing report...</p>')
+    try {
+      const response = await api.get('/internal-projects/reports/summary', { params, responseType: 'text' })
+      reportWindow.document.open()
+      reportWindow.document.write(response.data)
+      reportWindow.document.close()
+    } catch (error) {
+      reportWindow.close()
+      throw error
+    }
+  },
+}
+
 // ─── Tasks ───────────────────────────────────────────
 export const taskService = {
   list: (params?: any) => api.get('/tasks', { params }),
@@ -259,6 +333,13 @@ export const fileService = {
   createFolder: (data: any) => api.post('/files/folder', data),
   delete: (id: number) => api.delete(`/files/${id}`),
   toggleFavorite: (id: number) => api.patch(`/files/${id}/favorite`),
+}
+
+// ─── Personal Notifications ─────────────────────────
+export const notificationService = {
+  list: (params?: { unread?: boolean }) => api.get('/notifications', { params }),
+  markRead: (id: number) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
 }
 
 // ─── Todos ───────────────────────────────────────────

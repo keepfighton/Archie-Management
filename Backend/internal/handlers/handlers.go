@@ -3421,6 +3421,10 @@ func (h *FileHandler) Upload(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+	if header.Size > 10*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File size cannot exceed 10 MB"})
+		return
+	}
 
 	// Simpan ke subdirektori YYYY/MM
 	subDir := time.Now().Format("2006/01")
@@ -3477,9 +3481,17 @@ func (h *FileHandler) Download(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
 		return
 	}
-	if f.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+	if f.OwnerID != userID && getUserRole(c) != "admin" {
+		var sharedCount int64
+		h.db.Table("internal_task_attachments ita").
+			Joins("JOIN internal_tasks it ON it.id = ita.task_id AND it.deleted_at IS NULL").
+			Joins("JOIN internal_project_members ipm ON ipm.project_id = it.project_id AND ipm.deleted_at IS NULL").
+			Where("ita.file_id = ? AND ita.deleted_at IS NULL AND ipm.user_id = ?", f.ID, userID).
+			Count(&sharedCount)
+		if sharedCount == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 	if f.IsFolder || f.Path == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Not a downloadable file"})

@@ -219,6 +219,144 @@ type Project struct {
 	Members     []User    `gorm:"many2many:project_members;" json:"members,omitempty"`
 }
 
+// ─── INTERNAL PROJECT ───────────────────────────────
+// Internal projects are intentionally isolated from client projects. They use
+// NEXONE users for ownership and membership, but have no client, contract, or
+// finance relationships.
+type InternalProject struct {
+	Base
+	Name        string                  `gorm:"not null" json:"name"`
+	Description string                  `gorm:"type:text" json:"description"`
+	OwnerID     uint                    `gorm:"index;not null" json:"owner_id"`
+	Owner       *User                   `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Status      string                  `gorm:"default:active;index" json:"status"` // active, archived
+	Progress    int                     `gorm:"default:0" json:"progress"`
+	Members     []InternalProjectMember `gorm:"foreignKey:ProjectID" json:"members,omitempty"`
+	Columns     []InternalProjectColumn `gorm:"foreignKey:ProjectID" json:"columns,omitempty"`
+	Tasks       []InternalTask          `gorm:"foreignKey:ProjectID" json:"tasks,omitempty"`
+}
+
+type InternalProjectMember struct {
+	Base
+	ProjectID uint             `gorm:"uniqueIndex:idx_internal_project_user;not null" json:"project_id"`
+	Project   *InternalProject `gorm:"foreignKey:ProjectID;constraint:OnDelete:CASCADE" json:"project,omitempty"`
+	UserID    uint             `gorm:"uniqueIndex:idx_internal_project_user;not null" json:"user_id"`
+	User      *User            `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Role      string           `gorm:"default:member" json:"role"` // owner, member
+}
+
+type InternalProjectColumn struct {
+	Base
+	ProjectID uint             `gorm:"uniqueIndex:idx_internal_project_column_key;not null" json:"project_id"`
+	Project   *InternalProject `gorm:"foreignKey:ProjectID;constraint:OnDelete:CASCADE" json:"project,omitempty"`
+	Key       string           `gorm:"uniqueIndex:idx_internal_project_column_key;not null" json:"key"`
+	Label     string           `gorm:"not null" json:"label"`
+	Color     string           `json:"color"`
+	Position  int              `gorm:"default:0;index" json:"position"`
+}
+
+type InternalTask struct {
+	Base
+	ProjectID    uint                   `gorm:"index;not null" json:"project_id"`
+	Project      *InternalProject       `gorm:"foreignKey:ProjectID;constraint:OnDelete:CASCADE" json:"project,omitempty"`
+	ColumnID     uint                   `gorm:"index;not null" json:"column_id"`
+	Column       *InternalProjectColumn `gorm:"foreignKey:ColumnID" json:"column,omitempty"`
+	Title        string                 `gorm:"not null" json:"title"`
+	Description  string                 `gorm:"type:text" json:"description"`
+	Category     string                 `json:"category"`
+	Status       string                 `gorm:"default:backlog;index" json:"status"`
+	Priority     string                 `gorm:"default:medium;index" json:"priority"`
+	DueDate      *time.Time             `gorm:"index" json:"due_date"`
+	CreatorID    uint                   `gorm:"index;not null" json:"creator_id"`
+	Creator      *User                  `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+	ParentTaskID *uint                  `gorm:"index" json:"parent_task_id"`
+	Position     int                    `gorm:"default:0;index" json:"position"`
+	Assignees    []InternalTaskAssignee `gorm:"foreignKey:TaskID" json:"assignees,omitempty"`
+	TimeLogs     []InternalTimeLog      `gorm:"foreignKey:TaskID" json:"time_logs,omitempty"`
+}
+
+type InternalTaskAssignee struct {
+	ID        uint          `gorm:"primaryKey;autoIncrement" json:"id"`
+	TaskID    uint          `gorm:"uniqueIndex:idx_internal_task_user;not null" json:"task_id"`
+	Task      *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	UserID    uint          `gorm:"uniqueIndex:idx_internal_task_user;not null" json:"user_id"`
+	User      *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
+type InternalTimeLog struct {
+	Base
+	TaskID          uint          `gorm:"index;not null" json:"task_id"`
+	Task            *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	UserID          uint          `gorm:"index;not null" json:"user_id"`
+	User            *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	ClockIn         time.Time     `gorm:"index;not null" json:"clock_in"`
+	ClockOut        *time.Time    `gorm:"index" json:"clock_out"`
+	DurationSeconds int64         `gorm:"default:0" json:"duration_seconds"`
+}
+
+type InternalSubtask struct {
+	Base
+	TaskID      uint          `gorm:"index;not null" json:"task_id"`
+	Task        *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	Title       string        `gorm:"not null" json:"title"`
+	Description string        `gorm:"type:text" json:"description"`
+	Status      string        `gorm:"default:pending;index" json:"status"` // pending, completed
+	Position    int           `gorm:"default:0;index" json:"position"`
+	AssigneeID  *uint         `gorm:"index" json:"assignee_id"`
+	Assignee    *User         `gorm:"foreignKey:AssigneeID" json:"assignee,omitempty"`
+	DueDate     *FlexTime     `json:"due_date"`
+}
+
+type InternalTaskComment struct {
+	Base
+	TaskID   uint                         `gorm:"index;not null" json:"task_id"`
+	Task     *InternalTask                `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	UserID   uint                         `gorm:"index;not null" json:"user_id"`
+	User     *User                        `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Body     string                       `gorm:"type:text;not null" json:"body"`
+	Mentions []InternalTaskCommentMention `gorm:"foreignKey:CommentID" json:"mentions,omitempty"`
+}
+
+type InternalTaskCommentMention struct {
+	ID        uint                 `gorm:"primaryKey;autoIncrement" json:"id"`
+	CommentID uint                 `gorm:"uniqueIndex:idx_internal_comment_user;not null" json:"comment_id"`
+	Comment   *InternalTaskComment `gorm:"foreignKey:CommentID;constraint:OnDelete:CASCADE" json:"comment,omitempty"`
+	UserID    uint                 `gorm:"uniqueIndex:idx_internal_comment_user;not null" json:"user_id"`
+	User      *User                `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	CreatedAt time.Time            `json:"created_at"`
+}
+
+type InternalTaskAttachment struct {
+	Base
+	TaskID       uint          `gorm:"index;not null" json:"task_id"`
+	Task         *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	FileID       uint          `gorm:"uniqueIndex;not null" json:"file_id"`
+	File         *File         `gorm:"foreignKey:FileID" json:"file,omitempty"`
+	UploadedByID uint          `gorm:"index;not null" json:"uploaded_by_id"`
+	UploadedBy   *User         `gorm:"foreignKey:UploadedByID" json:"uploaded_by,omitempty"`
+}
+
+type InternalTaskReferenceLink struct {
+	Base
+	TaskID      uint          `gorm:"index;not null" json:"task_id"`
+	Task        *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	Title       string        `gorm:"not null" json:"title"`
+	URL         string        `gorm:"type:text;not null" json:"url"`
+	CreatedByID uint          `gorm:"index;not null" json:"created_by_id"`
+	CreatedBy   *User         `gorm:"foreignKey:CreatedByID" json:"created_by,omitempty"`
+}
+
+type InternalTaskActivity struct {
+	Base
+	TaskID      uint          `gorm:"index;not null" json:"task_id"`
+	Task        *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	UserID      uint          `gorm:"index;not null" json:"user_id"`
+	User        *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Action      string        `gorm:"index;not null" json:"action"`
+	Description string        `gorm:"type:text;not null" json:"description"`
+}
+
 // ─── TASK ────────────────────────────────────────────
 type TaskKanbanColumn struct {
 	Base
@@ -433,6 +571,22 @@ type Announcement struct {
 	EndDate     FlexTime `json:"end_date"`
 	CreatedByID uint     `json:"created_by_id"`
 	CreatedBy   *User    `gorm:"foreignKey:CreatedByID" json:"created_by,omitempty"`
+}
+
+// Notification stores personal, actionable notifications. Announcements remain
+// company-wide broadcasts and are displayed alongside these items in the UI.
+type Notification struct {
+	Base
+	UserID     uint       `gorm:"index;not null" json:"user_id"`
+	User       *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Type       string     `gorm:"index;not null" json:"type"`
+	Title      string     `gorm:"not null" json:"title"`
+	Message    string     `gorm:"type:text" json:"message"`
+	Link       string     `json:"link"`
+	EntityType string     `gorm:"index" json:"entity_type"`
+	EntityID   uint       `gorm:"index" json:"entity_id"`
+	UniqueKey  *string    `gorm:"uniqueIndex:idx_notification_user_key" json:"-"`
+	ReadAt     *time.Time `gorm:"index" json:"read_at"`
 }
 
 // ─── TIME CARD ───────────────────────────────────────

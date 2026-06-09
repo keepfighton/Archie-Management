@@ -7,3 +7,6 @@ Frontend/.env.local
 node_modules/
 Frontend/dist/
 Backend/api
+Backend/uploads/
+docker-compose.override.yml
+/catatan NEX-ONE WEB.docx

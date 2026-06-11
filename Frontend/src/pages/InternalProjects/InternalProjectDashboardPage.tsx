@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock, FolderKanban, RefreshCw, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock, FolderKanban, ListChecks, RefreshCw, Users } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { toast } from 'react-toastify'
 import { internalProjectService } from '@/services/api'
@@ -12,7 +12,7 @@ type Member = { id: number; user_id: number; user?: UserSummary }
 type FilterProject = { id: number; name: string; members?: Member[] }
 type DashboardSummary = {
   total_projects: number; active_projects: number; archived_projects: number; total_tasks: number
-  done_tasks: number; overdue_tasks: number; high_priority_tasks: number; overall_progress: number
+  done_tasks: number; overdue_tasks: number; high_priority_tasks: number; overall_progress: number; my_tasks: number
 }
 type StatusDistribution = { status: string; label: string; count: number }
 type ProjectHealth = {
@@ -37,7 +37,7 @@ function formatHours(hours: number): string {
 }
 
 const emptyData: DashboardData = {
-  summary: { total_projects: 0, active_projects: 0, archived_projects: 0, total_tasks: 0, done_tasks: 0, overdue_tasks: 0, high_priority_tasks: 0, overall_progress: 0 },
+  summary: { total_projects: 0, active_projects: 0, archived_projects: 0, total_tasks: 0, done_tasks: 0, overdue_tasks: 0, high_priority_tasks: 0, overall_progress: 0, my_tasks: 0 },
   status_distribution: [], projects: [], workload: [], attention_tasks: [], days: 30,
 }
 
@@ -151,12 +151,13 @@ export default function InternalProjectDashboardPage() {
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="stat-card"><div className="stat-icon bg-blue-50 text-blue-600"><FolderKanban size={19} /></div><div><div className="stat-val">{data.summary.active_projects}</div><div className="stat-label">{t('internalProjectDashboard.activeProjects', 'Active projects')}</div></div></div>
-        <div className="stat-card"><div className="stat-icon bg-emerald-50 text-emerald-600"><CheckCircle2 size={19} /></div><div><div className="stat-val">{data.summary.done_tasks}/{data.summary.total_tasks}</div><div className="stat-label">{t('internalProjectDashboard.completedTasks', 'Completed tasks')}</div></div></div>
-        <div className="stat-card"><div className="stat-icon bg-red-50 text-red-600"><AlertTriangle size={19} /></div><div><div className="stat-val">{data.summary.overdue_tasks}</div><div className="stat-label">{t('internalProjectDashboard.overdueTasks', 'Overdue tasks')}</div></div></div>
-        <div className="stat-card"><div className="stat-icon bg-violet-50 text-violet-600"><Users size={19} /></div><div><div className="stat-val">{data.summary.overall_progress}%</div><div className="stat-label">{t('internalProjectDashboard.overallProgress', 'Overall progress')}</div></div></div>
-        <div className="stat-card"><div className="stat-icon bg-amber-50 text-amber-600"><Clock size={19} /></div><div><div className="stat-val">{formatHours(todayHours)} / {formatHours(weekHours)}</div><div className="stat-label">{t('internalProjectDashboard.hoursTodayWeek', 'Hours (Today / Week)')}</div></div></div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <Link to="/internal-project/projects" className="stat-card cursor-pointer transition-shadow hover:shadow-md"><div className="stat-icon bg-blue-50 text-blue-600"><FolderKanban size={19} /></div><div><div className="stat-val">{data.summary.active_projects}</div><div className="stat-label">{t('internalProjectDashboard.activeProjects', 'Active projects')}</div></div></Link>
+        <Link to="/internal-project/my-tasks" className="stat-card cursor-pointer transition-shadow hover:shadow-md"><div className="stat-icon bg-indigo-50 text-indigo-600"><ListChecks size={19} /></div><div><div className="stat-val">{data.summary.my_tasks}</div><div className="stat-label">{t('internalProjectDashboard.myTasks', 'My tasks')}</div></div></Link>
+        <Link to="/internal-project/my-tasks?tab=completed" className="stat-card cursor-pointer transition-shadow hover:shadow-md"><div className="stat-icon bg-emerald-50 text-emerald-600"><CheckCircle2 size={19} /></div><div><div className="stat-val">{data.summary.done_tasks}/{data.summary.total_tasks}</div><div className="stat-label">{t('internalProjectDashboard.completedTasks', 'Completed tasks')}</div></div></Link>
+        <Link to="/internal-project/my-tasks?tab=overdue" className="stat-card cursor-pointer transition-shadow hover:shadow-md"><div className="stat-icon bg-red-50 text-red-600"><AlertTriangle size={19} /></div><div><div className="stat-val">{data.summary.overdue_tasks}</div><div className="stat-label">{t('internalProjectDashboard.overdueTasks', 'Overdue tasks')}</div></div></Link>
+        <Link to="/internal-project/projects" className="stat-card cursor-pointer transition-shadow hover:shadow-md"><div className="stat-icon bg-violet-50 text-violet-600"><Users size={19} /></div><div><div className="stat-val">{data.summary.overall_progress}%</div><div className="stat-label">{t('internalProjectDashboard.overallProgress', 'Overall progress')}</div></div></Link>
+        <Link to="/internal-project/timesheet" className="stat-card cursor-pointer transition-shadow hover:shadow-md"><div className="stat-icon bg-amber-50 text-amber-600"><Clock size={19} /></div><div><div className="stat-val">{formatHours(todayHours)} / {formatHours(weekHours)}</div><div className="stat-label">{t('internalProjectDashboard.hoursTodayWeek', 'Hours (Today / Week)')}</div></div></Link>
       </div>
 
       <div className="mb-5 grid gap-4 xl:grid-cols-[1.05fr_1.05fr_1.4fr]">

@@ -253,11 +253,28 @@ func (h *InternalProjectHandler) Dashboard(c *gin.Context) {
 		overallProgress = doneTasks * 100 / totalTasks
 	}
 
+	// Count my tasks (tasks assigned to current user)
+	currentUserID := getUserID(c)
+	myTasksCount := 0
+	for _, project := range projects {
+		for _, task := range project.Tasks {
+			isDone := task.Status == "done"
+			if !isDone {
+				for _, assignee := range task.Assignees {
+					if assignee.UserID == currentUserID {
+						myTasksCount++
+						break
+					}
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"summary": gin.H{
 			"total_projects": len(projects), "active_projects": activeProjects, "archived_projects": archivedProjects,
 			"total_tasks": totalTasks, "done_tasks": doneTasks, "overdue_tasks": overdueTasks,
-			"high_priority_tasks": highPriorityTasks, "overall_progress": overallProgress,
+			"high_priority_tasks": highPriorityTasks, "overall_progress": overallProgress, "my_tasks": myTasksCount,
 		},
 		"status_distribution": distribution,
 		"projects":            projectSummaries,

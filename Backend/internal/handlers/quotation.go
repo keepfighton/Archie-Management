@@ -15,8 +15,11 @@ import (
 	"gorm.io/gorm"
 )
 
-//go:embed logo_nexora.png
-var logoNexoraBytes []byte
+//go:embed assets/quotations/quotations-header.png
+var quotationHeaderBytes []byte
+
+//go:embed assets/quotations/quotations-footer.png
+var quotationFooterBytes []byte
 
 type QuotationHandler struct{ db *gorm.DB }
 
@@ -333,12 +336,14 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 		models.Quotation
 		PrintedAt    string
 		DownloadMode bool
-		LogoBase64   string
+		HeaderBase64 string
+		FooterBase64 string
 	}{
 		Quotation:    quotation,
 		PrintedAt:    time.Now().Format("02 January 2006 15:04"),
 		DownloadMode: c.Query("download") == "1",
-		LogoBase64:   base64.StdEncoding.EncodeToString(logoNexoraBytes),
+		HeaderBase64: base64.StdEncoding.EncodeToString(quotationHeaderBytes),
+		FooterBase64: base64.StdEncoding.EncodeToString(quotationFooterBytes),
 	}
 	_ = tmpl.Execute(c.Writer, data)
 }
@@ -534,16 +539,15 @@ const quotationPrintTemplate = `<!DOCTYPE html>
 <title>Quotation {{.QuoteNumber}}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:28px 32px;}
+body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;padding:22px 32px;}
 @media print{
   @page{size:A4;margin:0;}
-  body{padding:15mm;}
+  body{padding:10mm 15mm;}
   .no-print{display:none!important;}
   .page-break{page-break-before:always;}
 }
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;border-bottom:3px solid #1a3c7a;padding-bottom:10px;}
-.brand{font-size:20px;font-weight:900;color:#1a3c7a;letter-spacing:1px;}
-.brand small{display:block;font-size:10px;font-weight:400;color:#555;}
+.letterhead{width:100%;display:block;margin:0 0 14px;}
+.header{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:18px;}
 .doc-heading{text-align:right;}
 .doc-heading h1{font-size:20px;font-weight:700;color:#1a3c7a;}
 .doc-heading p{color:#444;font-size:11px;margin-top:2px;}
@@ -574,8 +578,7 @@ table td.tr{text-align:right;}
 .sig-line{height:56px;border-bottom:1px solid #333;margin:6px 0;}
 .sig-name{font-weight:700;font-size:12px;}
 .sig-ttl{color:#555;font-size:11px;}
-.doc-footer{margin-top:18px;padding-top:7px;border-top:1px solid #ccc;display:flex;gap:24px;font-size:10px;color:#555;}
-.doc-footer span{font-weight:600;color:#1a3c7a;}
+.letterfoot{width:100%;display:block;margin-top:18px;page-break-inside:avoid;}
 .tc-hdr{font-size:15px;font-weight:700;color:#1a3c7a;margin-bottom:12px;text-align:center;border-bottom:2px solid #1a3c7a;padding-bottom:7px;}
 .tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;font-size:10.5px;line-height:1.5;}
 .tc-pasal{margin-bottom:8px;}
@@ -586,10 +589,8 @@ table td.tr{text-align:right;}
 <body>
 
 <!-- HEADER -->
+<img class="letterhead" src="data:image/png;base64,{{.HeaderBase64}}" alt="PT Alfarhein Teknologi Investama">
 <div class="header">
-  <div>
-    <div class="brand"><img src="data:image/png;base64,{{.LogoBase64}}" alt="NEXORA" style="height:48px;width:auto;display:block;"></div>
-  </div>
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}</p>
@@ -685,12 +686,11 @@ table td.tr{text-align:right;}
 </div>
 
 <!-- FOOTER -->
-<div class="doc-footer">
-  <div>Dicetak: {{.PrintedAt}}</div>
-</div>
+<img class="letterfoot" src="data:image/png;base64,{{.FooterBase64}}" alt="Nexora contact information">
 
 <!-- PAGE 2: TERMS & CONDITIONS -->
 <div class="page-break">
+<img class="letterhead" src="data:image/png;base64,{{.HeaderBase64}}" alt="PT Alfarhein Teknologi Investama">
 <div class="tc-hdr">TERMS &amp; CONDITIONS</div>
 <div class="tc-grid">
 
@@ -751,6 +751,8 @@ Hal-hal yang belum cukup diatur dalam Perjanjian ini, namun Para Pihak memandang
     <div style="color:#555;font-size:11px;">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
   </div>
 </div>
+
+<img class="letterfoot" src="data:image/png;base64,{{.FooterBase64}}" alt="Nexora contact information">
 </div>
 
 {{if .DownloadMode}}

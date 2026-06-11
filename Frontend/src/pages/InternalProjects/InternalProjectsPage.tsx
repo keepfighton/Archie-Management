@@ -241,60 +241,6 @@ export default function InternalProjectsPage() {
         </div>
       </div>
 
-      {myTasks.length > 0 && (
-        <div className="card mb-5">
-          <div className="card-header cursor-pointer" onClick={() => setMyTasksCollapsed(!myTasksCollapsed)}>
-            <div className="flex items-center gap-2">
-              <AlertCircle size={16} className="text-amber-500" />
-              <p className="section-title">My Tasks ({myTasks.length})</p>
-            </div>
-            {myTasksCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </div>
-          {!myTasksCollapsed && (
-            <div className="divide-y divide-gray-100">
-              {myTasks.map(task => {
-                const isOverdue = task.due_date && new Date(task.due_date) < new Date()
-                const priorityColors: Record<string, string> = {
-                  urgent: 'badge-red',
-                  high: 'badge-orange',
-                  medium: 'badge-blue',
-                  low: 'badge-green'
-                }
-                return (
-                  <Link
-                    key={task.id}
-                    to={`/internal-project/projects/${task.project_id}`}
-                    className="flex items-center justify-between gap-3 p-4 transition hover:bg-slate-50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-gray-800">{task.title}</p>
-                      <p className="mt-0.5 truncate text-xs text-gray-400">{task.project?.name || '-'}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isOverdue && <span className="badge badge-red text-xs">Overdue</span>}
-                      {!isOverdue && task.priority && (
-                        <span className={`badge ${priorityColors[task.priority] || 'badge-gray'} text-xs`}>
-                          {task.priority}
-                        </span>
-                      )}
-                      <ArrowRight size={14} className="text-gray-300" />
-                    </div>
-                  </Link>
-                )
-              })}
-              <div className="px-4 py-3 text-center">
-                <Link
-                  to="/internal-project/my-tasks"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                >
-                  {t('internalProjectMyTasks.viewAll', 'View all my tasks')} <ArrowRight size={12} />
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       <Toolbar
         left={
           <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
@@ -372,6 +318,60 @@ export default function InternalProjectsPage() {
           </>
         )}
       </div>
+
+      {myTasks.length > 0 && (
+        <div className="card mt-5">
+          <div className="card-header cursor-pointer" onClick={() => setMyTasksCollapsed(!myTasksCollapsed)}>
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-amber-500" />
+              <p className="section-title">My Tasks ({myTasks.length})</p>
+            </div>
+            {myTasksCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </div>
+          {!myTasksCollapsed && (
+            <div className="divide-y divide-gray-100">
+              {myTasks.map(task => {
+                const isOverdue = task.due_date && new Date(task.due_date) < new Date()
+                const priorityColors: Record<string, string> = {
+                  urgent: 'badge-red',
+                  high: 'badge-orange',
+                  medium: 'badge-blue',
+                  low: 'badge-green'
+                }
+                return (
+                  <Link
+                    key={task.id}
+                    to={`/internal-project/projects/${task.project_id}`}
+                    className="flex items-center justify-between gap-3 p-4 transition hover:bg-slate-50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-gray-800">{task.title}</p>
+                      <p className="mt-0.5 truncate text-xs text-gray-400">{task.project?.name || '-'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isOverdue && <span className="badge badge-red text-xs">Overdue</span>}
+                      {!isOverdue && task.priority && (
+                        <span className={`badge ${priorityColors[task.priority] || 'badge-gray'} text-xs`}>
+                          {task.priority}
+                        </span>
+                      )}
+                      <ArrowRight size={14} className="text-gray-300" />
+                    </div>
+                  </Link>
+                )
+              })}
+              <div className="px-4 py-3 text-center">
+                <Link
+                  to="/internal-project/my-tasks"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  {t('internalProjectMyTasks.viewAll', 'View all my tasks')} <ArrowRight size={12} />
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal
         open={showForm}

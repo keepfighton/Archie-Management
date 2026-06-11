@@ -93,9 +93,17 @@ export default function InternalProjectDetailPage() {
       ])
       setProject(projectResponse.data)
       setTasks(taskResponse.data.data || [])
-    } catch {
+    } catch (error: any) {
+      console.error('Failed to load internal project:', {
+        projectId,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      })
       setProject(null)
-      toast.error(t('internalProjectDetail.loadFailed', 'Failed to load internal project'))
+      const errorMsg = error.response?.data?.error || t('internalProjectDetail.loadFailed', 'Failed to load internal project')
+      toast.error(errorMsg)
     } finally {
       if (showLoader) setLoading(false)
     }

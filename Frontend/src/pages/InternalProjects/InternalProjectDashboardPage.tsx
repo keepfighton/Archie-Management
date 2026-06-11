@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, FolderKanban, ListChecks, RefreshCw, Users } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { toast } from 'react-toastify'
@@ -52,6 +52,7 @@ const priorityBadge: Record<string, string> = {
 
 export default function InternalProjectDashboardPage() {
   const { locale, t } = useLocale()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [data, setData] = useState<DashboardData>(emptyData)
   const [filterProjects, setFilterProjects] = useState<FilterProject[]>([])
@@ -100,6 +101,12 @@ export default function InternalProjectDashboardPage() {
   useEffect(() => { void loadDashboard() }, [loadDashboard])
 
   const maxWorkload = Math.max(1, ...data.workload.map(item => item.total))
+
+  const handleWorkloadClick = (entry: any) => {
+    if (!entry || !entry.activePayload?.[0]?.payload) return
+    const member = entry.activePayload[0].payload as Workload
+    navigate(`/internal-project/my-tasks?user=${member.user_id}`)
+  }
 
   if (loading) return <div className="p-5"><Loading /></div>
 
@@ -228,9 +235,9 @@ export default function InternalProjectDashboardPage() {
         </div>
 
         <div className="card">
-          <div className="card-header"><div><p className="section-title">{t('internalProjectDashboard.workload', 'Member workload')}</p><p className="mt-0.5 text-xs text-gray-400">{t('internalProjectDashboard.workloadHint', 'Open, completed, and overdue assigned tasks')}</p></div></div>
+          <div className="card-header"><div><p className="section-title">{t('internalProjectDashboard.workload', 'Member workload')}</p><p className="mt-0.5 text-xs text-gray-400">{t('internalProjectDashboard.workloadHint', 'Open, completed, and overdue assigned tasks - Click member to view details')}</p></div></div>
           <div className="card-body">
-            {data.workload.length === 0 ? <EmptyState message={t('internalProjectDashboard.noWorkload', 'No assigned tasks for this filter.')} /> : <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.workload.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 20 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} domain={[0, maxWorkload]} /><YAxis type="category" dataKey="name" width={105} tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="open" name={t('internalProjectDashboard.open', 'Open')} fill="#3b82f6" /><Bar dataKey="done" name={t('internalProjectDashboard.done', 'Done')} fill="#10b981" /><Bar dataKey="overdue" name={t('internalProjectDashboard.overdue', 'Overdue')} fill="#ef4444" /></BarChart></ResponsiveContainer></div>}
+            {data.workload.length === 0 ? <EmptyState message={t('internalProjectDashboard.noWorkload', 'No assigned tasks for this filter.')} /> : <div className="h-72 cursor-pointer"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.workload.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 20 }} onClick={handleWorkloadClick}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" allowDecimals={false} domain={[0, maxWorkload]} /><YAxis type="category" dataKey="name" width={105} tick={{ fontSize: 11 }} /><Tooltip cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }} /><Bar dataKey="open" name={t('internalProjectDashboard.open', 'Open')} fill="#3b82f6" /><Bar dataKey="done" name={t('internalProjectDashboard.done', 'Done')} fill="#10b981" /><Bar dataKey="overdue" name={t('internalProjectDashboard.overdue', 'Overdue')} fill="#ef4444" /></BarChart></ResponsiveContainer></div>}
           </div>
         </div>
       </div>

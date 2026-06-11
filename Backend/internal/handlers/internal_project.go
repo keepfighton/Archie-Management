@@ -2024,7 +2024,14 @@ func (h *InternalProjectHandler) canDeleteTaskCollaboration(c *gin.Context, task
 // card uses the default limit, while the dedicated page can request more rows
 // and include completed tasks.
 func (h *InternalProjectHandler) GetMyTasks(c *gin.Context) {
-	userID := getUserID(c)
+	// Support viewing other user's tasks (for admin/manager)
+	targetUserID := getUserID(c)
+	if userIDParam := c.Query("user_id"); userIDParam != "" {
+		if parsed, err := strconv.ParseUint(userIDParam, 10, 64); err == nil {
+			targetUserID = uint(parsed)
+		}
+	}
+
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 	if limit < 1 {
 		limit = 5
@@ -2037,7 +2044,7 @@ func (h *InternalProjectHandler) GetMyTasks(c *gin.Context) {
 	var tasks []models.InternalTask
 	query := h.db.
 		Joins("JOIN internal_task_assignees ON internal_task_assignees.task_id = internal_tasks.id").
-		Where("internal_task_assignees.user_id = ?", userID).
+		Where("internal_task_assignees.user_id = ?", targetUserID).
 		Preload("Project").
 		Preload("Assignees.User").
 		Preload("Column")

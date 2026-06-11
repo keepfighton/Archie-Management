@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, ClipboardList, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { internalProjectService } from '@/services/api'
 import { useLocale } from '@/contexts/LocaleContext'
 import { EmptyState, FormField, Loading, StatusBadge } from '@/components/common'
 
+type UserSummary = { id: number; name: string; email: string }
 type ProjectSummary = { id: number; name: string }
 type ColumnSummary = { id: number; label: string; key: string }
+type TaskAssignee = { id: number; user_id: number; user?: UserSummary }
 type MyTask = {
   id: number
   project_id: number
@@ -19,6 +21,7 @@ type MyTask = {
   due_date?: string | null
   project?: ProjectSummary
   column?: ColumnSummary
+  assignees?: TaskAssignee[]
 }
 
 type TaskTab = 'all' | 'overdue' | 'today' | 'upcoming' | 'done'
@@ -37,19 +40,26 @@ function taskDateKey(task: MyTask) {
 
 export default function InternalProjectMyTasksPage() {
   const { locale, t } = useLocale()
+  const [searchParams] = useSearchParams()
   const [tasks, setTasks] = useState<MyTask[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<TaskTab>('all')
+  const [tab, setTab] = useState<TaskTab>(searchParams.get('tab') as TaskTab || 'all')
   const [search, setSearch] = useState('')
   const [projectID, setProjectID] = useState('')
   const [priority, setPriority] = useState('')
 
+  const userIdParam = searchParams.get('user')
+  const viewingOtherUser = !!userIdParam
+
   useEffect(() => {
-    internalProjectService.getMyTasks({ limit: 500, include_done: true })
+    const params: any = { limit: 500, include_done: true }
+    if (userIdParam) params.user_id = userIdParam
+
+    internalProjectService.getMyTasks(params)
       .then(response => setTasks(response.data.data || []))
-      .catch(() => toast.error(t('internalProjectMyTasks.loadFailed', 'Failed to load your tasks')))
+      .catch(() => toast.error(t('internalProjectMyTasks.loadFailed', 'Failed to load tasks')))
       .finally(() => setLoading(false))
-  }, [t])
+  }, [userIdParam, t])
 
   const today = localDateKey(new Date())
   const projects = useMemo(() => {
@@ -101,7 +111,20 @@ export default function InternalProjectMyTasksPage() {
     <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex items-start gap-3">
         <div className="rounded-xl bg-blue-50 p-3 text-blue-600"><ClipboardList size={22} /></div>
-        <div><h1 className="page-title">{t('internalProjectMyTasks.title', 'My Internal Tasks')}</h1><p className="mt-1 text-sm text-gray-500">{t('internalProjectMyTasks.subtitle', 'Review every internal project task assigned to you.')}</p></div>
+        <div>
+          <h1 className="page-title">
+            {viewingOtherUser
+              ? tasks.length > 0 && tasks[0].assignees?.[0]?.user?.name
+                ? `${tasks[0].assignees[0].user.name}'s Tasks`
+                : 'Member Tasks'
+              : t('internalProjectMyTasks.title', 'My Internal Tasks')}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {viewingOtherUser
+              ? 'Review all internal project tasks assigned to this member.'
+              : t('internalProjectMyTasks.subtitle', 'Review every internal project task assigned to you.')}
+          </p>
+        </div>
       </div>
       <Link to="/internal-project/projects" className="btn btn-secondary">{t('internalProjectMyTasks.openProjects', 'Open projects')}<ArrowRight size={14} /></Link>
     </div>

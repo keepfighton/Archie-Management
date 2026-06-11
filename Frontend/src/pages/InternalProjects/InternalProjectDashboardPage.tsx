@@ -245,12 +245,84 @@ export default function InternalProjectDashboardPage() {
       <div className="mb-5 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
         <div className="card overflow-hidden">
           <div className="card-header"><div><p className="section-title">{t('internalProjectDashboard.projectHealth', 'Project health')}</p><p className="mt-0.5 text-xs text-gray-400">{t('internalProjectDashboard.projectHealthHint', 'Progress and delivery risks for accessible projects')}</p></div></div>
-          {data.projects.length === 0 ? <EmptyState message={t('internalProjectDashboard.noProjects', 'No internal projects match this filter.')} /> : <div className="divide-y divide-gray-100">{data.projects.map(project => <Link key={project.id} to={`/internal-project/projects/${project.id}`} className="flex flex-col gap-3 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="truncate font-medium text-gray-800">{project.name}</p><span className={`badge ${project.status === 'active' ? 'badge-green' : 'badge-gray'}`}>{project.status}</span></div><div className="mt-2 flex items-center gap-2"><ProgressBar value={project.progress} className="max-w-52 flex-1" /><span className="text-xs font-semibold text-gray-600">{project.progress}%</span></div><p className="mt-2 text-xs text-gray-400">{project.done_tasks}/{project.total_tasks} {t('internalProjectDashboard.tasksDone', 'tasks done')} · {project.members?.length || 0} {t('internalProjectDashboard.members', 'members')}</p></div><div className="flex items-center gap-3 text-xs"><span className={project.overdue_tasks ? 'text-red-500' : 'text-gray-400'}>{project.overdue_tasks} {t('internalProjectDashboard.overdue', 'overdue')}</span><span className={project.high_priority_tasks ? 'text-orange-500' : 'text-gray-400'}>{project.high_priority_tasks} {t('internalProjectDashboard.highPriority', 'high priority')}</span><ArrowRight size={15} className="text-gray-300" /></div></Link>)}</div>}
+          {data.projects.length === 0 ? <EmptyState message={t('internalProjectDashboard.noProjects', 'No internal projects match this filter.')} /> : (
+            <>
+              <div className="divide-y divide-gray-100">
+                {data.projects.slice(0, 5).map(project => (
+                  <Link key={project.id} to={`/internal-project/projects/${project.id}`} className="flex flex-col gap-3 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-medium text-gray-800">{project.name}</p>
+                        <span className={`badge ${project.status === 'active' ? 'badge-green' : 'badge-gray'}`}>{project.status}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <ProgressBar value={project.progress} className="max-w-52 flex-1" />
+                        <span className="text-xs font-semibold text-gray-600">{project.progress}%</span>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-400">
+                        {project.done_tasks}/{project.total_tasks} {t('internalProjectDashboard.tasksDone', 'tasks done')} · {project.members?.length || 0} {t('internalProjectDashboard.members', 'members')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className={project.overdue_tasks ? 'text-red-500' : 'text-gray-400'}>
+                        {project.overdue_tasks} {t('internalProjectDashboard.overdue', 'overdue')}
+                      </span>
+                      <span className={project.high_priority_tasks ? 'text-orange-500' : 'text-gray-400'}>
+                        {project.high_priority_tasks} {t('internalProjectDashboard.highPriority', 'high priority')}
+                      </span>
+                      <ArrowRight size={15} className="text-gray-300" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {data.projects.length > 5 && (
+                <div className="border-t border-gray-100 bg-slate-50 p-3 text-center">
+                  <Link to="/internal-project/projects" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                    {t('internalProjectDashboard.viewAllProjects', 'View all projects')} ({data.projects.length}) <ArrowRight size={12} />
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <div className="card overflow-hidden">
           <div className="card-header"><div><p className="section-title">{t('internalProjectDashboard.attention', 'Needs attention')}</p><p className="mt-0.5 text-xs text-gray-400">{t('internalProjectDashboard.attentionHint', 'Overdue, high-priority, or upcoming tasks')}</p></div><span className="badge badge-orange">{data.attention_tasks.length}</span></div>
-          {data.attention_tasks.length === 0 ? <EmptyState message={t('internalProjectDashboard.noAttention', 'No urgent tasks in this period.')} /> : <div className="divide-y divide-gray-100">{data.attention_tasks.map(task => <Link key={task.id} to={`/internal-project/projects/${task.project_id}`} className="block p-4 transition hover:bg-slate-50"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{task.title}</p><p className="mt-0.5 truncate text-xs text-gray-400">{task.project_name}</p></div><span className={`badge ${priorityBadge[task.priority] || 'badge-gray'}`}>{t(`internalProjectDetail.priority.${task.priority}`, task.priority)}</span></div><div className="mt-3 flex items-center justify-between"><StatusBadge status={task.status} /><span className={`text-[11px] ${task.overdue ? 'font-medium text-red-500' : 'text-gray-400'}`}>{task.due_date ? new Date(task.due_date).toLocaleDateString(locale) : t('internalProjectDetail.noDeadline', 'No deadline')}</span></div><div className="mt-2 flex -space-x-1">{task.assignees?.slice(0, 4).map(assignee => <Avatar key={assignee.id} name={assignee.user?.name || '?'} />)}</div></Link>)}</div>}
+          {data.attention_tasks.length === 0 ? <EmptyState message={t('internalProjectDashboard.noAttention', 'No urgent tasks in this period.')} /> : (
+            <>
+              <div className="divide-y divide-gray-100">
+                {data.attention_tasks.slice(0, 5).map(task => (
+                  <Link key={task.id} to={`/internal-project/projects/${task.project_id}`} className="block p-4 transition hover:bg-slate-50">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-gray-800">{task.title}</p>
+                        <p className="mt-0.5 truncate text-xs text-gray-400">{task.project_name}</p>
+                      </div>
+                      <span className={`badge ${priorityBadge[task.priority] || 'badge-gray'}`}>
+                        {t(`internalProjectDetail.priority.${task.priority}`, task.priority)}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <StatusBadge status={task.status} />
+                      <span className={`text-[11px] ${task.overdue ? 'font-medium text-red-500' : 'text-gray-400'}`}>
+                        {task.due_date ? new Date(task.due_date).toLocaleDateString(locale) : t('internalProjectDetail.noDeadline', 'No deadline')}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex -space-x-1">
+                      {task.assignees?.slice(0, 4).map(assignee => <Avatar key={assignee.id} name={assignee.user?.name || '?'} />)}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {data.attention_tasks.length > 5 && (
+                <div className="border-t border-gray-100 bg-slate-50 p-3 text-center">
+                  <Link to="/internal-project/my-tasks?tab=overdue" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                    {t('internalProjectDashboard.viewAllAttention', 'View all attention tasks')} ({data.attention_tasks.length}) <ArrowRight size={12} />
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

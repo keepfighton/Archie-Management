@@ -58,7 +58,6 @@ export default function InternalProjectDashboardPage() {
   const [filterProjects, setFilterProjects] = useState<FilterProject[]>([])
   const [projectId, setProjectId] = useState('')
   const [userId, setUserId] = useState(searchParams.get('user') || '')
-  const [days, setDays] = useState('30')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [todayHours, setTodayHours] = useState(0)
@@ -78,7 +77,7 @@ export default function InternalProjectDashboardPage() {
     try {
       const params = { project_id: projectId || undefined, user_id: userId || undefined }
       const [dashboardResponse, timeResponse] = await Promise.all([
-        internalProjectService.dashboard({ ...params, days }),
+        internalProjectService.dashboard({ ...params, days: '30' }),
         internalProjectService.getTimeSummary(params),
       ])
       setData(dashboardResponse.data)
@@ -90,7 +89,7 @@ export default function InternalProjectDashboardPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [days, projectId, t, userId])
+  }, [projectId, t, userId])
 
   useEffect(() => {
     internalProjectService.list({ limit: 500 })
@@ -141,17 +140,8 @@ export default function InternalProjectDashboardPage() {
               </select>
             </FormField>
           </div>
-          <div className="flex-1 min-w-[150px]">
-            <FormField label={t('internalProjectDashboard.period', 'Deadline horizon')}>
-              <select className="input" value={days} onChange={event => setDays(event.target.value)}>
-                <option value="7">7 {t('internalProjectDashboard.days', 'days')}</option>
-                <option value="30">30 {t('internalProjectDashboard.days', 'days')}</option>
-                <option value="90">90 {t('internalProjectDashboard.days', 'days')}</option>
-              </select>
-            </FormField>
-          </div>
           <div className="mb-3">
-            <button className="btn btn-secondary whitespace-nowrap" onClick={() => { setProjectId(''); setUserId(''); setDays('30') }}>
+            <button className="btn btn-secondary whitespace-nowrap" onClick={() => { setProjectId(''); setUserId('') }}>
               {t('internalProjectDashboard.clear', 'Clear')}
             </button>
           </div>

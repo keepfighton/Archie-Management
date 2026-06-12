@@ -47,6 +47,10 @@ type PersonalNotification = {
   read_at?: string | null
 }
 
+type NotificationPreviewItem =
+  | { kind: 'personal'; created_at: string; item: PersonalNotification }
+  | { kind: 'announcement'; created_at: string; item: AnnouncementItem }
+
 type AuditItem = {
   id: number
   action: string
@@ -217,6 +221,7 @@ export default function Layout() {
     { key: '/internal-project/my-tasks', translationKey: 'page.internalProjectMyTasks', fallback: 'My Internal Tasks' },
     { key: '/internal-project/projects', translationKey: 'page.internalProjects', fallback: 'Internal Projects' },
     { key: '/internal-project/dashboard', translationKey: 'page.internalProjectDashboard', fallback: 'Internal Project Monitoring' },
+    { key: '/notifications', translationKey: 'layout.notifications', fallback: 'Notifications' },
     { key: '/dashboard', translationKey: 'page.dashboard', fallback: 'Dashboard' },
     { key: '/events', translationKey: 'page.events', fallback: 'Events' },
     { key: '/clients', translationKey: 'page.clients', fallback: 'Clients' },
@@ -335,7 +340,10 @@ export default function Layout() {
       return !Number.isNaN(createdAt) && createdAt > seenAt
     }).length
   }, [activeAnnouncements, lastAnnouncementsSeenAt])
-  const activePersonalNotifications = useMemo(() => personalNotifications.slice(0, 8), [personalNotifications])
+  const notificationPreviewItems = useMemo<NotificationPreviewItem[]>(() => [
+    ...personalNotifications.map(item => ({ kind: 'personal' as const, created_at: item.created_at, item })),
+    ...activeAnnouncements.map(item => ({ kind: 'announcement' as const, created_at: item.created_at, item })),
+  ].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()).slice(0, 6), [activeAnnouncements, personalNotifications])
   const unreadPersonalNotifications = useMemo(() => personalNotifications.filter(item => !item.read_at).length, [personalNotifications])
   const unreadNotifications = unreadAnnouncements + unreadPersonalNotifications
 
@@ -1070,52 +1078,30 @@ export default function Layout() {
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                       {t('layout.loadingNotifications', 'Loading notifications...')}
                     </div>
-                  ) : activePersonalNotifications.length === 0 && activeAnnouncements.length === 0 ? (
+                  ) : notificationPreviewItems.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                       {t('layout.noNotifications', 'No notifications available.')}
                     </div>
                   ) : <>
-                    {activePersonalNotifications.map(item => (
-                      <button
-                        key={`notification-${item.id}`}
-                        onClick={() => void handlePersonalNotification(item)}
-                        className={`block w-full rounded-xl border px-3 py-3 text-left transition-colors hover:bg-slate-50 ${item.read_at ? 'border-gray-100' : 'border-blue-100 bg-blue-50/40'}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium text-gray-700">{item.title}</p>
-                            {item.message && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.message}</p>}
-                          </div>
-                          {!item.read_at && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />}
-                        </div>
-                        <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
+                    {notificationPreviewItems.map(preview => preview.kind === 'personal' ? (
+                      <button key={`notification-${preview.item.id}`} onClick={() => void handlePersonalNotification(preview.item)} className={`block w-full rounded-xl border px-3 py-3 text-left transition-colors hover:bg-slate-50 ${preview.item.read_at ? 'border-gray-100' : 'border-blue-100 bg-blue-50/40'}`}>
+                        <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-gray-700">{preview.item.title}</p>{preview.item.message && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{preview.item.message}</p>}</div>{!preview.item.read_at && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />}</div>
+                        <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(preview.item.created_at, selectedLocale)}</p>
                       </button>
-                    ))}
-                    {activeAnnouncements.map(item => (
-                    <button
-                      key={`announcement-${item.id}`}
-                      onClick={() => handleNavigate('/team/announcements')}
-                      className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">{item.title}</p>
-                          {item.content && (
-                            <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>
-                          )}
-                        </div>
-                        {lastAnnouncementsSeenAt && new Date(item.created_at) > new Date(lastAnnouncementsSeenAt) && (
-                          <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red-500" />
-                        )}
-                      </div>
-                      <p className="mt-2 text-[11px] text-gray-400">
-                        {formatDateTime(item.created_at, selectedLocale)}
-                        {item.created_by?.name ? ` · ${item.created_by.name}` : ''}
-                      </p>
-                    </button>
+                    ) : (
+                      <button key={`announcement-${preview.item.id}`} onClick={() => handleNavigate('/team/announcements')} className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-slate-50">
+                        <p className="text-sm font-medium text-gray-700">{preview.item.title}</p>
+                        {preview.item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{preview.item.content}</p>}
+                        <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(preview.item.created_at, selectedLocale)}{preview.item.created_by?.name ? ` · ${preview.item.created_by.name}` : ''}</p>
+                      </button>
                     ))}
                   </>}
                 </div>
+                {!notificationsLoading && notificationPreviewItems.length > 0 && (
+                  <button type="button" onClick={() => handleNavigate('/notifications')} className="mt-3 w-full border-t border-gray-100 pt-3 text-center text-xs font-semibold text-primary hover:underline">
+                    {t('layout.viewAllNotifications', 'View all notifications')}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1338,34 +1324,30 @@ export default function Layout() {
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                     {t('layout.loadingNotifications', 'Loading notifications...')}
                   </div>
-                ) : activePersonalNotifications.length === 0 && activeAnnouncements.length === 0 ? (
+                ) : notificationPreviewItems.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-400">
                     {t('layout.noNotifications', 'No notifications available.')}
                   </div>
                 ) : <>
-                  {activePersonalNotifications.map(item => (
-                    <button
-                      key={`notification-${item.id}`}
-                      onClick={() => void handlePersonalNotification(item)}
-                      className={`block w-full rounded-xl border px-3 py-3 text-left ${item.read_at ? 'border-gray-100' : 'border-blue-100 bg-blue-50/40'}`}
-                    >
-                      <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-gray-700">{item.title}</p>{item.message && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.message}</p>}</div>{!item.read_at && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />}</div>
-                      <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
+                  {notificationPreviewItems.map(preview => preview.kind === 'personal' ? (
+                    <button key={`notification-${preview.item.id}`} onClick={() => void handlePersonalNotification(preview.item)} className={`block w-full rounded-xl border px-3 py-3 text-left ${preview.item.read_at ? 'border-gray-100' : 'border-blue-100 bg-blue-50/40'}`}>
+                      <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-gray-700">{preview.item.title}</p>{preview.item.message && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{preview.item.message}</p>}</div>{!preview.item.read_at && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />}</div>
+                      <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(preview.item.created_at, selectedLocale)}</p>
                     </button>
-                  ))}
-                  {activeAnnouncements.map(item => (
-                  <button
-                    key={`announcement-${item.id}`}
-                    onClick={() => handleNavigate('/team/announcements')}
-                    className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left"
-                  >
-                    <p className="text-sm font-medium text-gray-700">{item.title}</p>
-                    {item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.content}</p>}
-                    <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(item.created_at, selectedLocale)}</p>
-                  </button>
+                  ) : (
+                    <button key={`announcement-${preview.item.id}`} onClick={() => handleNavigate('/team/announcements')} className="block w-full rounded-xl border border-gray-100 px-3 py-3 text-left">
+                      <p className="text-sm font-medium text-gray-700">{preview.item.title}</p>
+                      {preview.item.content && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{preview.item.content}</p>}
+                      <p className="mt-2 text-[11px] text-gray-400">{formatDateTime(preview.item.created_at, selectedLocale)}</p>
+                    </button>
                   ))}
                 </>}
               </div>
+              {!notificationsLoading && notificationPreviewItems.length > 0 && (
+                <button type="button" onClick={() => handleNavigate('/notifications')} className="mt-3 w-full border-t border-gray-100 pt-3 text-center text-xs font-semibold text-primary">
+                  {t('layout.viewAllNotifications', 'View all notifications')}
+                </button>
+              )}
             </div>
           </div>
         )}

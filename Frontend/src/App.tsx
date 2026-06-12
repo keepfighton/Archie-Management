@@ -51,6 +51,7 @@ import TodoPage from '@/pages/Todo/TodoPage'
 import UsersPage from '@/pages/Settings/UsersPage'
 import AuditLogPage from '@/pages/Settings/AuditLogPage'
 import RolesPage from '@/pages/Settings/RolesPage'
+import NotificationsPage from '@/pages/Notifications/NotificationsPage'
 import { fetchMe } from '@/store/slices/authSlice'
 import { LocaleProvider } from '@/contexts/LocaleContext'
 
@@ -85,6 +86,7 @@ function AppShell() {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="clients" element={<ClientsPage />} />
         <Route path="clients/:id" element={<ClientDetailPage />} />

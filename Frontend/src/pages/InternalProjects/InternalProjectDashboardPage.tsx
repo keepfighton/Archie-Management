@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock, FolderKanban, ListChecks, RefreshCw, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock, FolderKanban, ListChecks, MapPin, RefreshCw, Users } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { toast } from 'react-toastify'
-import { internalProjectService } from '@/services/api'
+import { internalProjectService, teamService } from '@/services/api'
 import { useLocale } from '@/contexts/LocaleContext'
-import { Avatar, EmptyState, FormField, Loading, ProgressBar, StatusBadge } from '@/components/common'
+import { Avatar, ClockInModal, EmptyState, FormField, getLocationWithFallback, Loading, ProgressBar, StatusBadge, WorkMode } from '@/components/common'
+import { AppDispatch, RootState } from '@/store'
+import { fetchMe } from '@/store/slices/authSlice'
 
 type UserSummary = { id: number; name: string; email: string }
 type Member = { id: number; user_id: number; user?: UserSummary }
@@ -50,7 +53,22 @@ const priorityBadge: Record<string, string> = {
   low: 'badge-green', medium: 'badge-blue', high: 'badge-orange', urgent: 'badge-red',
 }
 
+const OFFICE_LAT = -6.2936
+const OFFICE_LNG = 106.7811
+
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const radiusM = 6371000
+  const toRad = (degree: number) => (degree * Math.PI) / 180
+  const deltaLat = toRad(lat2 - lat1)
+  const deltaLng = toRad(lng2 - lng1)
+  const calculation = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(deltaLng / 2) ** 2
+  return radiusM * 2 * Math.atan2(Math.sqrt(calculation), Math.sqrt(1 - calculation))
+}
+
 export default function InternalProjectDashboardPage() {
+  const dispatch = useDispatch<AppDispatch>()
+  const user = useSelector((state: RootState) => state.auth.user)
   const { locale, t } = useLocale()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -62,6 +80,10 @@ export default function InternalProjectDashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [todayHours, setTodayHours] = useState(0)
   const [weekHours, setWeekHours] = useState(0)
+  const [clockLoading, setClockLoading] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [showClockInModal, setShowClockInModal] = useState(false)
+  const [storedLocation, setStoredLocation] = useState<{ distanceM: number } | null>(null)
 
   const members = useMemo(() => {
     const unique = new Map<number, UserSummary>()
@@ -107,6 +129,69 @@ export default function InternalProjectDashboardPage() {
     navigate(`/internal-project/my-tasks?user=${member.user_id}`)
   }
 
+  const handleRefreshLocation = async () => {
+    setLocationLoading(true)
+    try {
+      const position = await getLocationWithFallback()
+      const distanceM = haversineM(position.coords.latitude, position.coords.longitude, OFFICE_LAT, OFFICE_LNG)
+      setStoredLocation({ distanceM })
+      const distance = distanceM >= 1000 ? `${(distanceM / 1000).toFixed(1)} km` : `${Math.round(distanceM)} m`
+      toast.success(`${t('internalProjectDashboard.locationSaved', 'Location saved')} - ${distance} ${t('internalProjectDashboard.fromOffice', 'from office')}`)
+    } catch {
+      toast.error(t('internalProjectDashboard.locationFailed', 'Unable to get location. Enable browser location access.'))
+    } finally {
+      setLocationLoading(false)
+    }
+  }
+
+  const handleClock = async () => {
+    if (!user?.clocked_in) {
+      setShowClockInModal(true)
+      return
+    }
+
+    setClockLoading(true)
+    try {
+      await teamService.clockOut()
+      await dispatch(fetchMe()).unwrap()
+      toast.success(t('internalProjectDashboard.clockOutSuccess', 'Clocked out successfully'))
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('internalProjectDashboard.clockActionFailed', 'Unable to update attendance'))
+    } finally {
+      setClockLoading(false)
+    }
+  }
+
+  const handleClockInConfirm = async (mode: WorkMode) => {
+    setShowClockInModal(false)
+    setClockLoading(true)
+    try {
+      let latitude = 0
+      let longitude = 0
+      let locationAccuracy = 0
+
+      try {
+        const position = await getLocationWithFallback()
+        latitude = position.coords.latitude
+        longitude = position.coords.longitude
+        locationAccuracy = position.coords.accuracy
+      } catch {
+        if (mode === 'WFO') {
+          toast.error(t('internalProjectDashboard.wfoLocationRequired', 'Location access is required for WFO.'))
+          return
+        }
+      }
+
+      await teamService.clockIn({ work_mode: mode, latitude, longitude, location_accuracy: locationAccuracy })
+      await dispatch(fetchMe()).unwrap()
+      toast.success(`${t('internalProjectDashboard.clockInSuccess', 'Clocked in successfully')} (${mode})`)
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || t('internalProjectDashboard.clockActionFailed', 'Unable to update attendance'))
+    } finally {
+      setClockLoading(false)
+    }
+  }
+
   if (loading) return <div className="p-5"><Loading /></div>
 
   return (
@@ -122,28 +207,63 @@ export default function InternalProjectDashboardPage() {
         </div>
       </div>
 
-      <div className="card mb-5 p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[200px]">
-            <FormField label={t('internalProjectDashboard.filterProject', 'Project')}>
-              <select className="input" value={projectId} onChange={event => setProjectId(event.target.value)}>
-                <option value="">{t('internalProjectDashboard.allProjects', 'All projects')}</option>
-                {filterProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
-            </FormField>
+      <div className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div className="card p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[200px] flex-1">
+              <FormField label={t('internalProjectDashboard.filterProject', 'Project')}>
+                <select className="input" value={projectId} onChange={event => setProjectId(event.target.value)}>
+                  <option value="">{t('internalProjectDashboard.allProjects', 'All projects')}</option>
+                  {filterProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+              </FormField>
+            </div>
+            <div className="min-w-[200px] flex-1">
+              <FormField label={t('internalProjectDashboard.filterMember', 'Member')}>
+                <select className="input" value={userId} onChange={event => setUserId(event.target.value)}>
+                  <option value="">{t('internalProjectDashboard.allMembers', 'All members')}</option>
+                  {members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
+                </select>
+              </FormField>
+            </div>
+            <div className="mb-3">
+              <button className="btn btn-secondary whitespace-nowrap" onClick={() => { setProjectId(''); setUserId('') }}>
+                {t('internalProjectDashboard.clear', 'Clear')}
+              </button>
+            </div>
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <FormField label={t('internalProjectDashboard.filterMember', 'Member')}>
-              <select className="input" value={userId} onChange={event => setUserId(event.target.value)}>
-                <option value="">{t('internalProjectDashboard.allMembers', 'All members')}</option>
-                {members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
-              </select>
-            </FormField>
-          </div>
-          <div className="mb-3">
-            <button className="btn btn-secondary whitespace-nowrap" onClick={() => { setProjectId(''); setUserId('') }}>
-              {t('internalProjectDashboard.clear', 'Clear')}
+        </div>
+
+        <div className="rounded-2xl border border-primary-200 bg-gradient-to-br from-primary-50 to-primary-100 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary-700">
+            {t('internalProjectDashboard.quickAction', 'Quick action')}
+          </p>
+          <div className="mt-4 flex flex-col gap-3">
+            {!user?.clocked_in && (
+              <button type="button" onClick={() => void handleRefreshLocation()} disabled={locationLoading} className="flex items-center justify-center gap-2 rounded-xl border border-primary-300 bg-white px-4 py-2.5 text-sm font-medium text-primary-700 transition hover:bg-primary-50 disabled:opacity-60">
+                <RefreshCw size={15} className={locationLoading ? 'animate-spin' : ''} />
+                {locationLoading ? t('internalProjectDashboard.gettingLocation', 'Getting location...') : t('internalProjectDashboard.refreshLocation', 'Refresh location')}
+              </button>
+            )}
+            {!user?.clocked_in && storedLocation && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                <MapPin size={13} className="shrink-0" />
+                <span>{t('internalProjectDashboard.locationSaved', 'Location saved')} ({storedLocation.distanceM >= 1000 ? `${(storedLocation.distanceM / 1000).toFixed(1)} km` : `${Math.round(storedLocation.distanceM)} m`} {t('internalProjectDashboard.fromOffice', 'from office')})</span>
+              </div>
+            )}
+            <button type="button" onClick={() => void handleClock()} disabled={clockLoading} className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-base font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60">
+              <Clock size={18} />
+              {clockLoading
+                ? t('internalProjectDashboard.updatingAttendance', 'Updating...')
+                : user?.clocked_in
+                  ? t('internalProjectDashboard.clockOut', 'Clock Out')
+                  : t('internalProjectDashboard.clockIn', 'Clock In')}
             </button>
+            <Link to="/team/timecards" className="flex items-center justify-center gap-2 rounded-xl border-2 border-primary-300 bg-white px-4 py-2.5 text-sm font-medium text-primary-700 transition hover:bg-primary-50">
+              <Users size={16} />
+              {t('internalProjectDashboard.viewTimeCards', 'View time cards')}
+              <ArrowRight size={14} />
+            </Link>
           </div>
         </div>
       </div>
@@ -315,6 +435,12 @@ export default function InternalProjectDashboardPage() {
           )}
         </div>
       </div>
+
+      <ClockInModal
+        open={showClockInModal}
+        onClose={() => setShowClockInModal(false)}
+        onConfirm={handleClockInConfirm}
+      />
     </div>
   )
 }

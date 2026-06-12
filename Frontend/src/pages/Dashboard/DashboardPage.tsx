@@ -686,9 +686,10 @@ export default function DashboardPage() {
           { label: 'Contract/Won',  value: funnelData.won_value,          count: funnelData.won_count,          color: '#0369a1' },
           { label: 'Project',       value: funnelData.projects_value,     count: funnelData.projects_count,     color: '#1a5276' },
         ]
-        const maxCount = Math.max(...funnelLayers.map(l => l.count || 1), 1)
-        const minW = 28
-        const widths = funnelLayers.map(l => minW + ((l.count / maxCount) * (100 - minW)))
+        // Funnel geometry represents progression between stages, not the raw item count.
+        // Keeping widths monotonic prevents equal counts from producing rectangles and
+        // later stages from widening again when an intermediate stage is empty.
+        const widths = [100, 82, 64, 48, 32]
 
         // ── Leads bar chart data ──
         const LEAD_STATUSES = ['new','qualified','discussion','negotiation','won','lost']

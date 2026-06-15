@@ -1286,6 +1286,11 @@ func (h *InternalProjectHandler) DeleteTimeLog(c *gin.Context) {
 		return
 	}
 
+	if !h.canAccess(c, task.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
 	// Check access (admin, project owner, or log owner)
 	if getUserRole(c) != "admin" && task.CreatorID != getUserID(c) && log.UserID != getUserID(c) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
@@ -1298,6 +1303,79 @@ func (h *InternalProjectHandler) DeleteTimeLog(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
+// UpdateTimeLog - Edit clock_in / clock_out dari time log yang sudah ada
+func (h *InternalProjectHandler) UpdateTimeLog(c *gin.Context) {
+	taskID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	logID, _ := strconv.ParseUint(c.Param("logId"), 10, 64)
+	if taskID == 0 || logID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	var log models.InternalTimeLog
+	if err := h.db.First(&log, logID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Time log not found"})
+		return
+	}
+
+	if log.TaskID != uint(taskID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Time log does not belong to this task"})
+		return
+	}
+
+	var task models.InternalTask
+	if err := h.db.First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	if !h.canAccess(c, task.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	if getUserRole(c) != "admin" && task.CreatorID != getUserID(c) && log.UserID != getUserID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	var req struct {
+		ClockIn  string `json:"clock_in" binding:"required"`
+		ClockOut string `json:"clock_out" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	clockIn, err := time.Parse(time.RFC3339, req.ClockIn)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid clock_in format"})
+		return
+	}
+	clockOut, err := time.Parse(time.RFC3339, req.ClockOut)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid clock_out format"})
+		return
+	}
+	if clockOut.Before(clockIn) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Clock out must be after clock in"})
+		return
+	}
+
+	log.ClockIn = clockIn
+	log.ClockOut = &clockOut
+	log.DurationSeconds = int64(clockOut.Sub(clockIn).Seconds())
+
+	if err := h.db.Save(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update time log"})
+		return
+	}
+
+	h.db.Preload("User").First(&log, log.ID)
+	c.JSON(http.StatusOK, gin.H{"data": log})
 }
 
 // GetMyTimeLogs - Get time logs user saat ini dengan filter tanggal

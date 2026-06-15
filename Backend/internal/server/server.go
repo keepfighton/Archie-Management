@@ -173,6 +173,7 @@ func (s *Server) setupRoutes() {
 			internalProjects.POST("/tasks/:id/clock-out", internalTimesheetEdit, internalProjectH.ClockOut)
 			internalProjects.GET("/tasks/:id/time-logs", internalTimesheetRead, internalProjectH.GetTimeLogs)
 			internalProjects.POST("/tasks/:id/time-logs", internalTimesheetEdit, internalProjectH.CreateManualTimeLog)
+			internalProjects.PUT("/tasks/:id/time-logs/:logId", internalTimesheetEdit, internalProjectH.UpdateTimeLog)
 			internalProjects.DELETE("/tasks/:id/time-logs/:logId", internalTimesheetEdit, internalProjectH.DeleteTimeLog)
 			internalProjects.GET("/my-time-logs", internalTimesheetRead, internalProjectH.GetMyTimeLogs)
 			internalProjects.GET("/my-active-log", internalTimesheetRead, internalProjectH.GetActiveLog)

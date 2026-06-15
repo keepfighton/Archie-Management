@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
-import { CalendarDays, ChevronLeft, Clock, GripVertical, LayoutDashboard, List, MessageSquare, Plus, Search, Trash2, Users, X } from 'lucide-react'
+import { CalendarDays, ChevronLeft, Clock, GripVertical, LayoutDashboard, List, MessageSquare, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'react-toastify'
 import type { RootState } from '@/store'
 import { internalProjectService } from '@/services/api'
@@ -79,6 +79,14 @@ export default function InternalProjectDetailPage() {
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([])
   const [activeLog, setActiveLog] = useState<TimeLog | null>(null)
   const [timeLogsLoading, setTimeLogsLoading] = useState(false)
+  const [showManualLogForm, setShowManualLogForm] = useState(false)
+  const [manualLogForm, setManualLogForm] = useState({ date: '', clock_in: '', clock_out: '' })
+  const [manualLogSaving, setManualLogSaving] = useState(false)
+  const [editLog, setEditLog] = useState<TimeLog | null>(null)
+  const [editLogForm, setEditLogForm] = useState({ date: '', clock_in: '', clock_out: '' })
+  const [editLogSaving, setEditLogSaving] = useState(false)
+  const [deleteLogId, setDeleteLogId] = useState<number | null>(null)
+  const [deleteLogLoading, setDeleteLogLoading] = useState(false)
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
   const [subtasksLoading, setSubtasksLoading] = useState(false)
   const [filters, setFilters] = useState<TaskFilters>(emptyTaskFilters)
@@ -219,6 +227,69 @@ export default function InternalProjectDetailPage() {
   const refreshTimeLogs = async () => {
     if (!editTask) return
     await loadTimeLogs(editTask.id)
+  }
+
+  const handleAddManualLog = async () => {
+    if (!editTask || !manualLogForm.date || !manualLogForm.clock_in || !manualLogForm.clock_out) return
+    const clockIn = new Date(`${manualLogForm.date}T${manualLogForm.clock_in}:00`)
+    const clockOut = new Date(`${manualLogForm.date}T${manualLogForm.clock_out}:00`)
+    if (clockOut <= clockIn) { toast.error('Jam selesai harus setelah jam mulai'); return }
+    setManualLogSaving(true)
+    try {
+      await internalProjectService.createManualTimeLog(editTask.id, {
+        clock_in: clockIn.toISOString(),
+        clock_out: clockOut.toISOString(),
+      })
+      toast.success('Log waktu ditambahkan')
+      setShowManualLogForm(false)
+      setManualLogForm({ date: '', clock_in: '', clock_out: '' })
+      await refreshTimeLogs()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menambah log')
+    } finally { setManualLogSaving(false) }
+  }
+
+  const openEditLog = (log: TimeLog) => {
+    const clockIn = new Date(log.clock_in)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const dateStr = `${clockIn.getFullYear()}-${pad(clockIn.getMonth() + 1)}-${pad(clockIn.getDate())}`
+    const inStr = `${pad(clockIn.getHours())}:${pad(clockIn.getMinutes())}`
+    const clockOut = log.clock_out ? new Date(log.clock_out) : null
+    const outStr = clockOut ? `${pad(clockOut.getHours())}:${pad(clockOut.getMinutes())}` : ''
+    setEditLog(log)
+    setEditLogForm({ date: dateStr, clock_in: inStr, clock_out: outStr })
+  }
+
+  const handleUpdateLog = async () => {
+    if (!editTask || !editLog || !editLogForm.date || !editLogForm.clock_in || !editLogForm.clock_out) return
+    const clockIn = new Date(`${editLogForm.date}T${editLogForm.clock_in}:00`)
+    const clockOut = new Date(`${editLogForm.date}T${editLogForm.clock_out}:00`)
+    if (clockOut <= clockIn) { toast.error('Jam selesai harus setelah jam mulai'); return }
+    setEditLogSaving(true)
+    try {
+      await internalProjectService.updateTimeLog(editTask.id, editLog.id, {
+        clock_in: clockIn.toISOString(),
+        clock_out: clockOut.toISOString(),
+      })
+      toast.success('Log waktu diperbarui')
+      setEditLog(null)
+      await refreshTimeLogs()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal memperbarui log')
+    } finally { setEditLogSaving(false) }
+  }
+
+  const handleDeleteLog = async () => {
+    if (!editTask || !deleteLogId) return
+    setDeleteLogLoading(true)
+    try {
+      await internalProjectService.deleteTimeLog(editTask.id, deleteLogId)
+      toast.success('Log waktu dihapus')
+      setDeleteLogId(null)
+      await refreshTimeLogs()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menghapus log')
+    } finally { setDeleteLogLoading(false) }
   }
 
   const loadSubtasks = async (taskId: number) => {
@@ -459,37 +530,180 @@ export default function InternalProjectDetailPage() {
           />
         )}
 
-        {taskModalTab === 'time' && editTask && (
-          <div className="space-y-4">
-            <TaskTimer taskId={editTask.id} activeLog={activeLog} onClockIn={handleClockIn} onClockOut={handleClockOut} onRefresh={refreshTimeLogs} />
+        {taskModalTab === 'time' && editTask && (() => {
+          const completedLogs = timeLogs.filter(l => l.clock_out)
+          const totalSeconds = completedLogs.reduce((sum, l) => sum + l.duration_seconds, 0)
+          const fmtSecs = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Time Log History</h3>
-              {timeLogsLoading ? (
-                <div className="text-center py-8 text-gray-400">Loading...</div>
-              ) : timeLogs.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">No time logs yet</div>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {timeLogs.map(log => (
-                    <div key={log.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">{log.user?.name || `User #${log.user_id}`}</p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(log.clock_in).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                          {log.clock_out && ` - ${new Date(log.clock_out).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}
-                        </p>
+          const userMap = new Map<number, { name: string; seconds: number }>()
+          completedLogs.forEach(l => {
+            const name = l.user?.name || `User #${l.user_id}`
+            const prev = userMap.get(l.user_id) || { name, seconds: 0 }
+            userMap.set(l.user_id, { name, seconds: prev.seconds + l.duration_seconds })
+          })
+          const userBreakdown = Array.from(userMap.values()).sort((a, b) => b.seconds - a.seconds)
+
+          return (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-blue-400 mb-1">Total Waktu</p>
+                  <p className="text-xl font-mono font-bold text-blue-700">{fmtSecs(totalSeconds)}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Log Entries</p>
+                  <p className="text-xl font-mono font-bold text-gray-700">{timeLogs.length}</p>
+                </div>
+              </div>
+
+              {/* Per-user breakdown */}
+              {userBreakdown.length > 1 && (
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-2">Breakdown per Anggota</p>
+                  <div className="space-y-1.5">
+                    {userBreakdown.map(u => (
+                      <div key={u.name} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600">{u.name}</span>
+                        <span className="text-xs font-mono font-semibold text-gray-700">{fmtSecs(u.seconds)}</span>
                       </div>
-                      <div className="text-sm font-mono font-semibold text-gray-600">
-                        {log.clock_out ? `${Math.floor(log.duration_seconds / 3600)}h ${Math.floor((log.duration_seconds % 3600) / 60)}m` : 'Active'}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
+
+              {/* Timer + Add Manual */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <TaskTimer taskId={editTask.id} activeLog={activeLog} onClockIn={handleClockIn} onClockOut={handleClockOut} onRefresh={refreshTimeLogs} compact />
+                </div>
+                <button
+                  className="btn btn-secondary flex items-center gap-1.5 text-xs py-1.5"
+                  onClick={() => { setShowManualLogForm(v => !v); setManualLogForm({ date: '', clock_in: '', clock_out: '' }) }}
+                >
+                  <Plus size={13} /> Manual
+                </button>
+              </div>
+
+              {/* Manual Log Form */}
+              {showManualLogForm && (
+                <div className="border border-dashed border-blue-300 bg-blue-50/50 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-blue-700">Tambah Log Manual</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-1">Tanggal</label>
+                      <input type="date" className="input text-xs py-1.5 w-full" value={manualLogForm.date} onChange={e => setManualLogForm(f => ({ ...f, date: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-1">Mulai</label>
+                      <input type="time" className="input text-xs py-1.5 w-full" value={manualLogForm.clock_in} onChange={e => setManualLogForm(f => ({ ...f, clock_in: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-1">Selesai</label>
+                      <input type="time" className="input text-xs py-1.5 w-full" value={manualLogForm.clock_out} onChange={e => setManualLogForm(f => ({ ...f, clock_out: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button className="btn btn-secondary text-xs py-1" onClick={() => setShowManualLogForm(false)}>Batal</button>
+                    <button className="btn btn-primary text-xs py-1" onClick={handleAddManualLog} disabled={manualLogSaving}>
+                      {manualLogSaving ? 'Menyimpan...' : 'Simpan'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Time Log History */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Riwayat Log</p>
+                {timeLogsLoading ? (
+                  <div className="text-center py-6 text-gray-400 text-sm">Loading...</div>
+                ) : timeLogs.length === 0 ? (
+                  <div className="text-center py-6 text-gray-400 text-sm">Belum ada log waktu</div>
+                ) : (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                    {timeLogs.map(log => (
+                      <div key={log.id} className="flex items-center gap-3 p-2.5 border border-gray-100 rounded-lg hover:bg-gray-50 group">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-700 truncate">{log.user?.name || `User #${log.user_id}`}</p>
+                          <p className="text-[11px] text-gray-400">
+                            {new Date(log.clock_in).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                            {' · '}
+                            {new Date(log.clock_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                            {log.clock_out && ` – ${new Date(log.clock_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}
+                          </p>
+                        </div>
+                        <span className={`text-xs font-mono font-semibold shrink-0 ${log.clock_out ? 'text-gray-700' : 'text-green-500'}`}>
+                          {log.clock_out ? fmtSecs(log.duration_seconds) : 'Aktif'}
+                        </span>
+                        {log.clock_out && (
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              onClick={() => openEditLog(log)}
+                              title="Edit log"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              onClick={() => setDeleteLogId(log.id)}
+                              title="Hapus log"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Edit Log Modal */}
+        {editLog && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-xl p-5 w-80 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-800">Edit Log Waktu</p>
+                <button onClick={() => setEditLog(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-1">Tanggal</label>
+                  <input type="date" className="input text-xs py-1.5 w-full" value={editLogForm.date} onChange={e => setEditLogForm(f => ({ ...f, date: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-1">Mulai</label>
+                    <input type="time" className="input text-xs py-1.5 w-full" value={editLogForm.clock_in} onChange={e => setEditLogForm(f => ({ ...f, clock_in: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-1">Selesai</label>
+                    <input type="time" className="input text-xs py-1.5 w-full" value={editLogForm.clock_out} onChange={e => setEditLogForm(f => ({ ...f, clock_out: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button className="btn btn-secondary text-xs" onClick={() => setEditLog(null)}>Batal</button>
+                <button className="btn btn-primary text-xs" onClick={handleUpdateLog} disabled={editLogSaving}>
+                  {editLogSaving ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Confirm Delete Log */}
+        <ConfirmDialog
+          open={!!deleteLogId}
+          onClose={() => setDeleteLogId(null)}
+          onConfirm={handleDeleteLog}
+          title="Hapus Log Waktu"
+          message="Log waktu ini akan dihapus permanen."
+        />
 
         {taskModalTab === 'collaboration' && editTask && project && (
           <TaskCollaboration

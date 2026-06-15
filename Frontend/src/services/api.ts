@@ -140,6 +140,8 @@ export const internalProjectService = {
   getTimeLogs: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/time-logs`),
   createManualTimeLog: (taskId: number, data: { clock_in: string; clock_out: string }) =>
     api.post(`/internal-projects/tasks/${taskId}/time-logs`, data),
+  updateTimeLog: (taskId: number, logId: number, data: { clock_in: string; clock_out: string }) =>
+    api.put(`/internal-projects/tasks/${taskId}/time-logs/${logId}`, data),
   deleteTimeLog: (taskId: number, logId: number) => api.delete(`/internal-projects/tasks/${taskId}/time-logs/${logId}`),
   getMyTimeLogs: (params?: { from?: string; to?: string }) => api.get('/internal-projects/my-time-logs', { params }),
   getProjectTimeLogs: (projectId: number, params?: { from?: string; to?: string; user_id?: string }) =>

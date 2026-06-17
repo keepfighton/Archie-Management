@@ -155,6 +155,21 @@ export const internalProjectService = {
     api.patch(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/toggle`),
   deleteSubtask: (taskId: number, subtaskId: number) =>
     api.delete(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}`),
+  updateSubtaskEstimate: (taskId: number, subtaskId: number, estimatedSeconds: number) =>
+    api.patch(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/estimate`, { estimated_seconds: estimatedSeconds }),
+  // Subtask time tracking
+  subtaskClockIn: (taskId: number, subtaskId: number) =>
+    api.post(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/clock-in`),
+  subtaskClockOut: (taskId: number, subtaskId: number) =>
+    api.post(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/clock-out`),
+  getSubtaskTimeLogs: (taskId: number, subtaskId: number) =>
+    api.get(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/time-logs`),
+  createSubtaskManualTimeLog: (taskId: number, subtaskId: number, data: { clock_in: string; clock_out: string }) =>
+    api.post(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/time-logs`, data),
+  updateSubtaskTimeLog: (taskId: number, subtaskId: number, logId: number, data: { clock_in: string; clock_out: string }) =>
+    api.put(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/time-logs/${logId}`, data),
+  deleteSubtaskTimeLog: (taskId: number, subtaskId: number, logId: number) =>
+    api.delete(`/internal-projects/tasks/${taskId}/subtasks/${subtaskId}/time-logs/${logId}`),
   // Task collaboration
   listTaskComments: (taskId: number) => api.get(`/internal-projects/tasks/${taskId}/comments`),
   createTaskComment: (taskId: number, data: { body: string; mentioned_user_ids: number[] }) =>

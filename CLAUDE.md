@@ -11,15 +11,13 @@ Aplikasi bisnis all-in-one untuk CBQA (IT Audit & Advisory Indonesia) yang menca
 | Service | Port |
 |---------|------|
 | Frontend (Vite dev) | http://localhost:3091 |
-| Backend (Go) | http://localhost:8092 |
-
-> Port 8091 dipakai Java process lain di sistem — backend lokal pakai 8092.
+| Backend (Go) | http://localhost:8091 |
 
 ### Jalankan App
 ```bash
 # Tab 1 - Backend (WAJIB dari direktori Backend/ agar .env terbaca)
 cd Backend
-PORT=8092 go run cmd/api/main.go
+PORT=8091 go run cmd/api/main.go
 
 # Tab 2 - Frontend
 cd Frontend

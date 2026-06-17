@@ -34,6 +34,7 @@ type TimeLog = {
 type Subtask = {
   id: number; task_id: number; title: string; description: string; status: string
   position: number; assignee_id: number | null; assignee?: UserSummary; due_date: string | null
+  estimated_seconds: number
 }
 type TaskFilters = {
   search: string; assigneeId: string; priority: string; category: string; columnId: string; deadline: string
@@ -521,6 +522,7 @@ export default function InternalProjectDetailPage() {
 
         {taskModalTab === 'subtasks' && editTask && (
           <SubtaskList
+            taskId={editTask.id}
             subtasks={subtasks}
             onToggle={handleToggleSubtask}
             onAdd={handleAddSubtask}

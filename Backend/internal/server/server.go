@@ -33,7 +33,7 @@ func (s *Server) setupRoutes() {
 
 	// Health check
 	s.router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "version": "1.0.2"})
+		c.JSON(200, gin.H{"status": "ok", "version": "1.0.6"})
 	})
 
 	api := s.router.Group("/api/v1")
@@ -185,6 +185,14 @@ func (s *Server) setupRoutes() {
 			internalProjects.PATCH("/tasks/:id/subtasks/:subtaskId/toggle", internalProjectsEdit, internalProjectH.ToggleSubtaskStatus)
 			internalProjects.DELETE("/tasks/:id/subtasks/:subtaskId", internalProjectsEdit, internalProjectH.DeleteSubtask)
 			internalProjects.PATCH("/tasks/:id/subtasks/reorder", internalProjectsEdit, internalProjectH.ReorderSubtasks)
+			// Subtask time tracking
+			internalProjects.POST("/tasks/:id/subtasks/:subtaskId/clock-in", internalProjectsEdit, internalProjectH.SubtaskClockIn)
+			internalProjects.POST("/tasks/:id/subtasks/:subtaskId/clock-out", internalProjectsEdit, internalProjectH.SubtaskClockOut)
+			internalProjects.GET("/tasks/:id/subtasks/:subtaskId/time-logs", internalProjectsRead, internalProjectH.GetSubtaskTimeLogs)
+			internalProjects.POST("/tasks/:id/subtasks/:subtaskId/time-logs", internalProjectsEdit, internalProjectH.CreateSubtaskManualTimeLog)
+			internalProjects.PUT("/tasks/:id/subtasks/:subtaskId/time-logs/:logId", internalProjectsEdit, internalProjectH.UpdateSubtaskTimeLog)
+			internalProjects.DELETE("/tasks/:id/subtasks/:subtaskId/time-logs/:logId", internalProjectsEdit, internalProjectH.DeleteSubtaskTimeLog)
+			internalProjects.PATCH("/tasks/:id/subtasks/:subtaskId/estimate", internalProjectsEdit, internalProjectH.UpdateSubtaskEstimate)
 			// Task collaboration
 			internalProjects.GET("/tasks/:id/comments", internalProjectsRead, internalProjectH.ListTaskComments)
 			internalProjects.POST("/tasks/:id/comments", internalProjectsEdit, internalProjectH.CreateTaskComment)

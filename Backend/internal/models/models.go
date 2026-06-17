@@ -286,26 +286,29 @@ type InternalTaskAssignee struct {
 
 type InternalTimeLog struct {
 	Base
-	TaskID          uint          `gorm:"index;not null" json:"task_id"`
-	Task            *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
-	UserID          uint          `gorm:"index;not null" json:"user_id"`
-	User            *User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	ClockIn         time.Time     `gorm:"index;not null" json:"clock_in"`
-	ClockOut        *time.Time    `gorm:"index" json:"clock_out"`
-	DurationSeconds int64         `gorm:"default:0" json:"duration_seconds"`
+	TaskID          uint              `gorm:"index;not null" json:"task_id"`
+	Task            *InternalTask     `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	SubtaskID       *uint             `gorm:"index" json:"subtask_id"`
+	Subtask         *InternalSubtask  `gorm:"foreignKey:SubtaskID;constraint:OnDelete:SET NULL" json:"subtask,omitempty"`
+	UserID          uint              `gorm:"index;not null" json:"user_id"`
+	User            *User             `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	ClockIn         time.Time         `gorm:"index;not null" json:"clock_in"`
+	ClockOut        *time.Time        `gorm:"index" json:"clock_out"`
+	DurationSeconds int64             `gorm:"default:0" json:"duration_seconds"`
 }
 
 type InternalSubtask struct {
 	Base
-	TaskID      uint          `gorm:"index;not null" json:"task_id"`
-	Task        *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
-	Title       string        `gorm:"not null" json:"title"`
-	Description string        `gorm:"type:text" json:"description"`
-	Status      string        `gorm:"default:pending;index" json:"status"` // pending, completed
-	Position    int           `gorm:"default:0;index" json:"position"`
-	AssigneeID  *uint         `gorm:"index" json:"assignee_id"`
-	Assignee    *User         `gorm:"foreignKey:AssigneeID" json:"assignee,omitempty"`
-	DueDate     *FlexTime     `json:"due_date"`
+	TaskID           uint          `gorm:"index;not null" json:"task_id"`
+	Task             *InternalTask `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"task,omitempty"`
+	Title            string        `gorm:"not null" json:"title"`
+	Description      string        `gorm:"type:text" json:"description"`
+	Status           string        `gorm:"default:pending;index" json:"status"` // pending, completed
+	Position         int           `gorm:"default:0;index" json:"position"`
+	AssigneeID       *uint         `gorm:"index" json:"assignee_id"`
+	Assignee         *User         `gorm:"foreignKey:AssigneeID" json:"assignee,omitempty"`
+	DueDate          *FlexTime     `json:"due_date"`
+	EstimatedSeconds int64         `gorm:"default:0" json:"estimated_seconds"`
 }
 
 type InternalTaskComment struct {

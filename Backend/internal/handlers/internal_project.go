@@ -2172,3 +2172,318 @@ func priorityWeight(priority string) int {
 		return 0
 	}
 }
+
+// --- Subtask Time Tracking ---
+
+func (h *InternalProjectHandler) resolveSubtask(c *gin.Context) (*models.InternalSubtask, *models.InternalTask, bool) {
+	taskID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	subtaskID, _ := strconv.ParseUint(c.Param("subtaskId"), 10, 64)
+	if taskID == 0 || subtaskID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return nil, nil, false
+	}
+
+	var task models.InternalTask
+	if err := h.db.First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return nil, nil, false
+	}
+
+	if !h.canAccess(c, task.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return nil, nil, false
+	}
+
+	var subtask models.InternalSubtask
+	if err := h.db.First(&subtask, subtaskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Subtask not found"})
+		return nil, nil, false
+	}
+
+	if subtask.TaskID != uint(taskID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subtask does not belong to this task"})
+		return nil, nil, false
+	}
+
+	return &subtask, &task, true
+}
+
+// SubtaskClockIn - Start timer untuk subtask
+func (h *InternalProjectHandler) SubtaskClockIn(c *gin.Context) {
+	subtask, _, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	userID := getUserID(c)
+	if !scheduler.ClockInAllowed(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Clock in is unavailable after the daily 23:30 WIB cutoff"})
+		return
+	}
+
+	// Check if user already has active timer
+	var activeLog models.InternalTimeLog
+	if err := h.db.Where("user_id = ? AND clock_out IS NULL", userID).First(&activeLog).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You already have an active timer. Please clock out first.", "active_task_id": activeLog.TaskID})
+		return
+	}
+
+	now := time.Now()
+	subtaskID := subtask.ID
+	log := models.InternalTimeLog{
+		TaskID:          subtask.TaskID,
+		SubtaskID:       &subtaskID,
+		UserID:          userID,
+		ClockIn:         now,
+		DurationSeconds: 0,
+	}
+
+	if err := h.db.Create(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clock in"})
+		return
+	}
+
+	h.db.Preload("User").First(&log, log.ID)
+	c.JSON(http.StatusOK, gin.H{"data": log})
+}
+
+// SubtaskClockOut - Stop timer untuk subtask
+func (h *InternalProjectHandler) SubtaskClockOut(c *gin.Context) {
+	subtask, _, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	userID := getUserID(c)
+	subtaskID := subtask.ID
+
+	var log models.InternalTimeLog
+	if err := h.db.Where("subtask_id = ? AND user_id = ? AND clock_out IS NULL", subtaskID, userID).First(&log).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active timer found for this subtask"})
+		return
+	}
+
+	now := time.Now()
+	log.ClockOut = &now
+	log.DurationSeconds = int64(now.Sub(log.ClockIn).Seconds())
+
+	if err := h.db.Save(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clock out"})
+		return
+	}
+
+	h.db.Preload("User").First(&log, log.ID)
+	c.JSON(http.StatusOK, gin.H{"data": log})
+}
+
+// GetSubtaskTimeLogs - List time logs untuk subtask
+func (h *InternalProjectHandler) GetSubtaskTimeLogs(c *gin.Context) {
+	subtask, _, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	var logs []models.InternalTimeLog
+	h.db.Where("subtask_id = ?", subtask.ID).
+		Preload("User").
+		Order("clock_in desc").
+		Find(&logs)
+
+	var totalSeconds int64
+	var activeLog *models.InternalTimeLog
+	for i := range logs {
+		totalSeconds += logs[i].DurationSeconds
+		if logs[i].ClockOut == nil {
+			activeLog = &logs[i]
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":          logs,
+		"active_log":    activeLog,
+		"total_seconds": totalSeconds,
+	})
+}
+
+// CreateSubtaskManualTimeLog - Buat manual time log untuk subtask
+func (h *InternalProjectHandler) CreateSubtaskManualTimeLog(c *gin.Context) {
+	subtask, _, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		ClockIn  string `json:"clock_in" binding:"required"`
+		ClockOut string `json:"clock_out" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	clockIn, err := time.Parse(time.RFC3339, req.ClockIn)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid clock_in format"})
+		return
+	}
+	clockOut, err := time.Parse(time.RFC3339, req.ClockOut)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid clock_out format"})
+		return
+	}
+	if clockOut.Before(clockIn) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Clock out must be after clock in"})
+		return
+	}
+
+	subtaskID := subtask.ID
+	log := models.InternalTimeLog{
+		TaskID:          subtask.TaskID,
+		SubtaskID:       &subtaskID,
+		UserID:          getUserID(c),
+		ClockIn:         clockIn,
+		ClockOut:        &clockOut,
+		DurationSeconds: int64(clockOut.Sub(clockIn).Seconds()),
+	}
+
+	if err := h.db.Create(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create time log"})
+		return
+	}
+
+	h.db.Preload("User").First(&log, log.ID)
+	c.JSON(http.StatusCreated, gin.H{"data": log})
+}
+
+// UpdateSubtaskTimeLog - Edit clock_in / clock_out dari subtask time log
+func (h *InternalProjectHandler) UpdateSubtaskTimeLog(c *gin.Context) {
+	subtask, task, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	logID, _ := strconv.ParseUint(c.Param("logId"), 10, 64)
+	if logID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid log ID"})
+		return
+	}
+
+	var log models.InternalTimeLog
+	if err := h.db.First(&log, logID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Time log not found"})
+		return
+	}
+
+	if log.SubtaskID == nil || *log.SubtaskID != subtask.ID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Time log does not belong to this subtask"})
+		return
+	}
+
+	if getUserRole(c) != "admin" && task.CreatorID != getUserID(c) && log.UserID != getUserID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	var req struct {
+		ClockIn  string `json:"clock_in" binding:"required"`
+		ClockOut string `json:"clock_out" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	clockIn, err := time.Parse(time.RFC3339, req.ClockIn)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid clock_in format"})
+		return
+	}
+	clockOut, err := time.Parse(time.RFC3339, req.ClockOut)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid clock_out format"})
+		return
+	}
+	if clockOut.Before(clockIn) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Clock out must be after clock in"})
+		return
+	}
+
+	log.ClockIn = clockIn
+	log.ClockOut = &clockOut
+	log.DurationSeconds = int64(clockOut.Sub(clockIn).Seconds())
+
+	if err := h.db.Save(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update time log"})
+		return
+	}
+
+	h.db.Preload("User").First(&log, log.ID)
+	c.JSON(http.StatusOK, gin.H{"data": log})
+}
+
+// DeleteSubtaskTimeLog - Hapus subtask time log
+func (h *InternalProjectHandler) DeleteSubtaskTimeLog(c *gin.Context) {
+	subtask, task, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	logID, _ := strconv.ParseUint(c.Param("logId"), 10, 64)
+	if logID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid log ID"})
+		return
+	}
+
+	var log models.InternalTimeLog
+	if err := h.db.First(&log, logID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Time log not found"})
+		return
+	}
+
+	if log.SubtaskID == nil || *log.SubtaskID != subtask.ID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Time log does not belong to this subtask"})
+		return
+	}
+
+	if getUserRole(c) != "admin" && task.CreatorID != getUserID(c) && log.UserID != getUserID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	if err := h.db.Delete(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete time log"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
+// UpdateSubtaskEstimate - Set estimated_seconds untuk subtask
+func (h *InternalProjectHandler) UpdateSubtaskEstimate(c *gin.Context) {
+	subtask, _, ok := h.resolveSubtask(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		EstimatedSeconds int64 `json:"estimated_seconds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.EstimatedSeconds < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Estimated seconds cannot be negative"})
+		return
+	}
+
+	subtask.EstimatedSeconds = req.EstimatedSeconds
+	if err := h.db.Save(subtask).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update estimate"})
+		return
+	}
+
+	h.db.Preload("Assignee").First(subtask, subtask.ID)
+	c.JSON(http.StatusOK, gin.H{"data": subtask})
+}

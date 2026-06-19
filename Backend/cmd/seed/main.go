@@ -51,7 +51,7 @@ func main() {
 		Email:    "admin@archieconsultant.com",
 		Password: hashPassword("Admin123!"),
 		JobTitle: "Consultant Manager",
-		Phone:    "+62-21-5551234",
+		Phone:    "+62 852 1807 1841",
 		Role:     "admin",
 		IsActive: true,
 	}
@@ -60,7 +60,7 @@ func main() {
 		Email:    "staff@archieconsultant.com",
 		Password: hashPassword("Member123!"),
 		JobTitle: "Senior Consultant",
-		Phone:    "+62-21-5555678",
+		Phone:    "+62 852 1807 1841",
 		Role:     "member",
 		IsActive: true,
 	}

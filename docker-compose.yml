@@ -2,7 +2,7 @@ services:
   # ─── PostgreSQL ──────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: nexone-postgres
+    container_name: archie-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -22,7 +22,7 @@ services:
   backend:
     build:
       context: ./Backend
-    container_name: nexone-backend
+    container_name: archie-backend
     restart: unless-stopped
     environment:
       PORT: 8080
@@ -59,11 +59,11 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
 
-      - "traefik.http.routers.nexone-nexora-api.rule=Host(`nexone.nexoratech.co`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.nexone-nexora-api.entrypoints=websecure"
-      - "traefik.http.routers.nexone-nexora-api.tls.certresolver=myresolver"
-      - "traefik.http.routers.nexone-nexora-api.service=nexone-nexora-api"
-      - "traefik.http.services.nexone-nexora-api.loadbalancer.server.port=8080"
+      - "traefik.http.routers.archie-api.rule=Host(`management.archieconsultant.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.archie-api.entrypoints=websecure"
+      - "traefik.http.routers.archie-api.tls.certresolver=myresolver"
+      - "traefik.http.routers.archie-api.service=archie-api"
+      - "traefik.http.services.archie-api.loadbalancer.server.port=8080"
 
   # ─── Frontend ────────────────────────────────────────
   frontend:
@@ -74,7 +74,7 @@ services:
         # Passing them as runtime `environment:` has no effect on the built
         # assets.  Use build args here so the Dockerfile ARG picks them up.
         VITE_API_URL: ${VITE_API_URL:-/api/v1}
-    container_name: nexone-frontend
+    container_name: archie-frontend
     restart: unless-stopped
     depends_on:
       - backend
@@ -85,11 +85,11 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
 
-      - "traefik.http.routers.nexone-nexora.rule=Host(`nexone.nexoratech.co`)"
-      - "traefik.http.routers.nexone-nexora.entrypoints=websecure"
-      - "traefik.http.routers.nexone-nexora.tls.certresolver=myresolver"
-      - "traefik.http.routers.nexone-nexora.service=nexone-nexora"
-      - "traefik.http.services.nexone-nexora.loadbalancer.server.port=80"
+      - "traefik.http.routers.archie.rule=Host(`management.archieconsultant.com`)"
+      - "traefik.http.routers.archie.entrypoints=websecure"
+      - "traefik.http.routers.archie.tls.certresolver=myresolver"
+      - "traefik.http.routers.archie.service=archie"
+      - "traefik.http.services.archie.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:

@@ -1,6 +1,6 @@
-# NEXONE The All About Tool
+# ARCHIE MANAGEMENT
 
-Full-stack clone of NEXONEß built with:
+Business management system for Archie Consultant built with:
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + Redux Toolkit
 - **Backend**: Golang (Gin) + GORM + PostgreSQL
 - **Auth**: JWT
@@ -59,9 +59,10 @@ cp .env.example .env
 docker-compose up -d
 
 # 4. Access the app
-# Frontend:  http://localhost:3000
-# Backend:   http://localhost:8080
-# pgAdmin:   http://localhost:5050  (run with: docker-compose --profile tools up -d)
+# Production: https://management.archieconsultant.com
+# Backend API: https://management.archieconsultant.com/api
+# Local Frontend:  http://localhost:3000
+# Local Backend:   http://localhost:8080
 ```
 
 ---
@@ -254,7 +255,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your@gmail.com
 SMTP_PASSWORD=your-app-password
-SMTP_FROM=noreply@cbqa.com
+SMTP_FROM=noreply@archieconsultant.com
 
 💬 WhatsApp Owner Report
 Backend menyediakan webhook WhatsApp Cloud API di:
@@ -267,7 +268,7 @@ POST /api/v1/whatsapp/webhook
 Gunakan URL public production untuk konfigurasi webhook Meta:
 
 ```text
-https://nexone.nexoratech.co/api/v1/whatsapp/webhook
+https://management.archieconsultant.com/api/v1/whatsapp/webhook
 ```
 
 Isi env berikut di `.env` root untuk Docker, atau `Backend/.env` untuk run manual:
@@ -300,5 +301,5 @@ Jalankan dengan: docker-compose --profile tools up
 
 👤 Login Default
 Role	Email	Password
-Admin	admin@cbqa.com	Admin123!
-Member	fauzi@cbqa.com	Member123!
+Admin	admin@archieconsultant.com	Admin123!
+Member	staff@archieconsultant.com	Member123!

@@ -47,27 +47,27 @@ func main() {
 
 	// ── Users ────────────────────────────────────────────────
 	adminUser := models.User{
-		Name:     "Admin CBQA",
-		Email:    "admin@cbqa.com",
+		Name:     "Admin Archie",
+		Email:    "admin@archieconsultant.com",
 		Password: hashPassword("Admin123!"),
-		JobTitle: "IT Audit Manager",
+		JobTitle: "Consultant Manager",
 		Phone:    "+62-21-5551234",
 		Role:     "admin",
 		IsActive: true,
 	}
 	memberUser := models.User{
-		Name:     "Fauzi Ramadhan",
-		Email:    "fauzi@cbqa.com",
+		Name:     "Staff Archie",
+		Email:    "staff@archieconsultant.com",
 		Password: hashPassword("Member123!"),
-		JobTitle: "Senior IT Auditor",
+		JobTitle: "Senior Consultant",
 		Phone:    "+62-21-5555678",
 		Role:     "member",
 		IsActive: true,
 	}
 	extraUsers := []models.User{
-		{Name: "Siti Rahayu", Email: "siti@cbqa.com", Password: hashPassword("Member123!"), JobTitle: "IT Auditor", Role: "member", IsActive: true},
-		{Name: "Budi Santoso", Email: "budi@cbqa.com", Password: hashPassword("Member123!"), JobTitle: "Compliance Officer", Role: "member", IsActive: true},
-		{Name: "Dewi Kusuma", Email: "dewi@cbqa.com", Password: hashPassword("Member123!"), JobTitle: "Junior Auditor", Role: "member", IsActive: true},
+		{Name: "Siti Rahayu", Email: "siti@archieconsultant.com", Password: hashPassword("Member123!"), JobTitle: "Consultant", Role: "member", IsActive: true},
+		{Name: "Budi Santoso", Email: "budi@archieconsultant.com", Password: hashPassword("Member123!"), JobTitle: "Project Manager", Role: "member", IsActive: true},
+		{Name: "Dewi Kusuma", Email: "dewi@archieconsultant.com", Password: hashPassword("Member123!"), JobTitle: "Junior Consultant", Role: "member", IsActive: true},
 	}
 
 	upsertUser := func(u *models.User) {
@@ -84,7 +84,7 @@ func main() {
 		upsertUser(&extraUsers[i])
 	}
 	allMembers := []*models.User{&adminUser, &memberUser, &extraUsers[0], &extraUsers[1], &extraUsers[2]}
-	log.Printf("  ✓ %d users (admin@cbqa.com / Admin123!, fauzi@cbqa.com / Member123!)", len(allMembers))
+	log.Printf("  ✓ %d users (admin@archieconsultant.com / Admin123!, staff@archieconsultant.com / Member123!)", len(allMembers))
 
 	// ── Clients ──────────────────────────────────────────────
 	clientsData := []struct {

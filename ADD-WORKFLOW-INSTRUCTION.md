@@ -49,7 +49,7 @@ jobs:
             set -e
 
             echo "📂 Navigating to project directory..."
-            cd /opt/archie-management
+            cd ~/archie-node/apps/archie-management
 
             echo "🔄 Pulling latest code..."
             git fetch origin main

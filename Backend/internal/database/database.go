@@ -39,6 +39,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) error {
+	// Step 1: Run AutoMigrate to create all tables first
 	if err := db.AutoMigrate(
 		&models.User{},
 		&models.Client{},
@@ -93,17 +94,18 @@ func Migrate(db *gorm.DB) error {
 		return err
 	}
 
-	// Sync table sequences after imports or manual data restoration.
+	// Step 2: Sync table sequences (AFTER tables exist)
 	tables := []string{"projects", "internal_projects", "internal_project_members", "internal_project_columns", "internal_tasks", "internal_task_assignees", "internal_time_logs", "internal_subtasks", "internal_task_comments", "internal_task_comment_mentions", "internal_task_attachments", "internal_task_reference_links", "internal_task_activities", "notifications", "tasks", "clients", "leads", "invoices", "users", "leaves"}
 	for _, table := range tables {
 		s := fmt.Sprintf(`DO $$ BEGIN PERFORM setval(pg_get_serial_sequence('%s', 'id'), COALESCE((SELECT MAX(id) FROM %s), 0) + 1, false); END $$;`, table, table)
 		if err := db.Exec(s).Error; err != nil {
-			return fmt.Errorf("failed to sync %s sequence: %w", table, err)
+			// Log but don't fail - sequence sync is optional
+			fmt.Printf("Warning: failed to sync %s sequence: %v\n", table, err)
 		}
 	}
 
-	// Recalculate progress for all projects based on their tasks
-	db.Exec(`
+	// Step 3: Recalculate progress (AFTER both projects and tasks tables exist)
+	if err := db.Exec(`
 		UPDATE projects p
 		SET progress = COALESCE((
 			SELECT CASE WHEN COUNT(*) = 0 THEN 0
@@ -112,7 +114,10 @@ func Migrate(db *gorm.DB) error {
 			FROM tasks t
 			WHERE t.project_id = p.id AND t.deleted_at IS NULL
 		), 0)
-	`)
+	`).Error; err != nil {
+		// Log but don't fail - this is just a data fix
+		fmt.Printf("Warning: failed to recalculate project progress: %v\n", err)
+	}
 
 	if err := seedInternalProjectColumns(db); err != nil {
 		return err

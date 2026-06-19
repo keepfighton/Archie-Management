@@ -1,10 +1,17 @@
 # ARCHIE MANAGEMENT
 
+[![Deploy to VPS](https://github.com/keepfighton/Archie-Management/actions/workflows/deploy.yml/badge.svg)](https://github.com/keepfighton/Archie-Management/actions/workflows/deploy.yml)
+
 Business management system for Archie Consultant built with:
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + Redux Toolkit
 - **Backend**: Golang (Gin) + GORM + PostgreSQL
 - **Auth**: JWT
-- **DevOps**: Docker Compose
+- **DevOps**: Docker Compose + GitHub Actions CI/CD
+
+## 🚀 Live Production
+- **URL**: https://management.archieconsultant.com
+- **Status**: ✅ Auto-deploy on push to `main`
+- **CI/CD**: GitHub Actions
 
 ---
 

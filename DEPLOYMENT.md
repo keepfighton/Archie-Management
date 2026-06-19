@@ -4,6 +4,35 @@
 - **Domain**: https://management.archieconsultant.com
 - **VPS IP**: 187.77.122.197
 - **GitHub**: https://github.com/keepfighton/Archie-Management
+- **CI/CD**: ✅ GitHub Actions (Auto-deploy on push to `main`)
+
+---
+
+## 🤖 CI/CD Automated Deployment
+
+Project ini sudah dilengkapi dengan **GitHub Actions** untuk automated deployment!
+
+### Quick Start CI/CD:
+1. **Setup GitHub Secrets** (one time only):
+   - Buka: https://github.com/keepfighton/Archie-Management/settings/secrets/actions
+   - Tambahkan:
+     - `VPS_HOST` = `187.77.122.197`
+     - `VPS_USER` = `root` (atau SSH username Anda)
+     - `VPS_PASSWORD` = Your VPS SSH password
+
+2. **Auto Deploy**: Setiap kali push ke `main`, otomatis deploy!
+   ```bash
+   git add .
+   git commit -m "Update feature"
+   git push origin main
+   # 🚀 Auto deployment triggered!
+   ```
+
+3. **Manual Deploy**: Via GitHub UI
+   - Buka: https://github.com/keepfighton/Archie-Management/actions
+   - Click "Run workflow"
+
+📖 **Detailed CI/CD Guide**: See [.github/CICD-SETUP.md](.github/CICD-SETUP.md)
 
 ---
 

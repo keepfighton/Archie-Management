@@ -1230,7 +1230,7 @@ const taskReportPDFTemplate = `<!DOCTYPE html>
 <body>
   <div class="header">
     <div>
-      <div class="brand">NEXONE WORKSPACE</div>
+      <div class="brand">Archie Management Workspace</div>
       <h1>Task Report</h1>
     </div>
     <div class="meta">
@@ -1274,7 +1274,7 @@ const taskReportPDFTemplate = `<!DOCTYPE html>
     </tbody>
   </table>
 
-  <div class="footer">Dokumen ini digenerate otomatis oleh NEXONE Workspace.</div>
+  <div class="footer">Dokumen ini digenerate otomatis oleh Archie Management Workspace.</div>
   <script>window.onload=function(){window.print()}</script>
 </body>
 </html>`

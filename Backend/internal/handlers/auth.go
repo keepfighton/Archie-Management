@@ -253,10 +253,10 @@ func sendResetEmail(cfg *config.Config, toEmail, toName, resetURL string) {
 	if cfg.SMTPHost == "" {
 		return
 	}
-	subject := "Reset Password NEXONE"
+	subject := "Reset Password Archie Management"
 	body := fmt.Sprintf(`<!DOCTYPE html>
 <html><body style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px">
-<h2 style="color:#2563eb">Reset Password NEXONE</h2>
+<h2 style="color:#2563eb">Reset Password Archie Management</h2>
 <p>Halo <strong>%s</strong>,</p>
 <p>Kami menerima permintaan reset password untuk akun Anda.</p>
 <p style="margin:24px 0">
@@ -267,7 +267,7 @@ func sendResetEmail(cfg *config.Config, toEmail, toName, resetURL string) {
 <p style="color:#64748b;font-size:13px">Link ini berlaku selama <strong>1 jam</strong>.<br>
 Jika Anda tidak meminta reset password, abaikan email ini.</p>
 <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
-<p style="color:#94a3b8;font-size:12px">NEXONE by Nexora</p>
+<p style="color:#94a3b8;font-size:12px">Archie Management</p>
 </body></html>`, toName, resetURL)
 
 	msg := fmt.Sprintf(

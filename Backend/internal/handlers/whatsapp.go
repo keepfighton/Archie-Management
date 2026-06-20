@@ -212,7 +212,7 @@ func (h *WhatsAppHandler) buildReply(message string) string {
 		report, err := h.ownerReport()
 		if err != nil {
 			log.Printf("failed building owner report: %v", err)
-			return "Maaf, laporan NEXONE belum bisa dibuat saat ini."
+			return "Maaf, laporan Archie Management belum bisa dibuat saat ini."
 		}
 		return formatOwnerReport(report)
 	case containsAny(normalized, "semua data", "all data", "overview", "gambaran"):
@@ -259,10 +259,10 @@ func (h *WhatsAppHandler) buildReply(message string) string {
 }
 
 func (h *WhatsAppHandler) executiveQuestionsReply() string {
-	return `NEXONE Executive Summary
+	return `Archie Management Executive Summary
 
 Pilih salah satu pertanyaan:
-1. Ringkasan NEXONE hari ini?
+1. Ringkasan Archie Management hari ini?
 2. Berapa project berjalan?
 3. Apa saja nama project berjalan?
 4. Revenue per client berapa?
@@ -275,10 +275,10 @@ Pilih salah satu pertanyaan:
 }
 
 func (h *WhatsAppHandler) menuReply() string {
-	return `NEXONE WA Assistant
+	return `Archie Management WA Assistant
 
 Contoh pertanyaan:
-- NEXONE
+- Archie Management
 - laporan
 - semua data
 - berapa project berjalan
@@ -307,7 +307,7 @@ func (h *WhatsAppHandler) businessOverviewReply() string {
 	report, err := h.ownerReport()
 	if err != nil {
 		log.Printf("failed building overview: %v", err)
-		return "Maaf, overview NEXONE belum bisa dibuat saat ini."
+		return "Maaf, overview Archie Management belum bisa dibuat saat ini."
 	}
 	return formatOwnerReport(report)
 }
@@ -339,7 +339,7 @@ func (h *WhatsAppHandler) projectOverviewReply() string {
 	var total int64
 	h.db.Model(&models.Project{}).Count(&total)
 
-	lines := []string{fmt.Sprintf("Project NEXONE: %d total", total)}
+	lines := []string{fmt.Sprintf("Project Archie Management: %d total", total)}
 	for _, row := range rows {
 		lines = append(lines, fmt.Sprintf("- %s: %d", projectStatusLabel(row.Status), row.Count))
 	}
@@ -414,7 +414,7 @@ func (h *WhatsAppHandler) clusterReply(q string) string {
 		if len(clusters) == 0 {
 			return "Belum ada cluster."
 		}
-		lines := []string{"Cluster NEXONE:"}
+		lines := []string{"Cluster Archie Management:"}
 		for i, cluster := range clusters {
 			open, completed, hold := 0, 0, 0
 			for _, project := range cluster.Projects {
@@ -433,7 +433,7 @@ func (h *WhatsAppHandler) clusterReply(q string) string {
 	}
 	var count int64
 	h.db.Model(&models.Cluster{}).Count(&count)
-	return fmt.Sprintf("Cluster NEXONE: %d", count)
+	return fmt.Sprintf("Cluster Archie Management: %d", count)
 }
 
 func (h *WhatsAppHandler) milestoneReply(q string) string {
@@ -463,7 +463,7 @@ func (h *WhatsAppHandler) milestoneReply(q string) string {
 		return "Belum ada milestone."
 	}
 
-	title := "Milestone NEXONE"
+	title := "Milestone Archie Management"
 	if hasProject {
 		title = "Milestone: " + project.Title
 	}
@@ -511,7 +511,7 @@ func (h *WhatsAppHandler) deliverableReply(q string) string {
 		return "Belum ada deliverable."
 	}
 
-	title := "Deliverable NEXONE"
+	title := "Deliverable Archie Management"
 	if hasProject {
 		title = "Deliverable: " + project.Title
 	}
@@ -557,7 +557,7 @@ func (h *WhatsAppHandler) projectPICReply(q string) string {
 	if len(projects) == 0 {
 		return "Belum ada project."
 	}
-	lines := []string{"PIC Project NEXONE:"}
+	lines := []string{"PIC Project Archie Management:"}
 	for i, project := range projects {
 		pic := "-"
 		if project.Pic != nil && project.Pic.Name != "" {
@@ -675,7 +675,7 @@ func (h *WhatsAppHandler) invoiceReply(q string) string {
 	if len(rows) == 0 {
 		return "Belum ada invoice yang cocok."
 	}
-	title := "Invoice NEXONE"
+	title := "Invoice Archie Management"
 	if label != "" {
 		title += " " + label
 	}
@@ -731,7 +731,7 @@ func (h *WhatsAppHandler) expenseReply(q string) string {
 		}
 		return strings.Join(lines, "\n")
 	}
-	return fmt.Sprintf("Expense NEXONE: %s dari %d transaksi", formatIDR(total), count)
+	return fmt.Sprintf("Expense Archie Management: %s dari %d transaksi", formatIDR(total), count)
 }
 
 func (h *WhatsAppHandler) financeReply() string {
@@ -740,7 +740,7 @@ func (h *WhatsAppHandler) financeReply() string {
 	h.db.Model(&models.Expense{}).Select("COALESCE(SUM(total),0)").Scan(&expenses)
 	h.db.Model(&models.Invoice{}).Select("COALESCE(SUM(total_amount),0)").Scan(&invoiced)
 	h.db.Model(&models.Invoice{}).Select("COALESCE(SUM(due_amount),0)").Scan(&due)
-	return fmt.Sprintf(`Keuangan NEXONE
+	return fmt.Sprintf(`Keuangan Archie Management
 Total invoice: %s
 Income diterima: %s
 Expense: %s
@@ -812,7 +812,7 @@ func (h *WhatsAppHandler) clientReply(q string) string {
 	}
 	var count int64
 	h.db.Model(&models.Client{}).Count(&count)
-	return fmt.Sprintf("Client NEXONE: %d", count)
+	return fmt.Sprintf("Client Archie Management: %d", count)
 }
 
 func (h *WhatsAppHandler) leadReply(q string) string {
@@ -906,7 +906,7 @@ func (h *WhatsAppHandler) teamReply(q string) string {
 	h.db.Model(&models.User{}).Where("is_active = true").Count(&activeMembers)
 	h.db.Model(&models.User{}).Where("is_active = true AND clocked_in = true").Count(&clockedIn)
 	h.db.Model(&models.Leave{}).Where("status = 'approved' AND DATE(start_date) <= ? AND DATE(end_date) >= ?", today, today).Count(&onLeave)
-	return fmt.Sprintf(`Team NEXONE
+	return fmt.Sprintf(`Team Archie Management
 Total member: %d
 Member aktif: %d
 Clocked in: %d
@@ -925,7 +925,7 @@ func (h *WhatsAppHandler) statusSummaryReply(title string, query *gorm.DB, label
 	if len(rows) == 0 {
 		return fmt.Sprintf("%s %s: 0", title, onlyLabel)
 	}
-	lines := []string{title + " NEXONE:"}
+	lines := []string{title + " Archie Management:"}
 	for _, row := range rows {
 		lines = append(lines, fmt.Sprintf("- %s: %d", labeler(row.Status), row.Count))
 	}
@@ -979,7 +979,7 @@ func formatOwnerReport(summary ownerReportSummary) string {
 	profit := summary.TotalIncome - summary.TotalExpenses
 	now := time.Now().In(time.FixedZone("WIB", 7*60*60)).Format("02 Jan 2006 15:04")
 
-	return fmt.Sprintf(`Ringkasan NEXONE
+	return fmt.Sprintf(`Ringkasan Archie Management
 %s WIB
 
 Project berjalan: %d

@@ -29,7 +29,7 @@
 
 ### 4. Frontend ✓
 - ✅ Frontend built successfully
-- ✅ Nginx config updated (nexone-backend → backend)
+- ✅ Nginx config updated (archie-backend → backend)
 - ✅ Frontend container running
 - ✅ Files exist di `/usr/share/nginx/html/`
 
@@ -248,21 +248,21 @@ curl -k https://management.archieconsultant.com/api/v1/health
 
 ---
 
-## 💡 Alternative: Use NEXONE Original
+## 💡 Alternative: Use Archie Management Original
 
-Kalau mau cepat, bisa gunakan NEXONE original dulu (sudah proven working):
+Kalau mau cepat, bisa gunakan Archie Management original dulu (sudah proven working):
 
 ```bash
 cd ~/archie-node/apps
-git clone https://github.com/Nexora-Tech-Team/NEXONE.git nexone-original
-cd nexone-original
+git clone https://github.com/Archie-Tech-Team/Archie Management.git archie-original
+cd archie-original
 # Edit .env untuk Archie branding
 docker compose up -d
 # Seed
 docker compose exec backend sh -c 'cd cmd/seed && go run main.go'
 ```
 
-NEXONE original routing sudah benar, tinggal ganti branding.
+Archie Management original routing sudah benar, tinggal ganti branding.
 
 ---
 

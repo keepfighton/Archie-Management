@@ -294,7 +294,7 @@ Docker volumes:
 
 ## 📝 Notes
 
-- Application menggunakan sistem NEXONE yang sudah di-customize untuk Archie Consultant
+- Application menggunakan basis sistem lama yang sudah di-customize untuk Archie Consultant
 - Database akan auto-migrate saat pertama kali backend start
 - File uploads disimpan di Docker volume yang persisten
 - Backup database minimal seminggu sekali

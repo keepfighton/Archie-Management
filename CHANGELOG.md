@@ -2,7 +2,7 @@
 
 > **Status Prod (2026-05-27 — update terakhir):**
 > Branch `main` di origin = commit `94fe127` (fix: recalc all project progress on startup)
-> Branch `nexone-full-power` = **7 commit ahead** dari main, belum di-merge/deploy
+> Branch `archie-full-power` = **7 commit ahead** dari main, belum di-merge/deploy
 > Working tree = **17 file modified + 3 untracked** — semua belum di-commit, siap naik ke prod
 
 ---
@@ -144,7 +144,7 @@ Dashboard hanya menampilkan 3 status proyek (Open, Completed, Hold). Diperlukan 
 
 ---
 
-## PENDING MERGE TO MAIN — branch `nexone-full-power` (7 commits, belum di-deploy)
+## PENDING MERGE TO MAIN — branch `archie-full-power` (7 commits, belum di-deploy)
 
 | Commit | Tanggal | Deskripsi |
 |--------|---------|-----------|
@@ -240,7 +240,7 @@ USD 2.350,50
 - `Backend/internal/models/models.go` — tambah model `AssetMasterData` (type: category/status/condition, name, color, description) menggantikan hardcoded constants
 - `Backend/internal/handlers/asset.go` — tambah `AssetMasterDataHandler` (List filter by type, Create, Update, Delete dengan proteksi: tidak bisa hapus jika nilai masih dipakai aset)
 - `Backend/internal/server/server.go` — routes baru di `/api/v1/asset-settings` (GET/POST/PUT:id/DELETE:id admin-only)
-- **Docker rebuild** — `nexone-local-backend` direbuild dengan image baru agar routes `/assets` dan `/asset-settings` tersedia
+- **Docker rebuild** — `archie-local-backend` direbuild dengan image baru agar routes `/assets` dan `/asset-settings` tersedia
 
 #### Frontend — `Frontend/src/pages/Assets/AssetsPage.tsx`
 - **Silent error on list**: `.catch()` sekarang `setAssets([]); setTotal(0)` — tidak tampilkan toast saat data kosong atau backend belum ada data

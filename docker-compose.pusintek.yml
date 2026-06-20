@@ -1,9 +1,9 @@
 services:
   postgres:
-    container_name: pusintek-nexone-postgres
+    container_name: pusintek-archie-postgres
 
   backend:
-    container_name: pusintek-nexone-backend
+    container_name: pusintek-archie-backend
 
   frontend:
-    container_name: pusintek-nexone-frontend
+    container_name: pusintek-archie-frontend

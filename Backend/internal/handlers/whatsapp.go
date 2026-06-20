@@ -200,7 +200,7 @@ func (h *WhatsAppHandler) isAllowedOwner(from string) bool {
 func (h *WhatsAppHandler) buildReply(message string) string {
 	normalized := normalizeQuestion(message)
 	switch {
-	case normalized == "nexone" || normalized == "halo nexone" || normalized == "hi nexone":
+	case normalized == "archie" || normalized == "halo archie" || normalized == "hi archie":
 		return h.executiveQuestionsReply()
 	case normalized == "help" || normalized == "bantuan" || normalized == "menu":
 		return h.menuReply()

@@ -120,7 +120,7 @@ export default function InternalProjectDetailPage() {
 
   useEffect(() => { void load() }, [projectId])
 
-  const filterStorageKey = `nexone.internal-project.${projectId}.task-filters.${currentUser?.id || 'guest'}`
+  const filterStorageKey = `archie.internal-project.${projectId}.task-filters.${currentUser?.id || 'guest'}`
   useEffect(() => {
     try {
       const saved = localStorage.getItem(filterStorageKey)

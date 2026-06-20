@@ -1,18 +1,18 @@
-# NEXONE Business & Sales Production Readiness
+# Archie Management Business & Sales Production Readiness
 
 Date: 9 June 2026
 
-Target: `https://nexone.nexoratech.co`
+Target: `https://archie.nexoratech.co`
 
 Status: Ready for release preparation. Production deployment has not been executed.
 
 ## Release Scope
 
-- Business & Sales enhancement integration from NEXONE-PCI.
-- Lead-to-Client flow and button parity with NEXONE-PCI.
+- Business & Sales enhancement integration from Archie Management-PCI.
+- Lead-to-Client flow and button parity with Archie Management-PCI.
 - Quotation, Contract, Project, Invoice, Payment, Item, and Expense enhancements.
 - Additive database schema changes through GORM AutoMigrate.
-- Nginx API routing uses the unique `nexone-backend` container hostname.
+- Nginx API routing uses the unique `archie-backend` container hostname.
 
 ## Local Acceptance
 
@@ -20,14 +20,14 @@ Status: Ready for release preparation. Production deployment has not been execut
 - Frontend TypeScript and production build passed.
 - Backend and frontend Docker images built successfully.
 - Local frontend responded on port `3000`.
-- Protected API routing reached the NEXONE backend.
+- Protected API routing reached the Archie Management backend.
 - Lead-to-Client flow was manually tested and accepted by the user.
 
 ## Git Scope
 
 Current branch: `main`
 
-Current remote: `origin` -> `Nexora-Tech-Team/NEXONE`
+Current remote: `origin` -> `Archie-Tech-Team/Archie Management`
 
 The local branch already contains one commit not yet on `origin/main`:
 
@@ -67,7 +67,7 @@ Production database backup is mandatory before restarting the backend because mi
 ## Pre-Deploy Checklist
 
 - Confirm production `.env` is present and not modified by the release.
-- Confirm `ENV=production`, `APP_URL=https://nexone.nexoratech.co`, and `VITE_API_URL=/api/v1`.
+- Confirm `ENV=production`, `APP_URL=https://archie.nexoratech.co`, and `VITE_API_URL=/api/v1`.
 - Confirm JWT, SMTP, WhatsApp, and PostgreSQL secrets are populated.
 - Confirm the external Docker network `web` exists.
 - Confirm free disk space for image build and database backup.
@@ -80,9 +80,9 @@ Production database backup is mandatory before restarting the backend because mi
 Run on the production server before deployment:
 
 ```bash
-docker exec nexone-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > nexone-pre-business-sales-2026-06-09.dump
-docker inspect nexone-backend --format '{{.Image}}'
-docker inspect nexone-frontend --format '{{.Image}}'
+docker exec archie-postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > archie-pre-business-sales-2026-06-09.dump
+docker inspect archie-backend --format '{{.Image}}'
+docker inspect archie-frontend --format '{{.Image}}'
 ```
 
 Store the dump outside the application directory or copy it to protected backup storage.
@@ -102,7 +102,7 @@ Do not use `docker compose down -v`; it would remove persistent database and upl
 
 ## Production Smoke Test
 
-- Open `https://nexone.nexoratech.co` and log in with an authorized account.
+- Open `https://archie.nexoratech.co` and log in with an authorized account.
 - Confirm dashboard and navigation load without API errors.
 - Verify Lead list and Kanban views.
 - Move or edit a test Lead to Won and confirm the `-> Client` button appears.
@@ -118,7 +118,7 @@ Do not use `docker compose down -v`; it would remove persistent database and upl
 ## Technical Verification
 
 ```bash
-curl -I https://nexone.nexoratech.co
+curl -I https://archie.nexoratech.co
 docker compose ps
 docker compose logs --tail=200 backend
 ```

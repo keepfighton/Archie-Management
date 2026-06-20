@@ -6,15 +6,15 @@ Tanggal pembaruan: 10 Juni 2026 (Monitoring & Access Hardening)
 
 Module `Internal Project` digunakan untuk mengelola dan memonitor proyek internal perusahaan yang tidak terhubung dengan client, contract, invoice, payment, atau project operasional berbasis client.
 
-Module menggunakan user terdaftar NEXONE untuk owner, member, dan assignee, tetapi seluruh data proyek dan task disimpan pada tabel khusus yang terpisah dari module Project existing.
+Module menggunakan user terdaftar Archie Management untuk owner, member, dan assignee, tetapi seluruh data proyek dan task disimpan pada tabel khusus yang terpisah dari module Project existing.
 
 ## ⚠️ PENTING: Port Configuration
 
-**NEXONE** (Project ini):
+**Archie Management** (Project ini):
 - Frontend: **Port 3000** (http://localhost:3000)
 - Backend: **Port 8080** (http://localhost:8080)
 
-**NEXONE-PCI** (Project terpisah):
+**Archie Management-PCI** (Project terpisah):
 - Frontend: **Port 3010** (http://localhost:3010)
 - Backend: **Port 8080** (sama, tapi instance berbeda)
 
@@ -54,8 +54,8 @@ Status: **Selesai**
 
 - Internal Project dipisahkan dari tabel `projects` milik project client.
 - Tidak memiliki relasi ke client, contract, quotation, invoice, payment, atau finance.
-- Tetap menggunakan user NEXONE sebagai owner, member, creator, dan assignee.
-- Pola fitur mengacu pada module Project NEXTOOLS, sedangkan UI mengikuti style NEXONE.
+- Tetap menggunakan user Archie Management sebagai owner, member, creator, dan assignee.
+- Pola fitur mengacu pada module Project NEXTOOLS, sedangkan UI mengikuti style Archie Management.
 
 ### 2. Navigasi Module
 
@@ -117,7 +117,7 @@ Status: **Selesai**
 
 Status: **Selesai**
 
-- Owner/admin dapat menambahkan user NEXONE sebagai anggota.
+- Owner/admin dapat menambahkan user Archie Management sebagai anggota.
 - Owner/admin dapat mengeluarkan anggota.
 - Owner tidak dapat dikeluarkan dari proyek.
 - Anggota proyek dapat melihat susunan tim.
@@ -133,7 +133,7 @@ Status: **Selesai**
 - Tampilan Task List.
 - Link dari daftar proyek menuju detail workspace.
 - Indikator jumlah task selesai dan overdue.
-- Tampilan responsive mengikuti UI/UX NEXONE.
+- Tampilan responsive mengikuti UI/UX Archie Management.
 
 ### 7. Kolom Kanban
 
@@ -277,7 +277,7 @@ Status: **Selesai**
 - 8 API service methods ditambahkan ke `internalProjectService`
 - Format durasi: live update setiap 1 detik
 - Sistem validasi 1 timer aktif per user di backend
-- UI mengikuti theme NEXONE existing (primary, slate, badges)
+- UI mengikuti theme Archie Management existing (primary, slate, badges)
 
 **Belum diimplementasikan (optional future enhancement):**
 - ❌ Export timesheet ke Excel/PDF
@@ -335,7 +335,7 @@ Status: **Selesai**
 - Subtask support assignee & due_date (optional)
 - Position-based ordering (drag-drop ready)
 - Status: "pending" atau "completed"
-- UI mengikuti theme NEXONE (slate, green checkboxes)
+- UI mengikuti theme Archie Management (slate, green checkboxes)
 
 **Belum diimplementasikan (optional future):**
 - ❌ Drag & drop reorder UI (endpoint sudah ready)
@@ -364,7 +364,7 @@ Pengembangan lanjutan:
 
 - Activity lebih detail untuk perubahan assignee dan nilai field sebelum/sesudah.
 - Rich text editor dan inline image preview.
-- Notifikasi mention masuk ke panel notification NEXONE (Section 17).
+- Notifikasi mention masuk ke panel notification Archie Management (Section 17).
 
 ### 15. Pengaturan Kolom Kanban
 
@@ -416,7 +416,7 @@ Sudah diimplementasikan:
 - Reminder task yang jatuh tempo dalam tiga hari.
 - Reminder task overdue.
 - Status unread/read dan aksi tandai semua dibaca.
-- Integrasi dengan panel lonceng NEXONE bersama pengumuman perusahaan.
+- Integrasi dengan panel lonceng Archie Management bersama pengumuman perusahaan.
 - Klik notifikasi membuka workspace Internal Project terkait.
 
 Pengembangan lanjutan:
@@ -565,7 +565,7 @@ Target pekerjaan:
 - Backup database production.
 - Verifikasi migration idempotent.
 - Commit perubahan terpilih tanpa file lokal yang tidak terkait.
-- Push ke repository NEXONE.
+- Push ke repository Archie Management.
 - Build production image.
 - Deploy backend dan frontend.
 - Health check API dan frontend.
@@ -601,25 +601,25 @@ Module Internal Project dapat dinyatakan selesai apabila:
 
 ### Environment Lokal
 
-**Backend NEXONE:**
+**Backend Archie Management:**
 - Status: ✅ Running
 - Port: 8080
 - URL: http://localhost:8080
 - Health check: http://localhost:8080/health → `{"status":"ok","version":"1.0.2"}`
 - Database migration: Auto-migrated (time log, subtask, comments, mentions, attachments, links, dan activities)
 
-**Frontend NEXONE:**
+**Frontend Archie Management:**
 - Status: ✅ Running
-- Port: 3000 (CATAT: ini NEXONE, bukan NEXONE-PCI di 3010)
+- Port: 3000 (CATAT: ini Archie Management, bukan Archie Management-PCI di 3010)
 - URL: http://localhost:3000
 - Vite dev server dengan HMR
 - Proxy: `/api` → `http://localhost:8080` (Fixed dari 8082)
 
-**Frontend NEXONE-PCI:**
+**Frontend Archie Management-PCI:**
 - Status: ✅ Running (tidak terpengaruh)
 - Port: 3010
 - URL: http://localhost:3010
-- Tetap aman, tidak kesenggol saat restart NEXONE
+- Tetap aman, tidak kesenggol saat restart Archie Management
 
 ### File Yang Sudah Dimodifikasi
 
@@ -716,7 +716,7 @@ Module Internal Project dapat dinyatakan selesai apabila:
 - **Multi bahasa:** Title menjadi `Monitoring Proyek Internal` untuk Bahasa Indonesia dan `Internal Project Monitoring` untuk Bahasa Inggris.
 - **Kompatibilitas teknis:** Route `/internal-project/dashboard`, endpoint `/api/v1/internal-projects/dashboard`, permission key `internal-project.dashboard`, serta nama file/class tetap dipertahankan agar integrasi tidak rusak.
 - **Keputusan SOP Kanban:** Pengaturan custom column tidak diperlukan. Tujuh kolom default dipertahankan sebagai workflow baku perusahaan.
-- **Notifikasi Internal Project:** Assignment, perubahan status, komentar, mention, deadline, dan overdue sudah masuk ke panel lonceng NEXONE dengan status unread/read.
+- **Notifikasi Internal Project:** Assignment, perubahan status, komentar, mention, deadline, dan overdue sudah masuk ke panel lonceng Archie Management dengan status unread/read.
 
 ### 10 Juni 2026
 - **Monitoring Hours Today:** agregasi tim dan anggota menggunakan endpoint backend khusus dengan timezone Asia/Jakarta.
@@ -728,6 +728,6 @@ Module Internal Project dapat dinyatakan selesai apabila:
 - **Timesheet member filter:** pilihan user kini dimuat dari anggota project yang dipilih dan dapat digunakan oleh pemegang permission Project maupun Timesheet.
 - **Release validation:** backend test, frontend ESLint, production build, Linux backend build, Docker Compose config, dan `git diff --check` lulus.
 - **Release safety:** upload runtime, Docker override lokal, dan dokumen Word pribadi dikecualikan dari Git.
-- **Production deployment:** release `25fe2a1` dibangun dan dijalankan pada `https://nexone.nexoratech.co`.
+- **Production deployment:** release `25fe2a1` dibangun dan dijalankan pada `https://archie.nexoratech.co`.
 - **Database safety:** backup PostgreSQL terkompresi dibuat dan diverifikasi sebelum container aplikasi diganti.
 - **Production smoke test:** frontend, login, Internal Project list, Monitoring, dan My Tasks merespons HTTP 200; seluruh tabel baru tersedia dan log backend bersih.

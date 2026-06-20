@@ -1,4 +1,4 @@
-# NEXONE - Project Context for Claude
+# ARCHIE MANAGEMENT - Project Context for Claude
 
 ## Overview
 Aplikasi bisnis all-in-one untuk CBQA (IT Audit & Advisory Indonesia) yang mencakup manajemen klien, sales, proyek internal, keuangan, dan komunikasi. Dibangun untuk kebutuhan tim IT Audit PUSINTEK.
@@ -323,7 +323,7 @@ DB_PASSWORD=cbqa123
 DB_NAME=cbqa_db
 
 # Auth
-JWT_SECRET=nexone-local-dev-secret-2026
+JWT_SECRET=archie-management-local-dev-secret-2026
 JWT_EXP_HOURS=24
 
 # SMTP (kosongkan untuk dev — tidak error)
@@ -354,7 +354,7 @@ docker-compose down
 Volume: `postgres_data` (DB), `uploads_data` (file upload → `/app/uploads`)
 
 ## GitHub
-- Remote NEXONE: https://github.com/Nexora-Tech-Team/NEXONE (branch: Dev_Har, main)
+- Remote Archie Management: https://github.com/keepfighton/Archie-Management (branch: main)
 - Struktur root: `Backend/`, `Frontend/`, `docker-compose.yml`
 
 ## Changelog

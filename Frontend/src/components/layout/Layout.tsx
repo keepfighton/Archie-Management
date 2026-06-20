@@ -7,7 +7,7 @@ import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import { auditService, notificationService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
 import { useLocale } from '@/contexts/LocaleContext'
-import nexoraLogoUrl from '../../../logo/Logo_Nexora_Part.png'
+import nexoraLogoUrl from '../../../assets/Logo-Archie.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
   TrendingUp, Menu, Search,
@@ -77,8 +77,8 @@ type LocaleOption = {
   fallbackDescription: string
 }
 
-const RECENT_VISITS_KEY = 'nexone.recent-visits'
-const ANNOUNCEMENTS_SEEN_KEY = 'nexone.announcements.last-seen'
+const RECENT_VISITS_KEY = 'archie.recent-visits'
+const ANNOUNCEMENTS_SEEN_KEY = 'archie.announcements.last-seen'
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'task', label: 'New task', description: 'Create and assign a task', to: '/tasks', menu: 'tasks', icon: CheckSquare },
@@ -1113,7 +1113,7 @@ export default function Layout() {
                 aria-haspopup="menu"
               >
                 <div className="flex h-9 items-center rounded-lg bg-white px-1">
-                  <img src={nexoraLogoUrl} alt="Nexora" className="h-7 w-auto object-contain" />
+                  <img src={nexoraLogoUrl} alt="Archie" className="h-7 w-auto object-contain" />
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="max-w-[160px] truncate text-sm font-semibold text-gray-700">{user?.name}</p>

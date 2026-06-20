@@ -8,7 +8,7 @@ import {
   translate,
 } from '@/i18n/messages'
 
-export const LOCALE_STORAGE_KEY = 'nexone.locale'
+export const LOCALE_STORAGE_KEY = 'archie.locale'
 
 type TranslateVariables = Record<string, string | number>
 

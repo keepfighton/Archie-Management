@@ -7,7 +7,7 @@
 set -e  # Exit on error
 
 echo "======================================"
-echo "NEXONE Internal Project Fix Deployment"
+echo "Archie Management Internal Project Fix Deployment"
 echo "======================================"
 echo ""
 
@@ -20,9 +20,9 @@ NC='\033[0m' # No Color
 
 # Config - EDIT THESE IF NEEDED
 SERVER_USER="ubuntu"
-SERVER_HOST="72.61.209.201"  # nexone.nexoratech.co
+SERVER_HOST="72.61.209.201"  # archie.nexoratech.co
 SSH_KEY="~/.ssh/979798.pem"
-DEPLOY_PATH="/opt/nexone"
+DEPLOY_PATH="/opt/archie"
 
 echo -e "${BLUE}📋 Pre-deployment Checklist${NC}"
 echo "1. Changes committed: ✅"
@@ -77,7 +77,7 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_HOST" << 'ENDSSH'
 set -e
 
 echo "📂 Navigate to deploy directory..."
-cd /opt/nexone || { echo "❌ Deploy directory not found"; exit 1; }
+cd /opt/archie || { echo "❌ Deploy directory not found"; exit 1; }
 
 echo "🔄 Pull latest changes..."
 git pull origin main
@@ -94,7 +94,7 @@ docker-compose up -d frontend
 echo "✅ Deployment complete!"
 echo ""
 echo "📋 Checking container status..."
-docker ps | grep nexone
+docker ps | grep archie
 
 echo ""
 echo "📝 Recent logs:"
@@ -110,7 +110,7 @@ echo -e "${GREEN}✅ Deployment Complete!${NC}"
 echo -e "${GREEN}================================${NC}"
 echo ""
 echo -e "${BLUE}📊 Next Steps:${NC}"
-echo "1. Open browser: https://nexone.nexoratech.co/internal-project/projects/1"
+echo "1. Open browser: https://archie.nexoratech.co/internal-project/projects/1"
 echo "2. Press F12 → Console tab"
 echo "3. Check for detailed error logs (should see full error object now)"
 echo "4. Share the console output for further analysis"

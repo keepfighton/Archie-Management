@@ -1,10 +1,10 @@
-# NEXONE Business & Sales Enhancements
+# Archie Management Business & Sales Enhancements
 
 Date: 9 June 2026
 
 ## Objective
 
-Bring the Business & Sales capabilities from NEXONE-PCI into NEXONE while retaining newer NEXONE features such as Cluster, PIC, Milestones, Deliverables, WhatsApp, messaging/presence, granular permissions, and the current Asset Management implementation.
+Bring the Business & Sales capabilities from Archie Management-PCI into Archie Management while retaining newer Archie Management features such as Cluster, PIC, Milestones, Deliverables, WhatsApp, messaging/presence, granular permissions, and the current Asset Management implementation.
 
 The integration was performed selectively. Whole backend files were not replaced because the two projects have diverged.
 
@@ -24,7 +24,7 @@ Items -> Expenses -> Reports
 
 ## Leads
 
-- The Lead-to-Client conversion flow and buttons now match NEXONE-PCI exactly.
+- The Lead-to-Client conversion flow and buttons now match Archie Management-PCI exactly.
 - The `-> Client` action is displayed only for a Won lead that has not been converted.
 - After conversion, the action is replaced by the `Client` converted indicator.
 - Conversion creates a Client from the lead name, email, and phone, then sets the lead status to `won` and stores `converted_client_id`.
@@ -34,7 +34,7 @@ Items -> Expenses -> Reports
 - Rollback clears `converted_client_id` and allows conversion again.
 - Changing a converted lead away from `won` clears its client link.
 - Added API endpoint: `POST /api/v1/leads/:id/rollback`.
-- List and Kanban views display the conversion action before conversion and the Client indicator afterward, matching NEXONE-PCI.
+- List and Kanban views display the conversion action before conversion and the Client indicator afterward, matching Archie Management-PCI.
 
 ## Quotations
 
@@ -46,7 +46,7 @@ Items -> Expenses -> Reports
 - Improved item loading and item-management workflow.
 - Added conversion modal for creating invoices with custom number, dates, totals, and notes.
 - Finance policy keeps converted invoices unpaid until payment is manually verified.
-- Existing quotation print fixes and NEXONE branding behavior were retained where newer.
+- Existing quotation print fixes and Archie Management branding behavior were retained where newer.
 
 ## Contracts
 
@@ -78,7 +78,7 @@ Items -> Expenses -> Reports
   - Project title.
   - Price and currency.
   - Start date and deadline.
-- Existing NEXONE Cluster and PIC fields were retained.
+- Existing Archie Management Cluster and PIC fields were retained.
 - Existing Project Detail, Milestones, Deliverables, and task behavior were retained.
 
 ## Invoices
@@ -94,7 +94,7 @@ Items -> Expenses -> Reports
 - Added delete action from the invoice list.
 - Invoice list preloads payments and parent invoice data.
 - Recalculation preserves stored subtotal when an invoice has no line items.
-- Existing NEXONE overdue detection and overpayment validation were retained.
+- Existing Archie Management overdue detection and overpayment validation were retained.
 - Payments remain manual; child invoices do not automatically create payments.
 
 ## Payments
@@ -154,10 +154,10 @@ No existing tables or business records were deleted or reset.
 The frontend Nginx API proxy now uses the unique container hostname:
 
 ```text
-nexone-backend:8080
+archie-backend:8080
 ```
 
-This prevents the generic Docker network alias `backend` from routing NEXONE requests to another project's backend.
+This prevents the generic Docker network alias `backend` from routing Archie Management requests to another project's backend.
 
 ## Files Updated
 
@@ -208,8 +208,8 @@ Completed checks:
   - Payments.
   - Items.
   - Expenses.
-- The Lead-to-Client flow was manually validated and accepted on local NEXONE on 9 June 2026.
-- `Frontend/src/pages/Leads/LeadsPage.tsx` was verified identical to the NEXONE-PCI implementation.
+- The Lead-to-Client flow was manually validated and accepted on local Archie Management on 9 June 2026.
+- `Frontend/src/pages/Leads/LeadsPage.tsx` was verified identical to the Archie Management-PCI implementation.
 
 ## Known Technical Notes
 

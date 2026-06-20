@@ -68,9 +68,9 @@ echo "   - SMTP: smtp.hostinger.com"
 echo ""
 echo "Step 4: Fixing Frontend nginx config..."
 # Check if nginx conf has old name
-if grep -q "nexone-backend" Frontend/nginx.conf 2>/dev/null; then
-    echo "   Updating nexone-backend → backend in nginx.conf"
-    sed -i 's/nexone-backend/backend/g' Frontend/nginx.conf
+if grep -q "archie-backend" Frontend/nginx.conf 2>/dev/null; then
+    echo "   Updating archie-backend → backend in nginx.conf"
+    sed -i 's/archie-backend/backend/g' Frontend/nginx.conf
     echo "   ✅ nginx.conf fixed"
 else
     echo "   ✅ nginx.conf already correct (or doesn't exist)"

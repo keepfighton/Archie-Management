@@ -371,7 +371,7 @@ export default function InvoicesPage() {
       <div className="p-5">
         <div className="print-header">
           <h1>Invoice List</h1>
-          <p>PT NEXORA TECH • Printed on {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p>PT Archie TECH • Printed on {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <PageHeader
         title="Invoices"

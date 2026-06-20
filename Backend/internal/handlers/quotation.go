@@ -686,7 +686,7 @@ table td.tr{text-align:right;}
 </div>
 
 <!-- FOOTER -->
-<img class="letterfoot" src="data:image/png;base64,{{.FooterBase64}}" alt="Nexora contact information">
+<img class="letterfoot" src="data:image/png;base64,{{.FooterBase64}}" alt="Archie contact information">
 
 <!-- PAGE 2: TERMS & CONDITIONS -->
 <div class="page-break">
@@ -752,7 +752,7 @@ Hal-hal yang belum cukup diatur dalam Perjanjian ini, namun Para Pihak memandang
   </div>
 </div>
 
-<img class="letterfoot" src="data:image/png;base64,{{.FooterBase64}}" alt="Nexora contact information">
+<img class="letterfoot" src="data:image/png;base64,{{.FooterBase64}}" alt="Archie contact information">
 </div>
 
 {{if .DownloadMode}}

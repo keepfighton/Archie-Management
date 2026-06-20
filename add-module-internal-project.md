@@ -4,7 +4,7 @@ Date: 9 June 2026
 
 ## Objective
 
-Add a new left-navigation module named `Internal Project` in NEXONE as the initial shell for the upcoming internal project management feature.
+Add a new left-navigation module named `Internal Project` in Archie Management as the initial shell for the upcoming internal project management feature.
 
 ## Navigation Added
 
@@ -52,8 +52,8 @@ internal-project.reports
 - `Monitoring` is active and opens `/internal-project/dashboard`.
 - `Timesheet` is active and opens `/internal-project/timesheet`.
 - `Reports` is active and opens `/internal-project/reports`.
-- The Project page follows the existing NEXONE UI/UX pattern: page header, summary cards, status tabs, search, responsive table, pagination, modal forms, confirmation dialog, and toast feedback.
-- Registered NEXONE users can access the module. Admins see all projects; other users see projects where they are owner/member.
+- The Project page follows the existing Archie Management UI/UX pattern: page header, summary cards, status tabs, search, responsive table, pagination, modal forms, confirmation dialog, and toast feedback.
+- Registered Archie Management users can access the module. Admins see all projects; other users see projects where they are owner/member.
 - Project owners and admins can edit project information and manage members. Only admins can permanently delete projects.
 - The page supports English and Bahasa Indonesia labels.
 - Existing Dashboard and Operations > Projects modules remain unchanged.
@@ -169,7 +169,7 @@ The detail workspace now provides:
 - Kanban and task-list views.
 - Task create, update, and delete flows.
 - Drag-and-drop movement between Backlog, To Do, Development, Review, UAT, Deploy To Production, and Done.
-- Multiple assignees selected from registered NEXONE users who are already project members.
+- Multiple assignees selected from registered Archie Management users who are already project members.
 - Task category, priority, description, deadline, and overdue indicator.
 - Task collaboration for comments, member mentions, attachments, reference links, and activity history.
 - English and Bahasa Indonesia labels.
@@ -216,7 +216,7 @@ Monitoring capabilities:
 - Filters by internal project, registered project member, and deadline horizon of 7, 30, or 90 days.
 - Direct navigation from project health and attention items to the project Kanban workspace.
 - Access-aware aggregation: admins see all internal projects, while other users only see projects where they are members.
-- English and Bahasa Indonesia labels following the NEXONE locale setting.
+- English and Bahasa Indonesia labels following the Archie Management locale setting.
 - Hours Today and Week use a server-side aggregate in `Asia/Jakarta`, with optional project and member filters.
 - The default Hours Today value represents all members across accessible projects.
 

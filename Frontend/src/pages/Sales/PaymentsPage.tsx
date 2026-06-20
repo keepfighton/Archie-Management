@@ -154,7 +154,7 @@ export default function PaymentsPage() {
       <div className="p-5">
         <div className="print-header">
           <h1>Payment Records</h1>
-          <p>PT NEXORA TECH • Printed on {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p>PT Archie TECH • Printed on {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
           <p style={{ marginTop: '8px', fontWeight: 600 }}>Total Received: {fmt(totalAmount)}</p>
         </div>
         <PageHeader title="Payments" />

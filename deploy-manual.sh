@@ -5,14 +5,14 @@
 set -e
 
 echo "======================================"
-echo "NEXONE Manual Deployment"
+echo "Archie Management Manual Deployment"
 echo "======================================"
 echo ""
 
 # Check if running on server or local
-if [ -d "$HOME/nexora-node/apps/nexone" ]; then
+if [ -d "$HOME/nexora-node/apps/archie" ]; then
     echo "📍 Detected: Running ON production server"
-    cd $HOME/nexora-node/apps/nexone
+    cd $HOME/nexora-node/apps/archie
 else
     echo "📍 Detected: Running from LOCAL machine"
     echo ""
@@ -22,10 +22,10 @@ else
     echo ""
     echo "Then run this script on the server, OR run these commands:"
     echo ""
-    echo "cd ~/nexora-node/apps/nexone"
+    echo "cd ~/nexora-node/apps/archie"
     echo "git pull origin main"
     echo "docker compose up -d --build --no-deps backend frontend"
-    echo "docker ps | grep nexone"
+    echo "docker ps | grep archie"
     echo ""
     exit 1
 fi
@@ -44,10 +44,10 @@ echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "📊 Container status:"
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|nexone"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|archie"
 
 echo ""
-echo "🌐 Application should be live at: https://nexone.nexoratech.co"
+echo "🌐 Application should be live at: https://archie.nexoratech.co"
 echo ""
 echo "📝 View logs:"
 echo "docker compose logs -f --tail=50 frontend"

@@ -221,7 +221,7 @@ type Project struct {
 
 // ─── INTERNAL PROJECT ───────────────────────────────
 // Internal projects are intentionally isolated from client projects. They use
-// NEXONE users for ownership and membership, but have no client, contract, or
+// Archie Management users for ownership and membership, but have no client, contract, or
 // finance relationships.
 type InternalProject struct {
 	Base

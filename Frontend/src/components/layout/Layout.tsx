@@ -722,13 +722,12 @@ export default function Layout() {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-5">
-          <button onClick={() => navigate('/dashboard')} className="flex flex-col items-start gap-0.5">
-            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-yellow-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
-              ARCHIE
-            </span>
-            <span className="text-[10px] font-medium tracking-wide text-white/40">
-              {t('layout.partOfGroup', 'Part of CBQA Global Group')}
-            </span>
+          <button onClick={() => navigate('/dashboard')} className="flex items-center">
+            <img
+              src={archieLogoUrl}
+              alt="Archie"
+              className="h-9 w-auto object-contain"
+            />
           </button>
           <button
             onClick={() => dispatch(setSidebar(false))}

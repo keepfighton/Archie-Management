@@ -3387,6 +3387,15 @@ func (h *TeamHandler) CreateAnnouncement(c *gin.Context) {
 	c.JSON(http.StatusCreated, ann)
 }
 
+func (h *TeamHandler) DeleteAnnouncement(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	if err := h.db.Delete(&models.Announcement{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
 // ─── FILE ────────────────────────────────────────────
 
 type FileHandler struct {

@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
 import { useSearchParams } from 'react-router-dom'
+import { RootState } from '@/store'
 import { teamService } from '@/services/api'
 import { toISODate } from '@/utils/format'
 import { toast } from 'react-toastify'
-import { Plus, Megaphone } from 'lucide-react'
-import { PageHeader, Loading, EmptyState, Modal, FormField } from '@/components/common'
+import { Plus, Megaphone, Trash2 } from 'lucide-react'
+import { PageHeader, Loading, EmptyState, Modal, FormField, ConfirmDialog } from '@/components/common'
 
 export default function AnnouncementsPage() {
+  const user = useSelector((s: RootState) => s.auth.user)
+  const isAdmin = user?.role === 'admin'
   const [searchParams, setSearchParams] = useSearchParams()
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
   const [form, setForm] = useState<any>({ title: '', content: '', start_date: '', end_date: '' })
 
   const load = (overridePage?: number) => {
@@ -47,6 +52,18 @@ export default function AnnouncementsPage() {
     finally { setSaving(false) }
   }
 
+  const handleDelete = async () => {
+    if (!deleteId) return
+    try {
+      await teamService.deleteAnnouncement(deleteId)
+      toast.success('Announcement deleted')
+      setDeleteId(null)
+      load()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Failed to delete announcement')
+    }
+  }
+
   return (
     <div className="p-5">
       <PageHeader
@@ -68,9 +85,22 @@ export default function AnnouncementsPage() {
                     <div className="flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-medium text-gray-800 text-sm">{a.title}</h3>
-                        <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-                          {new Date(a.created_at).toLocaleDateString('id')}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                            {new Date(a.created_at).toLocaleDateString('id')}
+                          </span>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteId(a.id)}
+                              className="rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                              title="Delete announcement"
+                              aria-label="Delete announcement"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {a.content && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{a.content}</p>}
                       {(a.start_date || a.end_date) && (
@@ -115,6 +145,13 @@ export default function AnnouncementsPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteId !== null}
+        message="Delete this announcement?"
+        onConfirm={handleDelete}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   )
 }

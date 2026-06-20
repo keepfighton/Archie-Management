@@ -387,6 +387,7 @@ func (s *Server) setupRoutes() {
 			team.DELETE("/leaves/:id", teamH.DeleteLeave)
 			team.GET("/announcements", teamH.ListAnnouncements)
 			team.POST("/announcements", teamH.CreateAnnouncement)
+			team.DELETE("/announcements/:id", middleware.AdminRequired(), teamH.DeleteAnnouncement)
 		}
 
 		// Files

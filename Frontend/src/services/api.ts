@@ -321,6 +321,7 @@ export const teamService = {
   deleteLeave: (id: number) => api.delete(`/team/leaves/${id}`),
   listAnnouncements: () => api.get('/team/announcements'),
   createAnnouncement: (data: any) => api.post('/team/announcements', data),
+  deleteAnnouncement: (id: number) => api.delete(`/team/announcements/${id}`),
 }
 
 // ─── Orders ──────────────────────────────────────────

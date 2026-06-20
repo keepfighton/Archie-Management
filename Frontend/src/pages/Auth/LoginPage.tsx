@@ -242,12 +242,16 @@ export default function LoginPage() {
           DESKTOP LAYOUT (unchanged)
       ══════════════════════════════════════════════ */}
       <div className="hidden lg:flex min-h-screen w-full flex-row">
-        <div className="anim-fadeInLeft relative z-10 flex min-h-screen w-[30%] flex-col bg-white shadow-[18px_0_48px_rgba(15,23,42,0.12)]">
-          <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2">
-            <img src={archieLogoUrl} alt="Archie Management" className="anim-logoDesktop h-[288px] w-auto object-contain"/>
-          </div>
-          <div className="flex flex-1 flex-col justify-center px-16 py-12">
+        <div className="anim-fadeInLeft relative z-10 flex min-h-screen w-[38%] min-w-[340px] max-w-[520px] flex-col bg-white shadow-[18px_0_48px_rgba(15,23,42,0.12)]">
+          <div className="flex flex-1 flex-col justify-center px-10 py-12 xl:px-16">
             <div className="w-full max-w-[420px]">
+              <div className="mb-8 flex justify-center lg:justify-start">
+                <img
+                  src={archieLogoUrl}
+                  alt="Archie Management"
+                  className="anim-logoDesktop h-[clamp(120px,14vw,220px)] w-auto max-w-full object-contain"
+                />
+              </div>
               <div className="anim-slideUp-1 mb-7">
                 <h2 className="text-[1.9rem] font-bold text-gray-900 leading-tight mb-1.5">Welcome back</h2>
                 <p className="text-[14px] text-gray-400">Sign in to access your workspace</p>

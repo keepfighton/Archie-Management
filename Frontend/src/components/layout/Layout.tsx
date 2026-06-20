@@ -7,7 +7,7 @@ import { setSidebar, toggleSidebar } from '@/store/slices/uiSlice'
 import { auditService, notificationService, teamService } from '@/services/api'
 import { dashboardItem, navGroups } from '@/config/navigation'
 import { useLocale } from '@/contexts/LocaleContext'
-import nexoraLogoUrl from '../../../assets/Logo-Archie.png'
+import archieLogoUrl from '../../../assets/Logo-Archie.png'
 import {
   LayoutDashboard, Calendar, Users, FolderKanban, CheckSquare,
   TrendingUp, Menu, Search,
@@ -724,7 +724,7 @@ export default function Layout() {
         <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-5">
           <button onClick={() => navigate('/dashboard')} className="flex flex-col items-start gap-0.5">
             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-yellow-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
-              nexora
+              ARCHIE
             </span>
             <span className="text-[10px] font-medium tracking-wide text-white/40">
               {t('layout.partOfGroup', 'Part of CBQA Global Group')}
@@ -1113,7 +1113,7 @@ export default function Layout() {
                 aria-haspopup="menu"
               >
                 <div className="flex h-9 items-center rounded-lg bg-white px-1">
-                  <img src={nexoraLogoUrl} alt="Archie" className="h-7 w-auto object-contain" />
+                  <img src={archieLogoUrl} alt="Archie" className="h-7 w-auto object-contain" />
                 </div>
                 <div className="hidden text-left sm:block">
                   <p className="max-w-[160px] truncate text-sm font-semibold text-gray-700">{user?.name}</p>

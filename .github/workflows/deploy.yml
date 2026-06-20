@@ -16,7 +16,6 @@ jobs:
     steps:
       - name: 🚀 Deploy to VPS via SSH
         id: deploy
-        continue-on-error: true
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -53,7 +52,7 @@ jobs:
             max_attempts=30
             attempt=0
             while [ $attempt -lt $max_attempts ]; do
-              if curl -s http://localhost:8080/health > /dev/null; then
+              if docker compose exec -T backend sh -lc 'wget -qO- http://127.0.0.1:8080/health >/dev/null'; then
                 echo "✅ Backend is healthy!"
                 break
               fi
@@ -80,7 +79,7 @@ jobs:
       - name: 📊 Deployment Status
         if: always()
         run: |
-          if [ "${{ steps.deploy.outcome }}" == "success" ]; then
+          if [ "${{ steps.deploy.outcome }}" = "success" ]; then
             echo "✅ Deployment successful!"
             echo "🌐 Live at: https://management.archieconsultant.com"
             echo "🕐 Deployed at: $(date)"
@@ -98,15 +97,18 @@ jobs:
             echo "- Verify GitHub Secrets: VPS_HOST, VPS_USER, VPS_PASSWORD"
             echo "- Check VPS firewall allows GitHub Actions IPs"
             echo "- Review VPS logs: docker compose logs"
-            exit 0
           fi
 
       - name: 📝 Deployment Summary
-        if: success()
+        if: always()
         run: |
           echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
           echo "- **URL**: https://management.archieconsultant.com" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

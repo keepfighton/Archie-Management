@@ -5,8 +5,8 @@ import { login } from '@/store/slices/authSlice'
 import { RootState, AppDispatch } from '@/store'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
-import frameKananUrl from '../../../logo/FrameKanan.png'
-import nexoraPartUrl from '../../../logo/Logo_Nexora_Part.png'
+import backgroundUrl from '../../../assets/Background.png'
+import archieLogoUrl from '../../../assets/archie-logo-transparent-clean.png'
 
 const mobileStyles = `
   @keyframes orbPulse {
@@ -119,145 +119,121 @@ export default function LoginPage() {
           MOBILE LAYOUT
       ══════════════════════════════════════════════ */}
       <div className="flex flex-col min-h-screen lg:hidden relative overflow-hidden"
-           style={{ background: 'linear-gradient(160deg, #060e20 0%, #0c1e40 35%, #0d2d60 65%, #07183a 100%)' }}>
+           style={{ background: '#07132d' }}>
+        <img
+          src={backgroundUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-left-top"
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(22,78,180,0.24),transparent_40%),linear-gradient(180deg,rgba(6,14,32,0.72)_0%,rgba(6,14,32,0.62)_35%,rgba(6,14,32,0.84)_100%)]" />
+        <div className="absolute inset-0 opacity-[0.055]"
+             style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
-        {/* Animated orb blobs */}
-        <div className="anim-orbDrift absolute -top-16 -right-16 w-72 h-72 rounded-full"
-             style={{ background: 'radial-gradient(circle, #2563eb 0%, transparent 70%)', filter: 'blur(40px)' }} />
-        <div className="anim-orbPulse absolute top-1/3 -left-20 w-64 h-64 rounded-full"
-             style={{ background: 'radial-gradient(circle, #4f46e5 0%, transparent 70%)', filter: 'blur(36px)', animationDelay: '2s' }} />
-        <div className="anim-orbPulse absolute bottom-32 right-0 w-52 h-52 rounded-full"
-             style={{ background: 'radial-gradient(circle, #0891b2 0%, transparent 70%)', filter: 'blur(28px)', animationDelay: '4s' }} />
+        <div className="relative z-10 flex min-h-screen flex-col px-4 pb-6 pt-6">
+          <div className="flex flex-1 flex-col items-center justify-start pt-4">
+            <div className="relative mb-6 flex flex-col items-center">
+              <div className="absolute -inset-6 rounded-full bg-blue-400/20 blur-3xl" />
+              <img
+                src={archieLogoUrl}
+                alt="Archie Management"
+                className="relative h-18 w-auto object-contain drop-shadow-[0_0_18px_rgba(59,130,246,0.35)]"
+              />
+              <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.35em] text-blue-100/55">
+                Business Platform
+              </p>
+            </div>
 
-        {/* Fine dot grid */}
-        <div className="absolute inset-0 opacity-[0.035]"
-             style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-
-        {/* Rotating ring ornaments */}
-        <div className="anim-rotateCW absolute top-14 right-6 w-32 h-32 opacity-[0.07]">
-          <svg viewBox="0 0 100 100" fill="none" className="w-full h-full">
-            <circle cx="50" cy="50" r="45" stroke="white" strokeWidth="1" strokeDasharray="8 6"/>
-            <circle cx="50" cy="50" r="30" stroke="white" strokeWidth="0.8" strokeDasharray="4 8"/>
-          </svg>
-        </div>
-        <div className="anim-rotateCCW absolute bottom-80 left-3 w-24 h-24 opacity-[0.06]">
-          <svg viewBox="0 0 100 100" fill="none" className="w-full h-full">
-            <circle cx="50" cy="50" r="45" stroke="white" strokeWidth="1.2" strokeDasharray="6 5"/>
-          </svg>
-        </div>
-
-        {/* ── Hero top ── */}
-        <div className="relative z-10 flex flex-col items-center pt-14 pb-6 px-6 anim-fadeInUp">
-          {/* Logo with glow */}
-          <div className="relative">
-            <div className="absolute inset-0 rounded-full"
-                 style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.4), transparent 70%)',
-                          filter: 'blur(20px)', transform: 'scale(1.8)' }} />
-            <img src={nexoraPartUrl} alt="Nexora" className="anim-logoPulse relative h-20 w-auto object-contain" />
-          </div>
-          <p className="mt-4 text-xs font-medium tracking-[0.25em] uppercase text-blue-200/50">Business Platform</p>
-
-          {/* Animated SVG network */}
-          <div className="relative mt-6 w-full" style={{ height: '120px' }}>
-            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" fill="none">
-              {/* Lines draw-in */}
-              <line x1="50"  y1="60" x2="160" y2="30"  stroke="rgba(99,102,241,0.3)" strokeWidth="1" strokeDasharray="120" strokeDashoffset="120"
-                    style={{ animation: 'lineDash 1.8s ease-out 0.3s forwards' }}/>
-              <line x1="270" y1="60" x2="160" y2="30"  stroke="rgba(99,102,241,0.3)" strokeWidth="1" strokeDasharray="120" strokeDashoffset="120"
-                    style={{ animation: 'lineDash 1.8s ease-out 0.6s forwards' }}/>
-              <line x1="50"  y1="60" x2="270" y2="60"  stroke="rgba(99,102,241,0.15)" strokeWidth="0.8" strokeDasharray="220" strokeDashoffset="220"
-                    style={{ animation: 'lineDash 2.2s ease-out 0.9s forwards' }}/>
-              <line x1="160" y1="30" x2="160" y2="100" stroke="rgba(99,102,241,0.2)" strokeWidth="0.8" strokeDasharray="70" strokeDashoffset="70"
-                    style={{ animation: 'lineDash 1.2s ease-out 1.2s forwards' }}/>
-              {/* Nodes */}
-              {[
-                { cx: 50,  cy: 60,  c: '#60a5fa', d: '0s' },
-                { cx: 270, cy: 60,  c: '#34d399', d: '0.3s' },
-                { cx: 160, cy: 30,  c: '#a78bfa', d: '0.6s' },
-                { cx: 160, cy: 100, c: '#f472b6', d: '0.9s' },
-              ].map((n, i) => (
-                <g key={i}>
-                  <circle cx={n.cx} cy={n.cy} r="16" fill={n.c} opacity="0.05"/>
-                  <circle cx={n.cx} cy={n.cy} r="16" fill={n.c} opacity="0"
-                          style={{ animation: `dotPing 2.5s ease-out ${n.d} infinite` }}/>
-                  <circle cx={n.cx} cy={n.cy} r="5"  fill={n.c} opacity="0.85"/>
-                  <circle cx={n.cx} cy={n.cy} r="2.5" fill="white" opacity="0.9"/>
-                </g>
-              ))}
-            </svg>
-          </div>
-        </div>
-
-        {/* ── Form card ── */}
-        <div className="relative z-10 mx-4 mb-6 rounded-3xl overflow-hidden"
-             style={{ boxShadow: '0 -4px 40px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.5)' }}>
-          {/* Dark header strip */}
-          <div className="px-6 pt-5 pb-4"
-               style={{ background: 'linear-gradient(135deg, rgba(13,31,60,0.97) 0%, rgba(26,58,107,0.97) 100%)',
-                        borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-            <h2 className="text-lg font-bold text-white">Welcome back</h2>
-            <p className="text-[11px] text-blue-200/45 mt-0.5">Sign in to access your workspace</p>
-          </div>
-
-          {/* Form body */}
-          <div className="px-6 py-5" style={{ background: 'rgba(255,255,255,0.97)' }}>
-            {error && (
-              <div className="mb-3 px-3 py-2.5 rounded-xl text-xs text-red-600 bg-red-50 border border-red-200">{error}</div>
-            )}
-            <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3.5">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 mb-1.5 uppercase tracking-widest">Email</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <Mail size={13} className="text-gray-400" />
-                  </span>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="Enter your email" required autoComplete="off"
-                    className="w-full pl-9 pr-4 py-2.5 text-[13px] rounded-xl border border-gray-200 bg-gray-50
-                               placeholder-gray-300 text-gray-900
-                               focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 focus:bg-white transition-all"/>
-                </div>
+            <div className="w-full max-w-md rounded-[28px] overflow-hidden border border-white/10 bg-white/96 shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div className="px-6 pt-5 pb-4 border-b border-slate-200/70 bg-[#0d1f3c]">
+                <h2 className="text-[1.1rem] font-bold text-white">Welcome back</h2>
+                <p className="text-[11px] text-blue-200/55 mt-0.5">Sign in to access your workspace</p>
               </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 mb-1.5 uppercase tracking-widest">Password</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <Lock size={13} className="text-gray-400" />
-                  </span>
-                  <input type={showPass ? 'text' : 'password'} value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Enter your password" required autoComplete="off"
-                    className="w-full pl-9 pr-10 py-2.5 text-[13px] rounded-xl border border-gray-200 bg-gray-50
-                               placeholder-gray-300 text-gray-900
-                               focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 focus:bg-white transition-all"/>
-                  <button type="button" onClick={() => setShowPass(!showPass)}
-                          className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
-                    {showPass ? <EyeOff size={13} /> : <Eye size={13} />}
+
+              <div className="px-5 py-5">
+                {error && (
+                  <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                    {error}
+                  </div>
+                )}
+                <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3.5">
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">
+                      Email
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                        <Mail size={13} className="text-slate-400" />
+                      </span>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        required
+                        autoComplete="off"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-4 text-[13px] text-slate-900 placeholder-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/10 focus:border-[#1e3a5f] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                        <Lock size={13} className="text-slate-400" />
+                      </span>
+                      <input
+                        type={showPass ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        required
+                        autoComplete="off"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-10 text-[13px] text-slate-900 placeholder-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/10 focus:border-[#1e3a5f] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass(!showPass)}
+                        className="absolute inset-y-0 right-3 flex items-center text-slate-400 transition-colors hover:text-slate-600"
+                      >
+                        {showPass ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={remember}
+                        onChange={e => setRemember(e.target.checked)}
+                        className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 accent-[#1e3a5f]"
+                      />
+                      <span className="text-[12px] text-slate-600">Remember me</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/forgot-password')}
+                      className="text-[12px] font-semibold text-[#1a5cb0] transition-colors hover:text-[#1e3a5f]"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[14px] font-semibold text-white transition-all disabled:opacity-70"
+                    style={{ background: 'linear-gradient(135deg, #0d1f3c 0%, #1a4a8a 100%)', boxShadow: '0 8px 22px rgba(13,31,60,0.35)' }}
+                  >
+                    {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 'Sign in'}
                   </button>
-                </div>
+                </form>
+                <p className="mt-4 text-center text-[10px] text-slate-400">© 2026 Archie Management. All rights reserved.</p>
               </div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}
-                         className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1e3a5f] cursor-pointer"/>
-                  <span className="text-[12px] text-gray-600">Remember me</span>
-                </label>
-                <button type="button" onClick={() => navigate('/forgot-password')}
-                        className="text-[12px] font-semibold text-[#1a5cb0] hover:text-[#1e3a5f] transition-colors">
-                  Forgot password?
-                </button>
-              </div>
-              <button type="submit" disabled={loading}
-                      className="w-full py-3 rounded-xl text-[14px] font-semibold text-white
-                                 flex items-center justify-center gap-2 transition-all disabled:opacity-70"
-                      style={{ background: 'linear-gradient(135deg, #0d1f3c 0%, #1a4a8a 100%)',
-                               boxShadow: '0 4px 18px rgba(13,31,60,0.4)' }}>
-                {loading
-                  ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>
-                  : 'Sign in'}
-              </button>
-            </form>
-            <p className="mt-4 text-center text-[10px] text-gray-300">© 2026 NEXORA. All rights reserved.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -268,7 +244,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex min-h-screen w-full flex-row">
         <div className="anim-fadeInLeft relative z-10 flex min-h-screen w-[30%] flex-col bg-white shadow-[18px_0_48px_rgba(15,23,42,0.12)]">
           <div className="z-20 flex items-center justify-center lg:absolute lg:left-1/2 lg:top-0 lg:-translate-x-1/2">
-            <img src={nexoraPartUrl} alt="Nexora" className="anim-logoDesktop h-[288px] w-auto object-contain"/>
+            <img src={archieLogoUrl} alt="Archie Management" className="anim-logoDesktop h-[288px] w-auto object-contain"/>
           </div>
           <div className="flex flex-1 flex-col justify-center px-16 py-12">
             <div className="w-full max-w-[420px]">
@@ -315,14 +291,14 @@ export default function LoginPage() {
               </form>
             </div>
           </div>
-          <div className="px-16 pb-8"><p className="text-[11px] text-gray-300">© 2026 NEXORA. All rights reserved.</p></div>
+          <div className="px-16 pb-8"><p className="text-[11px] text-gray-300">© 2026 Archie Management. All rights reserved.</p></div>
         </div>
         <div className="anim-fadeInRight flex flex-1 relative overflow-hidden items-center justify-center">
-          <img src={frameKananUrl} alt="" className="anim-bgDrift absolute inset-0 w-full h-full object-cover object-left-top"
+          <img src={backgroundUrl} alt="" className="anim-bgDrift absolute inset-0 w-full h-full object-cover object-left-top"
                style={{ filter: 'blur(18px)', opacity: 0.85 }}/>
           <div className="absolute inset-0" style={{ background: 'rgba(8,18,40,0.45)' }}/>
           <div className="anim-cardEntrance relative z-10 w-[99%] h-[99%] rounded-2xl overflow-hidden" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
-            <img src={frameKananUrl} alt="" className="w-full h-full object-cover object-left-top"/>
+            <img src={backgroundUrl} alt="" className="w-full h-full object-cover object-left-top"/>
           </div>
         </div>
       </div>

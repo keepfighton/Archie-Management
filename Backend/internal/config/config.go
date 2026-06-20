@@ -40,7 +40,7 @@ func Load() *Config {
 	_ = godotenv.Load(".env.local", ".env")
 	jwtExp := parsePositiveIntEnv("JWT_EXP_HOURS", 24)
 	return &Config{
-		Port:                  getEnv("PORT", "8080"),
+		Port:                  getEnv("PORT", "3092"),
 		DBHost:                getEnv("DB_HOST", "localhost"),
 		DBPort:                getEnv("DB_PORT", "5432"),
 		DBUser:                getEnv("DB_USER", "cbqa"),

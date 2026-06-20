@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authService } from '@/services/api'
-import nexoneLogoUrl from '../../../logo/Logo_Nexone.png'
+import backgroundUrl from '../../../assets/Background.png'
+import archieLogoUrl from '../../../assets/archie-logo-transparent-clean.png'
 import { ArrowLeft, ShieldAlert, CheckCircle } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
@@ -30,7 +31,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full lg:w-[40%] xl:w-[38%] flex flex-col justify-center">
         <div className="w-full px-10 xl:px-16 py-12">
           <div className="mb-10">
-            <img src={nexoneLogoUrl} alt="NEXONE by NEXORA" className="h-[280px] w-auto object-contain" />
+            <img src={archieLogoUrl} alt="Archie Management" className="h-[280px] w-auto object-contain" />
           </div>
 
           <div className="flex justify-center mb-5">
@@ -92,7 +93,9 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
 
-      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: '#0c1f40' }}>
+      <div className="hidden lg:flex flex-1 relative overflow-hidden">
+        <img src={backgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-left-top" />
+        <div className="absolute inset-0" style={{ background: 'rgba(8,18,40,0.5)' }} />
         <div className="absolute inset-0 pointer-events-none" style={{
           backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
           backgroundSize: '28px 28px',

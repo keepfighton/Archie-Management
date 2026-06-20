@@ -1,0 +1,114 @@
+name: Deploy Archie Management to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: archie-production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Deploy to VPS via SSH
+        id: deploy
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -e
+
+            echo "📂 Navigating to project directory..."
+            cd ~/archie-node/apps/archie-management
+
+            echo "🔄 Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "🔍 Checking environment file..."
+            if [ ! -f .env ]; then
+              echo "❌ .env file not found!"
+              exit 1
+            fi
+
+            echo "🌐 Checking network..."
+            docker network inspect web >/dev/null 2>&1 || docker network create web
+
+            echo "🐳 Building and deploying containers..."
+            docker compose up -d --build --no-deps backend frontend
+
+            echo "⏳ Waiting for services..."
+            sleep 10
+
+            echo "🏥 Health check..."
+            max_attempts=30
+            attempt=0
+            while [ $attempt -lt $max_attempts ]; do
+              if curl -s http://localhost:8080/health > /dev/null; then
+                echo "✅ Backend is healthy!"
+                break
+              fi
+              attempt=$((attempt + 1))
+              echo "Waiting... ($attempt/$max_attempts)"
+              sleep 2
+            done
+
+            if [ $attempt -eq $max_attempts ]; then
+              echo "⚠️ Health check timeout!"
+              docker compose logs --tail=50 backend
+              exit 1
+            fi
+
+            echo "🔍 Verifying containers..."
+            docker ps --format '{{.Names}}' | grep '^archie-backend$' || exit 1
+            docker ps --format '{{.Names}}' | grep '^archie-frontend$' || exit 1
+
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+
+            echo "✅ Deployment successful!"
+
+      - name: 📊 Deployment Status
+        if: always()
+        run: |
+          if [ "${{ steps.deploy.outcome }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+            echo "🌐 Live at: https://management.archieconsultant.com"
+            echo "🕐 Deployed at: $(date)"
+          else
+            echo "⚠️ Automated deployment failed!"
+            echo ""
+            echo "📋 Manual deployment steps:"
+            echo "1. SSH to VPS: ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+            echo "2. cd /opt/archie-management"
+            echo "3. git pull origin main"
+            echo "4. docker compose up -d --build"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "- Check VPS is accessible"
+            echo "- Verify GitHub Secrets: VPS_HOST, VPS_USER, VPS_PASSWORD"
+            echo "- Check VPS firewall allows GitHub Actions IPs"
+            echo "- Review VPS logs: docker compose logs"
+            exit 0
+          fi
+
+      - name: 📝 Deployment Summary
+        if: success()
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: https://management.archieconsultant.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY

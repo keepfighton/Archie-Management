@@ -68,8 +68,8 @@ docker-compose up -d
 # 4. Access the app
 # Production: https://management.archieconsultant.com
 # Backend API: https://management.archieconsultant.com/api
-# Local Frontend:  http://localhost:3000
-# Local Backend:   http://localhost:8080
+# Local Frontend:  http://localhost:3091
+# Local Backend:   http://localhost:3092
 ```
 
 ---
@@ -90,7 +90,7 @@ cp .env.example .env
 # Run
 go run ./cmd/api
 
-# Backend runs on http://localhost:8080
+# Backend runs on http://localhost:3092
 ```
 
 ### Frontend
@@ -101,13 +101,26 @@ cd cbqa-frontend
 npm install
 
 # Copy env
-echo "VITE_API_URL=http://localhost:8080/api/v1" > .env.local
+echo "VITE_API_URL=http://localhost:3092/api/v1" > .env.local
+# If you run the backend locally without Docker, it listens on port 3092 by default.
 
 # Run dev server
 npm run dev
 
-# Frontend runs on http://localhost:3000
+# Frontend runs on http://localhost:3091
 ```
+
+### Quick Local Check
+```bash
+cd /Users/cbqaglobal/Documents/New\ project/ARCHIE-MNGMNT
+chmod +x dev-local.sh
+./dev-local.sh
+```
+
+This starts:
+- Frontend on `http://localhost:3091`
+- Backend on `http://localhost:3092`
+- Logs in `./.logs/backend.log` and `./.logs/frontend.log`
 
 ---
 
@@ -239,10 +252,10 @@ Connection string:
 postgresql://cbqa:cbqa123@localhost:5432/cbqa_db
 🔧 Backend API
 Key	Value
-Port	8080
-Base URL (local)	http://localhost:8080
+Port	3092
+Base URL (local)	http://localhost:3092
 Base URL (Docker)	http://localhost:8080
-Health check	http://localhost:8080/health
+Health check	http://localhost:3092/health
 API prefix	/api/v1
 JWT secret	dev-secret-change-in-production
 JWT expiry	24 jam

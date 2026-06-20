@@ -11,18 +11,26 @@ Aplikasi bisnis all-in-one untuk CBQA (IT Audit & Advisory Indonesia) yang menca
 | Service | Port |
 |---------|------|
 | Frontend (Vite dev) | http://localhost:3091 |
-| Backend (Go) | http://localhost:8091 |
+| Backend (Go) | http://localhost:3092 |
 
 ### Jalankan App
 ```bash
+# Quick local check
+cd /Users/cbqaglobal/Documents/New\ project/ARCHIE-MNGMNT
+chmod +x dev-local.sh
+./dev-local.sh
+```
+
+Kalau mau manual:
+```bash
 # Tab 1 - Backend (WAJIB dari direktori Backend/ agar .env terbaca)
 cd Backend
-PORT=8091 go run cmd/api/main.go
+go run cmd/api/main.go
 
 # Tab 2 - Frontend
 cd Frontend
 npm install   # pertama kali saja
-npm run dev   # jalan di :3091, proxy /api → :8092
+npm run dev   # jalan di :3091, proxy /api → :3092
 ```
 
 ### Seed Database (pertama kali)
@@ -39,7 +47,7 @@ go run cmd/seed/main.go
 
 ### Cek Health Backend
 ```bash
-curl http://localhost:8092/health
+curl http://localhost:3092/health
 ```
 
 ### Prasyarat Database (install sekali)
@@ -118,7 +126,7 @@ root/
 │   │   ├── main.tsx
 │   │   └── index.css
 │   ├── index.html
-│   ├── vite.config.ts             # port 3091, proxy /api → :8092
+│   ├── vite.config.ts             # port 3091, proxy /api → :3092
 │   ├── tailwind.config.js
 │   ├── tsconfig.json
 │   ├── nginx.conf
@@ -303,7 +311,7 @@ File `.env` ada di root repo (docker-compose) dan `Backend/.env` (run manual). J
 ```env
 # App
 ENV=development
-PORT=8092            # lokal; production pakai 8080
+PORT=3092            # lokal; production pakai 8080
 APP_URL=http://localhost:3091
 UPLOAD_DIR=./uploads
 

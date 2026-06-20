@@ -8,5 +8,6 @@ node_modules/
 Frontend/dist/
 Backend/api
 Backend/uploads/
+.logs/
 docker-compose.override.yml
 /catatan NEX-ONE WEB.docx

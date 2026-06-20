@@ -91,6 +91,10 @@ if [ $attempt -eq $max_attempts ]; then
 fi
 
 echo ""
+echo "🌱 Syncing default login accounts..."
+docker compose exec -T backend sh -lc './seed'
+
+echo ""
 echo "📊 Container logs (last 20 lines):"
 echo "=================================="
 docker compose logs --tail=20

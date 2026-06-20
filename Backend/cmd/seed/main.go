@@ -75,7 +75,32 @@ func main() {
 		if err := db.Where("email = ?", u.Email).First(&existing).Error; err != nil {
 			db.Create(u)
 		} else {
-			u.Base = existing.Base
+			// Keep the default seed accounts in sync so fresh deployments and
+			// repaired databases always have the documented login credentials.
+			updates := map[string]any{
+				"name":       u.Name,
+				"email":      u.Email,
+				"password":   u.Password,
+				"job_title":  u.JobTitle,
+				"phone":      u.Phone,
+				"avatar":     u.Avatar,
+				"role":       u.Role,
+				"is_active":  u.IsActive,
+				"clocked_in": u.ClockedIn,
+				"app_role_id": u.AppRoleID,
+			}
+			db.Model(&existing).Updates(updates)
+			*u = existing
+			u.Name = updates["name"].(string)
+			u.Email = updates["email"].(string)
+			u.Password = updates["password"].(string)
+			u.JobTitle = updates["job_title"].(string)
+			u.Phone = updates["phone"].(string)
+			u.Avatar = updates["avatar"].(string)
+			u.Role = updates["role"].(string)
+			u.IsActive = updates["is_active"].(bool)
+			u.ClockedIn = updates["clocked_in"].(bool)
+			u.AppRoleID = updates["app_role_id"].(*uint)
 		}
 	}
 	upsertUser(&adminUser)

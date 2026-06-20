@@ -67,6 +67,9 @@ jobs:
               exit 1
             fi
 
+            echo "🌱 Syncing default login accounts..."
+            docker compose exec -T backend sh -lc './seed'
+
             echo "🔍 Verifying containers..."
             docker ps --format '{{.Names}}' | grep '^archie-backend$' || exit 1
             docker ps --format '{{.Names}}' | grep '^archie-frontend$' || exit 1

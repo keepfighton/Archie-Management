@@ -125,7 +125,7 @@ fi
 
 echo ""
 echo "Step 9: Seeding database..."
-docker compose exec -T backend sh -c 'cd cmd/seed && go run main.go' 2>&1 || echo "⚠️ Seeding failed or already seeded"
+docker compose exec -T backend sh -lc './seed'
 
 echo ""
 echo "=========================================="

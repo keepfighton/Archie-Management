@@ -67,7 +67,7 @@ func (h *QuotationHandler) List(c *gin.Context) {
 
 	var quotations []models.Quotation
 	var total int64
-	query := h.db.Model(&models.Quotation{}).Preload("Client").Preload("Project").Preload("Lead")
+	query := h.db.Model(&models.Quotation{}).Preload("Client").Preload("Project").Preload("Lead").Preload("Items")
 
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)

@@ -64,6 +64,7 @@ export default function QuotationsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState<any>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [loadingEdit, setLoadingEdit] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingDoc, setUploadingDoc] = useState(false)
 
@@ -124,46 +125,55 @@ export default function QuotationsPage() {
     setShowModal(true)
   }
 
-  const openEdit = (row: any) => {
-    setEditItem(row)
-    setForm({
-      quote_number: row.quote_number,
-      revision: row.revision ?? 0,
-      title: row.title,
-      lead_id: String(row.lead_id || ''),
-      client_id: String(row.client_id || ''),
-      issue_date: row.issue_date?.split('T')[0] || '',
-      valid_until: row.valid_until?.split('T')[0] || '',
-      masa_berlaku: row.masa_berlaku || '',
-      contract_no: row.contract_no || '',
-      status: row.status,
-      currency: row.currency,
-      subtotal_amount: row.subtotal_amount,
-      discount_pct: row.discount_pct || 0,
-      tax_pct: row.tax_pct ?? 10,
-      payment_terms: row.payment_terms || '',
-      scope_summary: row.scope_summary || '',
-      prepared_by: row.prepared_by || '',
-      prepared_by_title: row.prepared_by_title || '',
-      approved_by: row.approved_by || '',
-      approved_by_title: row.approved_by_title || 'Director',
-      pic: row.pic || '',
-      contact_phone: row.contact_phone || '',
-      terbilang: row.terbilang || '',
-      acceptance_notes: row.acceptance_notes || '',
-      notes: row.notes || '',
-    })
-    setLocalItems(row.items?.map((it: any) => ({
-      id: it.id,
-      description: it.description,
-      quantity: it.quantity,
-      unit_price: it.unit_price,
-      duration: it.duration || 12,
-      duration_unit: it.duration_unit || 'month',
-      total: it.total,
-    })) || [])
-    setEditingItemIdx(null)
-    setShowModal(true)
+  const openEdit = async (row: any) => {
+    setLoadingEdit(true)
+    try {
+      const res = await quotationService.get(row.id)
+      const detail = res.data
+      setEditItem(detail)
+      setForm({
+        quote_number: detail.quote_number,
+        revision: detail.revision ?? 0,
+        title: detail.title,
+        lead_id: String(detail.lead_id || ''),
+        client_id: String(detail.client_id || ''),
+        issue_date: detail.issue_date?.split('T')[0] || '',
+        valid_until: detail.valid_until?.split('T')[0] || '',
+        masa_berlaku: detail.masa_berlaku || '',
+        contract_no: detail.contract_no || '',
+        status: detail.status,
+        currency: detail.currency,
+        subtotal_amount: detail.subtotal_amount,
+        discount_pct: detail.discount_pct || 0,
+        tax_pct: detail.tax_pct ?? 10,
+        payment_terms: detail.payment_terms || '',
+        scope_summary: detail.scope_summary || '',
+        prepared_by: detail.prepared_by || '',
+        prepared_by_title: detail.prepared_by_title || '',
+        approved_by: detail.approved_by || '',
+        approved_by_title: detail.approved_by_title || 'Director',
+        pic: detail.pic || '',
+        contact_phone: detail.contact_phone || '',
+        terbilang: detail.terbilang || '',
+        acceptance_notes: detail.acceptance_notes || '',
+        notes: detail.notes || '',
+      })
+      setLocalItems((detail.items || []).map((it: any) => ({
+        id: it.id,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        duration: it.duration || 12,
+        duration_unit: it.duration_unit || 'month',
+        total: it.total,
+      })))
+      setEditingItemIdx(null)
+      setShowModal(true)
+    } catch {
+      toast.error('Failed to load quotation details')
+    } finally {
+      setLoadingEdit(false)
+    }
   }
 
   // Live total calculation — subtotal dari localItems
@@ -465,8 +475,8 @@ export default function QuotationsPage() {
                             → INV
                           </button>
                           <div className="w-px h-4 bg-gray-200 mx-0.5" />
-                          <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={() => openEdit(row)}>
-                            Edit
+                          <button className="btn btn-secondary text-xs py-0.5 px-2" onClick={() => void openEdit(row)} disabled={loadingEdit}>
+                            {loadingEdit ? 'Loading...' : 'Edit'}
                           </button>
                           <button className="btn btn-danger text-xs py-0.5 px-2" onClick={() => setDeleteId(row.id)}>
                             ×

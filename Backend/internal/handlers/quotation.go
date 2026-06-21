@@ -2,6 +2,7 @@ package handlers
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -15,6 +16,12 @@ import (
 )
 
 type QuotationHandler struct{ db *gorm.DB }
+
+//go:embed assets/quotations/quotations-header.png
+var quotationHeaderBytes []byte
+
+//go:embed assets/quotations/quotations-footer.png
+var quotationFooterBytes []byte
 
 func NewQuotationHandler(db *gorm.DB) *QuotationHandler { return &QuotationHandler{db: db} }
 
@@ -329,10 +336,14 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 		models.Quotation
 		PrintedAt    string
 		DownloadMode bool
+		HeaderBase64 string
+		FooterBase64 string
 	}{
 		Quotation:    quotation,
 		PrintedAt:    time.Now().Format("02 January 2006 15:04"),
 		DownloadMode: c.Query("download") == "1",
+		HeaderBase64: base64.StdEncoding.EncodeToString(quotationHeaderBytes),
+		FooterBase64: base64.StdEncoding.EncodeToString(quotationFooterBytes),
 	}
 	_ = tmpl.Execute(c.Writer, data)
 }
@@ -535,16 +546,13 @@ body{font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#000;background
   .no-print{display:none!important;}
   .page-break{page-break-before:always;}
 }
-.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;padding-bottom:14px;border-bottom:3px solid #1a3c7a;}
-.brand{display:flex;flex-direction:column;gap:2px;max-width:55%;}
-.brand-top{font-size:24px;font-weight:800;line-height:1;color:#000;letter-spacing:.2px;}
-.brand-sub{font-size:11px;color:#000;line-height:1.4;}
-.brand-tag{font-size:10px;color:#000;line-height:1.3;}
-.doc-heading{text-align:right;min-width:180px;}
+.letterhead{width:100%;display:block;margin:0 0 14px;}
+.header{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:18px;}
+.doc-heading{text-align:right;}
 .doc-heading h1{font-size:20px;font-weight:700;color:#000;}
 .doc-heading p{color:#000;font-size:11px;margin-top:2px;}
 .section-label{font-size:10px;color:#000;font-style:italic;letter-spacing:.5px;margin:12px 0 5px;}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;border:0;}
 .detail-left,.detail-right{padding:9px 12px;}
 .detail-right{border-left:none;}
 .detail-row{display:flex;margin-bottom:3px;font-size:11.5px;color:#000;}
@@ -570,9 +578,6 @@ table td.tr{text-align:right;}
 .sig-line{height:56px;border-bottom:1px solid #000;margin:6px 0;}
 .sig-name{font-weight:700;font-size:12px;}
 .sig-ttl{color:#000;font-size:11px;}
-.footer{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:18px;padding-top:10px;border-top:1px solid #b8b8b8;color:#000;font-size:10px;page-break-inside:avoid;}
-.footer strong{color:#000;}
-.footer-right{text-align:right;}
 .tc-hdr{font-size:15px;font-weight:700;color:#000;margin-bottom:12px;text-align:center;border-bottom:1px solid #b8b8b8;padding-bottom:7px;}
 .tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;font-size:10.5px;line-height:1.5;}
 .tc-pasal{margin-bottom:8px;}
@@ -583,12 +588,8 @@ table td.tr{text-align:right;}
 <body>
 
 <!-- HEADER -->
+<img class="letterhead" src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie quotation header">
 <div class="header">
-  <div class="brand">
-    <div class="brand-top">ARCHIE CONSULTANT</div>
-    <div class="brand-sub">Smart Tax, Accounting &amp; Business Solutions</div>
-    <div class="brand-tag">Part of CBQA Global Group</div>
-  </div>
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}</p>
@@ -684,26 +685,12 @@ table td.tr{text-align:right;}
 </div>
 
 <!-- FOOTER -->
-<div class="footer">
-  <div>
-    <strong>Archie Consultant</strong><br>
-    PT Archie Consultant Indonesia<br>
-    management.archieconsultant.com
-  </div>
-  <div class="footer-right">
-    <strong>Confidential</strong><br>
-    For internal/customer use only
-  </div>
-</div>
+<img class="letterhead" src="data:image/png;base64,{{.FooterBase64}}" alt="Archie quotation footer">
 
 <!-- PAGE 2: TERMS & CONDITIONS -->
 <div class="page-break">
+<img class="letterhead" src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie quotation header">
 <div class="header">
-  <div class="brand">
-    <div class="brand-top">ARCHIE CONSULTANT</div>
-    <div class="brand-sub">Smart Tax, Accounting &amp; Business Solutions</div>
-    <div class="brand-tag">Part of CBQA Global Group</div>
-  </div>
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}</p>
@@ -769,17 +756,7 @@ Hal-hal yang belum cukup diatur dalam Perjanjian ini, namun Para Pihak memandang
     <div style="color:#555;font-size:11px;">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
   </div>
 </div>
-<div class="footer">
-  <div>
-    <strong>Archie Consultant</strong><br>
-    PT Archie Consultant Indonesia<br>
-    management.archieconsultant.com
-  </div>
-  <div class="footer-right">
-    <strong>Confidential</strong><br>
-    For internal/customer use only
-  </div>
-</div>
+<img class="letterhead" src="data:image/png;base64,{{.FooterBase64}}" alt="Archie quotation footer">
 </div>
 
 {{if .DownloadMode}}

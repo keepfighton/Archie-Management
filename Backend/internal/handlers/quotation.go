@@ -539,56 +539,71 @@ const quotationPrintTemplate = `<!DOCTYPE html>
 <title>Quotation {{.QuoteNumber}}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#000;background:#fff;padding:22px 32px;}
+html,body{width:100%;}
+body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 44mm;}
+body *{font-family:inherit;color:inherit;}
+strong,b{font-weight:700;}
 @media print{
   @page{size:A4;margin:0;}
-  body{padding:10mm 15mm;}
+  body{padding:42mm 15mm 44mm;}
   .no-print{display:none!important;}
-  .page-break{page-break-before:always;}
+  .page-break{page-break-before:always;break-before:page;}
 }
-.letterhead{width:100%;display:block;margin:0 0 14px;}
-.header{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:18px;}
+.print-header{position:fixed;left:0;right:0;top:0;z-index:2;pointer-events:none;}
+.print-header img{width:100%;display:block;margin:0;}
+.header{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:14px;}
 .doc-heading{text-align:right;}
-.doc-heading h1{font-size:20px;font-weight:700;color:#000;}
-.doc-heading p{color:#000;font-size:11px;margin-top:2px;}
-.section-label{font-size:10px;color:#000;font-style:italic;letter-spacing:.5px;margin:12px 0 5px;}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;border:0;}
-.detail-left,.detail-right{padding:9px 12px;}
+.doc-heading h1{font-size:12px;font-weight:700;line-height:1.2;}
+.doc-heading p{font-size:12px;margin-top:2px;line-height:1.2;}
+.section-label{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:12px 0 5px;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px;}
+.detail-left,.detail-right{padding:8px 0;}
 .detail-right{border-left:none;}
-.detail-row{display:flex;margin-bottom:3px;font-size:11.5px;color:#000;}
-.dl{min-width:85px;font-weight:600;color:#000;}
-.dv{color:#000;}
-table{width:100%;border-collapse:collapse;font-size:11.5px;}
-table th{background:#fff;color:#000;padding:7px 8px;text-align:center;border:1px solid #b8b8b8;font-size:11px;}
+ .detail-row{display:flex;gap:10px;margin-bottom:3px;font-size:12px;line-height:1.35;}
+.dl{min-width:92px;font-weight:700;}
+.dv{flex:1;}
+table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.3;}
+table th{background:#fff;padding:7px 8px;text-align:center;border:1px solid #b8b8b8;font-size:12px;font-weight:700;}
 table th.tl{text-align:left;}
-table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;color:#000;}
+table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:12px;}
 table td.tc{text-align:center;}
 table td.tr{text-align:right;}
-.terb-row td{background:#f5f5f5;font-style:italic;font-size:11px;border-top:1px solid #b8b8b8;}
+.th-sub{display:block;font-weight:400;font-size:12px;line-height:1.1;}
+.terb-row td{background:#f5f5f5;font-style:italic;font-size:12px;border-top:1px solid #b8b8b8;}
 .bot{display:flex;justify-content:flex-end;margin-top:8px;}
-.tot-tbl{border-collapse:collapse;font-size:11.5px;}
-.tot-tbl td{padding:4px 10px;}
+.tot-tbl{border-collapse:collapse;font-size:12px;}
+.tot-tbl td{padding:4px 10px;font-size:12px;}
 .tot-tbl td:last-child{text-align:right;}
-.tot-tbl .lbl{color:#000;}
-.grand td{font-weight:700;font-size:13px;background:#fff;color:#000;padding:7px 10px;}
-.keter{margin-top:12px;font-size:11px;line-height:1.6;color:#000;}
-.keter strong{color:#000;}
-.sig-sec{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:26px;}
-.sig-lbl{font-weight:600;margin-bottom:3px;color:#000;font-size:11.5px;}
+.tot-tbl .lbl{font-size:12px;}
+.tot-tbl .emph{font-weight:600;}
+.grand td{font-weight:700;font-size:12px;background:#fff;padding:7px 10px;}
+.terb-label{font-weight:600;font-size:12px;}
+.terb-value{font-style:italic;font-size:12px;text-align:right;}
+.keter{margin-top:12px;font-size:12px;line-height:1.45;}
+.sig-sec{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:22px;}
+.sig-at{font-size:12px;margin-bottom:2px;}
+.sig-lbl{font-weight:700;margin-bottom:3px;font-size:12px;}
 .sig-line{height:56px;border-bottom:1px solid #000;margin:6px 0;}
 .sig-name{font-weight:700;font-size:12px;}
-.sig-ttl{color:#000;font-size:11px;}
-.tc-hdr{font-size:15px;font-weight:700;color:#000;margin-bottom:12px;text-align:center;border-bottom:1px solid #b8b8b8;padding-bottom:7px;}
-.tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;font-size:10.5px;line-height:1.5;}
+.sig-ttl{font-size:12px;}
+.tc-hdr{font-size:12px;font-weight:700;margin-bottom:12px;text-align:center;border-bottom:1px solid #b8b8b8;padding-bottom:7px;}
+.tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;font-size:12px;line-height:1.45;}
 .tc-pasal{margin-bottom:8px;}
-.tc-pasal strong{display:block;color:#000;margin-bottom:2px;font-size:11px;}
-.tc-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;font-size:11.5px;}
+.tc-pasal strong{display:block;margin-bottom:2px;font-size:12px;}
+.tc-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;font-size:12px;}
+.tc-at{font-size:12px;margin-bottom:2px;}
+.tc-name{font-weight:700;font-size:12px;}
+.tc-ttl{font-size:12px;}
+.print-footer{position:fixed;left:0;right:0;bottom:0;z-index:2;pointer-events:none;}
+.print-footer img{display:block;width:100%;margin:0;}
 </style>
 </head>
 <body>
 
 <!-- HEADER -->
-<img class="letterhead" src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie quotation header">
+<div class="print-header">
+  <img src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie quotation header">
+</div>
 <div class="header">
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
@@ -623,9 +638,9 @@ table td.tr{text-align:right;}
       <th style="width:4%">NO</th>
       <th class="tl" style="width:40%">PRODUCT</th>
       <th style="width:8%">QTY</th>
-      <th style="width:12%">DURATION<br><span style="font-weight:400;font-size:9px">(month)</span></th>
-      <th style="width:18%">HARGA SATUAN<br><span style="font-weight:400;font-size:9px">({{.Currency}})</span></th>
-      <th style="width:18%">JUMLAH<br><span style="font-weight:400;font-size:9px">({{.Currency}})</span></th>
+      <th style="width:12%">DURATION<br><span class="th-sub">(month)</span></th>
+      <th style="width:18%">HARGA SATUAN<br><span class="th-sub">({{.Currency}})</span></th>
+      <th style="width:18%">JUMLAH<br><span class="th-sub">({{.Currency}})</span></th>
     </tr>
   </thead>
   <tbody>
@@ -647,10 +662,10 @@ table td.tr{text-align:right;}
   <table class="tot-tbl">
     <tr><td class="lbl">Subtotal</td><td>{{formatRp .SubtotalAmount}}</td></tr>
     {{if .DiscountAmount}}<tr><td class="lbl">Diskon{{if .DiscountPct}} ({{printf "%.0f" .DiscountPct}}%){{end}}</td><td>{{formatRp .DiscountAmount}}</td></tr>{{end}}
-    {{if .DiscountAmount}}<tr><td class="lbl" style="font-weight:600;">Total Setelah Diskon</td><td style="font-weight:600;">{{formatRp (sub .SubtotalAmount .DiscountAmount)}}</td></tr>{{end}}
+    {{if .DiscountAmount}}<tr><td class="lbl emph">Total Setelah Diskon</td><td class="emph">{{formatRp (sub .SubtotalAmount .DiscountAmount)}}</td></tr>{{end}}
     {{if .TaxAmount}}<tr><td class="lbl">PPN {{if .TaxPct}}{{printf "%.0f" .TaxPct}}%{{else}}10%{{end}}</td><td>{{formatRp .TaxAmount}}</td></tr>{{end}}
     <tr class="grand"><td>GRAND TOTAL</td><td>{{formatRp .TotalAmount}}</td></tr>
-    <tr><td class="lbl" style="font-size:9px;font-weight:600;">Terbilang</td><td style="font-style:italic;color:#333;font-size:9px;">{{terbilang .TotalAmount}}</td></tr>
+    <tr><td class="terb-label">Terbilang</td><td class="terb-value">{{terbilang .TotalAmount}}</td></tr>
   </table>
 </div>
 
@@ -669,14 +684,14 @@ table td.tr{text-align:right;}
 <!-- SIGNATURES -->
 <div class="sig-sec">
   <div>
-    <div style="color:#444;font-size:11px;margin-bottom:2px;">{{.PrintedAt}}</div>
+    <div class="sig-at">{{.PrintedAt}}</div>
     <div class="sig-lbl">Dibuat oleh,</div>
     <div class="sig-line"></div>
     <div class="sig-name">{{if .PreparedBy}}{{.PreparedBy}}{{else}}-{{end}}</div>
     <div class="sig-ttl">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
   </div>
   <div>
-    <div style="color:#444;font-size:11px;margin-bottom:2px;">{{.PrintedAt}}</div>
+    <div class="sig-at">{{.PrintedAt}}</div>
     <div class="sig-lbl">Disetujui oleh,</div>
     <div class="sig-line"></div>
     <div class="sig-name">{{if .ApprovedBy}}{{.ApprovedBy}}{{else}}-{{end}}</div>
@@ -684,12 +699,8 @@ table td.tr{text-align:right;}
   </div>
 </div>
 
-<!-- FOOTER -->
-<img class="letterhead" src="data:image/png;base64,{{.FooterBase64}}" alt="Archie quotation footer">
-
 <!-- PAGE 2: TERMS & CONDITIONS -->
 <div class="page-break">
-<img class="letterhead" src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie quotation header">
 <div class="header">
   <div class="doc-heading">
     <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
@@ -742,21 +753,24 @@ Hal-hal yang belum cukup diatur dalam Perjanjian ini, namun Para Pihak memandang
 
 <div class="tc-sign">
   <div>
-    <div style="color:#444;font-size:11px;margin-bottom:2px;">{{.PrintedAt}}</div>
-    <div style="font-weight:600;margin-bottom:3px;">Dibuat oleh,</div>
+    <div class="tc-at">{{.PrintedAt}}</div>
+    <div class="sig-lbl">Dibuat oleh,</div>
     <div class="sig-line"></div>
-    <div style="font-weight:700;">{{if .PreparedBy}}{{.PreparedBy}}{{else}}-{{end}}</div>
-    <div style="color:#555;font-size:11px;">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
+    <div class="tc-name">{{if .PreparedBy}}{{.PreparedBy}}{{else}}-{{end}}</div>
+    <div class="tc-ttl">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
   </div>
   <div>
-    <div style="color:#444;font-size:11px;margin-bottom:2px;">{{.PrintedAt}}</div>
-    <div style="font-weight:600;margin-bottom:3px;">Disetujui oleh,</div>
+    <div class="tc-at">{{.PrintedAt}}</div>
+    <div class="sig-lbl">Disetujui oleh,</div>
     <div class="sig-line"></div>
-    <div style="font-weight:700;">{{if .ApprovedBy}}{{.ApprovedBy}}{{else}}-{{end}}</div>
-    <div style="color:#555;font-size:11px;">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
+    <div class="tc-name">{{if .ApprovedBy}}{{.ApprovedBy}}{{else}}-{{end}}</div>
+    <div class="tc-ttl">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
   </div>
 </div>
-<img class="letterhead" src="data:image/png;base64,{{.FooterBase64}}" alt="Archie quotation footer">
+</div>
+
+<div class="print-footer">
+  <img src="data:image/png;base64,{{.FooterBase64}}" alt="Archie quotation footer">
 </div>
 
 {{if .DownloadMode}}

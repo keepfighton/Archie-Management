@@ -569,28 +569,71 @@ table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:1
 table td.tc{text-align:center;}
 table td.tr{text-align:right;}
 .th-sub{display:block;font-weight:400;font-size:12px;line-height:1.1;}
+.scope-table thead th{
+  background:#1a3c7a;
+  color:#fff;
+  border-color:#1a3c7a;
+}
+.scope-table .th-sub{
+  color:rgba(255,255,255,.88);
+}
 .terb-row td{background:#f5f5f5;font-style:italic;font-size:12px;border-top:1px solid #b8b8b8;}
-.bot{display:flex;justify-content:flex-end;margin-top:8px;}
-.tot-tbl{border-collapse:collapse;font-size:12px;}
-.tot-tbl td{padding:4px 10px;font-size:12px;}
+.bot{display:flex;justify-content:flex-end;margin-top:10px;margin-bottom:6px;}
+.tot-tbl{
+  border-collapse:separate;
+  border-spacing:0;
+  font-size:12px;
+  min-width:320px;
+  background:#fff;
+  border:1px solid #c9d8f0;
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:0 8px 24px rgba(26,60,122,.08);
+}
+.tot-tbl td{padding:6px 12px;font-size:12px;background:#fff;}
 .tot-tbl td:last-child{text-align:right;}
 .tot-tbl .lbl{font-size:12px;}
 .tot-tbl .emph{font-weight:600;}
-.grand td{font-weight:700;font-size:12px;background:#fff;padding:7px 10px;}
+.grand td{font-weight:700;font-size:12px;background:#1a3c7a;color:#fff;padding:8px 12px;}
+.grand td:last-child{color:#fff;}
 .terb-label{font-weight:600;font-size:12px;}
 .terb-value{font-style:italic;font-size:12px;text-align:right;}
-.keter{margin-top:12px;font-size:12px;line-height:1.45;}
-.sig-sec{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:22px;}
+.keter{
+  margin-top:10px;
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.45;
+  border:1px solid #dbe7f7;
+  border-radius:10px;
+  background:#f8fbff;
+}
+.sig-sec{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:28px;
+  margin-top:18px;
+}
+.sig-sec > div,
+.tc-sign > div{
+  padding-top:8px;
+  border-top:2px solid #1a3c7a;
+}
 .sig-at{font-size:12px;margin-bottom:2px;}
 .sig-lbl{font-weight:700;margin-bottom:3px;font-size:12px;}
-.sig-line{height:56px;border-bottom:1px solid #000;margin:6px 0;}
+.sig-line{height:56px;border-bottom:1px solid #1a3c7a;margin:6px 0;}
 .sig-name{font-weight:700;font-size:12px;}
 .sig-ttl{font-size:12px;}
 .tc-hdr{font-size:12px;font-weight:700;margin-bottom:12px;text-align:center;border-bottom:1px solid #b8b8b8;padding-bottom:7px;}
 .tc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;font-size:12px;line-height:1.45;}
 .tc-pasal{margin-bottom:8px;}
 .tc-pasal strong{display:block;margin-bottom:2px;font-size:12px;}
-.tc-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;font-size:12px;}
+.tc-sign{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:28px;
+  margin-top:24px;
+  font-size:12px;
+}
 .tc-at{font-size:12px;margin-bottom:2px;}
 .tc-name{font-weight:700;font-size:12px;}
 .tc-ttl{font-size:12px;}
@@ -632,7 +675,7 @@ table td.tr{text-align:right;}
 
 <!-- PRODUCT SCOPE -->
 <div class="section-label">PRODUCT SCOPE</div>
-<table>
+<table class="scope-table">
   <thead>
     <tr>
       <th style="width:4%">NO</th>
@@ -677,8 +720,8 @@ table td.tr{text-align:right;}
 </div>
 {{end}}
 
-{{if .Notes}}<div class="keter"><strong>Keterangan:</strong><br>{{.Notes}}</div>{{end}}
 {{if .PaymentTerms}}<div class="keter"><strong>Payment Terms:</strong> {{.PaymentTerms}}</div>{{end}}
+{{if .Notes}}<div class="keter"><strong>Keterangan:</strong><br>{{.Notes}}</div>{{end}}
 {{if .AcceptanceNotes}}<div class="keter"><strong>Acceptance:</strong> {{.AcceptanceNotes}}</div>{{end}}
 
 <!-- SIGNATURES -->

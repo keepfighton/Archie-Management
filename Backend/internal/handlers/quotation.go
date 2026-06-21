@@ -543,6 +543,10 @@ html,body{width:100%;}
 body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 44mm;}
 body *{font-family:inherit;color:inherit;}
 strong,b{font-weight:700;}
+html,body,*{
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
 @media print{
   @page{size:A4;margin:0;}
   body{padding:42mm 15mm 44mm;}

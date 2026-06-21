@@ -555,9 +555,9 @@ html,body,*{
 }
 .print-header{position:fixed;left:0;right:0;top:0;z-index:2;pointer-events:none;}
 .print-header img{width:100%;display:block;margin:0;}
-.header{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:14px;}
-.doc-heading{text-align:right;}
-.doc-heading h1{font-size:12px;font-weight:700;line-height:1.2;}
+.header{display:flex;justify-content:center;align-items:flex-start;margin-bottom:14px;}
+.doc-heading{text-align:center;width:100%;}
+.doc-heading h1{font-size:14px;font-weight:700;line-height:1.2;letter-spacing:.3px;text-transform:uppercase;}
 .doc-heading p{font-size:12px;margin-top:2px;line-height:1.2;}
 .section-label{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:12px 0 5px;}
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px;}
@@ -653,7 +653,7 @@ table td.tr{text-align:right;}
 </div>
 <div class="header">
   <div class="doc-heading">
-    <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
+    <h1>PURCHASE ORDER{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}</p>
 
   </div>
@@ -749,7 +749,7 @@ table td.tr{text-align:right;}
 <div class="page-break">
 <div class="header">
   <div class="doc-heading">
-    <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
+    <h1>PURCHASE ORDER{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}</p>
   </div>
 </div>

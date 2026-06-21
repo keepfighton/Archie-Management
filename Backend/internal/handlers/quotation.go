@@ -670,7 +670,6 @@ table td.tr{text-align:right;}
     <div class="detail-row"><span class="dl">Email</span><span class="dv">{{if .Client}}{{.Client.Email}}{{else}}-{{end}}</span></div>
   </div>
   <div class="detail-right">
-    <div class="detail-row"><span class="dl">No Kontrak</span><span class="dv">{{if .ContractNo}}{{.ContractNo}}{{else}}-{{end}}</span></div>
     <div class="detail-row"><span class="dl">Tanggal Order</span><span class="dv">{{formatDate .IssueDate}}</span></div>
     <div class="detail-row"><span class="dl">Masa Berlaku</span><span class="dv">{{if .MasaBerlaku}}{{.MasaBerlaku}}{{else}}s/d {{formatDate .ValidUntil}}{{end}}</span></div>
     {{if .Project}}<div class="detail-row"><span class="dl">Project</span><span class="dv">{{.Project.Title}}</span></div>{{end}}
@@ -744,76 +743,6 @@ table td.tr{text-align:right;}
     <div class="sig-name">{{if .ApprovedBy}}{{.ApprovedBy}}{{else}}-{{end}}</div>
     <div class="sig-ttl">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
   </div>
-</div>
-
-<!-- PAGE 2: TERMS & CONDITIONS -->
-<div class="page-break">
-<div class="header">
-  <div class="doc-heading">
-    <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
-    <p>{{.QuoteNumber}}</p>
-  </div>
-</div>
-<div class="tc-hdr">TERMS &amp; CONDITIONS</div>
-<div class="tc-grid">
-
-<div class="tc-pasal"><strong>Pasal 1: Definisi</strong>
-Sistem adalah semua produk, aplikasi, dan solusi digital untuk mengotomasi sistem pelaporan dan administrasi yang dimiliki oleh Penyedia. Customer Support adalah jasa yang diberikan kepada Pihak Kedua berupa tindakan perbaikan sistem, saran, atau penggunaan sistem, dan juga pemberitahuan apabila ada pembaruan pada sistem. Pengguna Internal adalah karyawan Pihak Kedua yang alamat emailnya terdaftar pada sistem Penyedia.</div>
-
-<div class="tc-pasal"><strong>Pasal 2: Maksud dan Tujuan</strong>
-1. Maksud Perjanjian adalah untuk mengikat penggunaan sistem oleh Pihak Kedua selama Perjanjian berlaku. 2. Tujuannya adalah agar Penyedia menjamin sistem dapat digunakan Pihak Kedua sesuai dengan fungsinya, dan Pihak Kedua memberikan kompensasi biaya yang sesuai kepada Penyedia.</div>
-
-<div class="tc-pasal"><strong>Pasal 3: Ruang Lingkup</strong>
-1. Penyedia sepakat untuk memberikan izin penggunaan sistem kepada Pihak Kedua, dan Pihak Kedua sepakat untuk menggunakan sistem Penyedia hanya pada lingkungan internal sesuai jumlah pengguna pada penawaran. 2. Atas pemberian izin, Pihak Kedua wajib membayar biaya mencakup biaya lisensi dan biaya tahunan. 3. Atas penambahan pengguna, Pihak Kedua wajib membayar tambahan secara pro rata.</div>
-
-<div class="tc-pasal"><strong>Pasal 4: Hak dan Kewajiban Para Pihak</strong>
-1.1 Penyedia berhak mendapat pembayaran biaya lisensi dan biaya tahunan dari Pihak Kedua. 1.2 Penyedia berkewajiban memberikan izin penggunaan sistem kepada Pihak Kedua selama yang ditentukan pada penawaran. 1.3 Penyedia berkewajiban menyediakan sistem sesuai jumlah pengguna. 1.4 Penyedia berkewajiban memberikan Customer Support perihal penggunaan sistem. 2.1 Pihak Kedua berhak untuk menggunakan sistem Penyedia pada lingkungan internal sesuai dengan jumlah pengguna. 2.2 Pihak Kedua berhak untuk mendapatkan Customer Support.</div>
-
-<div class="tc-pasal"><strong>Pasal 5: Jangka Waktu</strong>
-1. Perjanjian ini berlaku sejak Perjanjian ini ditandatangani dan secara otomatis akan berlaku untuk periode dan jangka waktu 1 (satu) tahun berikutnya sepanjang tidak ada permintaan tertulis untuk pengakhiran penggunaan sistem oleh Pihak Kedua. 2. Jangka waktu penggunaan berlaku terhitung sejak tanggal aktif penggunaan oleh Pihak Kedua hingga saat Perjanjian ini berakhir.</div>
-
-<div class="tc-pasal"><strong>Pasal 6: Berakhirnya Perjanjian</strong>
-Perjanjian ini berakhir apabila: 1. Jika salah satu Pihak melanggar isi Perjanjian ini dan/atau terlambat pelanggaran hukum yang berlaku untuk salah satu Pihak. 2. Berakhirnya atau diakhirinya Perjanjian ini tidak menghapuskan tanggung jawab masing-masing pihak dari pelaksanaan Perjanjian ini. 3. Apabila Perjanjian diakhiri karena kelalaian atau kesengajaan yang dilakukan oleh Penyedia maka jumlah pembayaran yang telah dilakukan oleh Pihak Kedua kepada Penyedia harus dikembalikan dan karenanya menjadi hak sepenuhnya Penyedia.</div>
-
-<div class="tc-pasal"><strong>Pasal 7: Biaya</strong>
-Pihak Kedua berkewajiban untuk membayar semua biaya yang tertera pada penawaran yang sudah disetujui oleh pihak yang berwenang mewakili Pihak Kedua dengan menandatangani penawaran tersebut. Pembayaran dilakukan setelah selambat-lambatnya 7 (tujuh) hari setelah tagihan dikirimkan oleh Penyedia ke Pihak Kedua. Keterlambatan pembayaran oleh Pihak Kedua kepada Penyedia, keterlambatan yang diperkenankan adalah jangka waktu 7 (tujuh) hari sejak tanggal yang ditetapkan pada Pasal 7 ayat 2 Perjanjian ini maka akan menjadi tanggung jawab Pihak Kedua dan Pihak Kedua setuju untuk memberikan kompensasi keterlambatan sebesar 0,1% (nol koma satu persen) per hari dari nilai tagihan yang belum dibayarkan.</div>
-
-<div class="tc-pasal"><strong>Pasal 8: Etika</strong>
-Para Pihak setuju untuk saling menjaga kerahasiaan data, reputasi, nama baik, citra dan kelancaran informasi ataupun source program yang digunakan dalam sistem agar dapat berlangsung secara terus menerus dengan baik, walaupun kerjasama antara Para Pihak tidak lagi diteruskan.</div>
-
-<div class="tc-pasal"><strong>Pasal 9: Keadaan Memaksa (Force Majeure)</strong>
-Para Pihak dibebaskan dari segala sanksi atau tanggungjawab yang disebabkan keadaan/kejadian atau hal yang terjadi di luar kekuasaan wajar dari Penyedia maupun Pihak Kedua yang bersifat Force Majeure. Dalam hal timbul keadaan memaksa (Force Majeure), salah satu Pihak wajib memberitahukan kepada Pihak lainnya secara tertulis disertai dengan bukti-bukti yang cukup kuat selambat-lambatnya dalam waktu 3x24 jam.</div>
-
-<div class="tc-pasal"><strong>Pasal 10: Pengakhiran Karena Force Majeure</strong>
-Bilamana keadaan memaksa (Force Majeure) diterima oleh Pihak yang mendapat pemberitahuan, maka perlu diadakan lagi negosiasi untuk menyesuaikan kelangsungan Perjanjian sesuai dengan ketentuan yang ada tanpa merugikan kedua Para Pihak. Perjanjian ini tetap berlaku sesuai dengan ketentuan-ketentuan dalam Perjanjian ini.</div>
-
-<div class="tc-pasal"><strong>Pasal 11: Perselisihan</strong>
-1. Perjanjian ini tunduk pada Peraturan Perundang-undangan yang berlaku di wilayah Republik Indonesia. 2. Para Pihak harus berusaha mencari jalan untuk menyelesaikan masalah yang timbul terkait dengan penafsiran dan/atau pelaksanaan Perjanjian secara baik-baik (Musyawarah). Apabila penyelesaian melalui musyawarah tidak berhasil, maka Para Pihak sepakat untuk memilih tempat kedudukan hukum yang tetap dan tidak berubah di Kantor Panitera Pengadilan Negeri Jakarta Selatan.</div>
-
-<div class="tc-pasal"><strong>Pasal 12: Pernyataan dan Jaminan</strong>
-Para Pihak menyatakan dan menjamin bahwa: Perusahaan merupakan perusahaan sah, dan dijalankan dalam keadaan baik berdasarkan hukum Republik Indonesia. Terhadap Para Pihak saat ini tidak terdapat tindakan material, sengketa, gugatan, proses pengadilan, arbitrasi, pemeriksaan dan atau proses lainnya di hadapan hukum atau pengadilan atau pemerintah yang dapat mempengaruhi kemampuan pihak dalam melaksanakan kewajiban-kewajibannya berdasarkan Perjanjian ini.</div>
-
-<div class="tc-pasal"><strong>Pasal 13: Lain-lain</strong>
-Hal-hal yang belum cukup diatur dalam Perjanjian ini, namun Para Pihak memandang perlu untuk mengaturnya, maka akan dibuatkan adendum yang merupakan bagian tidak terpisahkan dari Perjanjian ini. Demikianlah Perjanjian ini dibuat dan Pihak Kedua menyatakan menyetujui Perjanjian ini secara keseluruhan tanpa pengecualian.</div>
-
-</div>
-
-<div class="tc-sign">
-  <div>
-    <div class="tc-at">{{.PrintedAt}}</div>
-    <div class="sig-lbl">Dibuat oleh,</div>
-    <div class="sig-line"></div>
-    <div class="tc-name">{{if .PreparedBy}}{{.PreparedBy}}{{else}}-{{end}}</div>
-    <div class="tc-ttl">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
-  </div>
-  <div>
-    <div class="tc-at">{{.PrintedAt}}</div>
-    <div class="sig-lbl">Disetujui oleh,</div>
-    <div class="sig-line"></div>
-    <div class="tc-name">{{if .ApprovedBy}}{{.ApprovedBy}}{{else}}-{{end}}</div>
-    <div class="tc-ttl">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
-  </div>
-</div>
 </div>
 
 <div class="print-footer">

@@ -745,6 +745,65 @@ table td.tr{text-align:right;}
   </div>
 </div>
 
+<!-- PAGE 2: TERMS & CONDITIONS -->
+<div class="page-break">
+<div class="header">
+  <div class="doc-heading">
+    <h1>Quotation{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
+    <p>{{.QuoteNumber}}</p>
+  </div>
+</div>
+<div class="tc-hdr">TERMS &amp; CONDITIONS</div>
+<div class="tc-grid">
+  <div class="tc-pasal"><strong>Pasal 1: Ruang Lingkup Layanan</strong>
+  Archie Consultant menyediakan layanan konsultasi pajak, akuntansi, pembukuan, pendirian usaha, dan business advisory sesuai ruang lingkup yang disepakati dalam penawaran ini. Setiap layanan dijalankan berdasarkan kebutuhan bisnis klien dan dapat disesuaikan selama masa kerja sama.</div>
+
+  <div class="tc-pasal"><strong>Pasal 2: Proses Pekerjaan</strong>
+  Kerja sama dimulai dari konsultasi awal, assessment kebutuhan, rekomendasi ruang lingkup, implementasi, dan ongoing support. Hasil assessment dapat menjadi dasar penyesuaian deliverable, timeline, maupun biaya layanan.</div>
+
+  <div class="tc-pasal"><strong>Pasal 3: Kewajiban Klien</strong>
+  Klien wajib menyediakan data, dokumen, akses, dan konfirmasi yang diperlukan secara lengkap, benar, dan tepat waktu. Keterlambatan atau ketidaklengkapan data dapat memengaruhi jadwal pekerjaan dan hasil layanan.</div>
+
+  <div class="tc-pasal"><strong>Pasal 4: Pajak dan Kepatuhan</strong>
+  Untuk layanan pajak, klien bertanggung jawab atas kebenaran data transaksi dan dokumen pendukung. Archie Consultant membantu analisis, pelaporan, review kepatuhan, tax planning, Coretax, SP2DK, dan pemeriksaan pajak sesuai ruang lingkup yang disepakati, namun keputusan akhir tetap mengikuti ketentuan regulasi yang berlaku.</div>
+
+  <div class="tc-pasal"><strong>Pasal 5: Akuntansi, Pembukuan, dan Setup</strong>
+  Untuk layanan akuntansi, pembukuan, dan company setup, pekerjaan mencakup pencatatan, rekonsiliasi, penyusunan laporan, administrasi usaha, dan rekomendasi perbaikan sistem. Implementasi mengikuti kondisi data dan proses bisnis klien pada saat pekerjaan dimulai.</div>
+
+  <div class="tc-pasal"><strong>Pasal 6: Biaya dan Pembayaran</strong>
+  Biaya layanan mengikuti penawaran yang telah disetujui. Pembayaran dilakukan sesuai termin yang tercantum pada quotation atau invoice. Pekerjaan dapat ditunda apabila pembayaran jatuh tempo belum diselesaikan.</div>
+
+  <div class="tc-pasal"><strong>Pasal 7: Deliverables dan Revisi</strong>
+  Deliverables berupa laporan, review, rekomendasi, file kerja, atau dokumen pendukung lain yang dijelaskan dalam ruang lingkup. Revisi di luar scope awal atau perubahan besar setelah approval dapat menjadi pekerjaan tambahan.</div>
+
+  <div class="tc-pasal"><strong>Pasal 8: Kerahasiaan</strong>
+  Seluruh data, dokumen, dan informasi bisnis klien diperlakukan sebagai rahasia dan hanya digunakan untuk pelaksanaan pekerjaan. Archie Consultant menjaga kerahasiaan sepanjang kerja sama dan setelah kerja sama berakhir, kecuali diwajibkan oleh hukum.</div>
+
+  <div class="tc-pasal"><strong>Pasal 9: Batasan Tanggung Jawab</strong>
+  Archie Consultant bekerja berdasarkan data dan informasi yang diberikan klien. Kami tidak bertanggung jawab atas konsekuensi yang timbul dari data yang tidak lengkap, tidak akurat, atau perubahan regulasi yang terjadi di luar kendali selama pekerjaan berlangsung.</div>
+
+  <div class="tc-pasal"><strong>Pasal 10: Pengakhiran dan Force Majeure</strong>
+  Kerja sama dapat diakhiri berdasarkan kesepakatan para pihak atau kondisi force majeure yang menghambat pelaksanaan pekerjaan. Dalam kondisi demikian, para pihak akan melakukan penyesuaian atas timeline, ruang lingkup, atau pengakhiran kerja sama secara wajar.</div>
+</div>
+
+<div class="tc-sign">
+  <div>
+    <div class="tc-at">{{.PrintedAt}}</div>
+    <div class="sig-lbl">Dibuat oleh,</div>
+    <div class="sig-line"></div>
+    <div class="tc-name">{{if .PreparedBy}}{{.PreparedBy}}{{else}}-{{end}}</div>
+    <div class="tc-ttl">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
+  </div>
+  <div>
+    <div class="tc-at">{{.PrintedAt}}</div>
+    <div class="sig-lbl">Disetujui oleh,</div>
+    <div class="sig-line"></div>
+    <div class="tc-name">{{if .ApprovedBy}}{{.ApprovedBy}}{{else}}-{{end}}</div>
+    <div class="tc-ttl">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
+  </div>
+</div>
+</div>
+
 <div class="print-footer">
   <img src="data:image/png;base64,{{.FooterBase64}}" alt="Archie quotation footer">
 </div>

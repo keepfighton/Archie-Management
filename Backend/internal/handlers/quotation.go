@@ -553,6 +553,9 @@ html,body,*{
   .no-print{display:none!important;}
   .page-break{page-break-before:always;break-before:page;}
 }
+.terms-page{padding-top:18mm;}
+.terms-page .header{margin-bottom:10px;}
+.terms-page .tc-hdr{margin-top:2px;}
 .print-header{position:fixed;left:0;right:0;top:0;z-index:2;pointer-events:none;}
 .print-header img{width:100%;display:block;margin:0;}
 .header{display:flex;justify-content:center;align-items:flex-start;margin-bottom:14px;}
@@ -746,7 +749,7 @@ table td.tr{text-align:right;}
 </div>
 
 <!-- PAGE 2: TERMS & CONDITIONS -->
-<div class="page-break">
+<div class="page-break terms-page">
 <div class="header">
   <div class="doc-heading">
     <h1>PURCHASE ORDER{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>

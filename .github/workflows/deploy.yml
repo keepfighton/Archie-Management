@@ -14,67 +14,66 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: 🧰 Install SSH client helpers
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: 🔍 Check SSH reachability
+        run: |
+          set -e
+          host="${{ secrets.VPS_HOST }}"
+          echo "Checking SSH reachability to ${host}:22 ..."
+          for attempt in 1 2 3; do
+            if nc -z -w 5 "$host" 22; then
+              echo "✅ SSH port is reachable"
+              exit 0
+            fi
+            echo "Waiting before retry $attempt/3..."
+            sleep $((attempt * 10))
+          done
+          echo "❌ SSH port is not reachable after 3 attempts"
+          exit 1
+
       - name: 🚀 Deploy to VPS via SSH
         id: deploy
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script_stop: true
-          command_timeout: 20m
-          script: |
-            set -e
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          deploy_script=".github/scripts/deploy_remote.sh"
 
-            echo "📂 Navigating to project directory..."
-            cd ~/archie-node/apps/archie-management
+          if [ ! -f "$deploy_script" ]; then
+            echo "❌ Deploy script not found: $deploy_script"
+            exit 1
+          fi
 
-            echo "🔄 Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+          deploy_once() {
+            sshpass -p "$VPS_PASSWORD" ssh \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=20 \
+              -o ServerAliveInterval=15 \
+              -o ServerAliveCountMax=4 \
+              "$VPS_USER@$VPS_HOST" 'bash -se' < "$deploy_script"
+          }
 
-            echo "🔍 Checking environment file..."
-            if [ ! -f .env ]; then
-              echo "❌ .env file not found!"
-              exit 1
+          for attempt in 1 2 3; do
+            echo "🚀 Deployment attempt $attempt/3"
+            if deploy_once; then
+              exit 0
             fi
-
-            echo "🌐 Checking network..."
-            docker network inspect web >/dev/null 2>&1 || docker network create web
-
-            echo "🐳 Building and deploying containers..."
-            docker compose up -d --build --no-deps backend frontend
-
-            echo "⏳ Waiting for services..."
-            sleep 10
-
-            echo "🏥 Health check..."
-            max_attempts=30
-            attempt=0
-            while [ $attempt -lt $max_attempts ]; do
-              if docker compose exec -T backend sh -lc 'wget -qO- http://127.0.0.1:8080/health >/dev/null'; then
-                echo "✅ Backend is healthy!"
-                break
-              fi
-              attempt=$((attempt + 1))
-              echo "Waiting... ($attempt/$max_attempts)"
-              sleep 2
-            done
-
-            if [ $attempt -eq $max_attempts ]; then
-              echo "⚠️ Health check timeout!"
-              docker compose logs --tail=50 backend
-              exit 1
+            echo "⚠️ Deploy attempt $attempt failed"
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 15))
             fi
+          done
 
-            echo "🔍 Verifying containers..."
-            docker ps --format '{{.Names}}' | grep '^archie-backend$' || exit 1
-            docker ps --format '{{.Names}}' | grep '^archie-frontend$' || exit 1
-
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f
-
-            echo "✅ Deployment successful!"
+          echo "❌ Deployment failed after 3 attempts"
+          exit 1
 
       - name: 📊 Deployment Status
         if: always()

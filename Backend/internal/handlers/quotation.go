@@ -553,7 +553,7 @@ html,body,*{
   .no-print{display:none!important;}
   .page-break{page-break-before:always;break-before:page;}
 }
-.terms-page{padding-top:30mm;}
+.terms-page{padding-top:44mm;}
 .terms-page .header{margin-bottom:10px;}
 .terms-page .tc-hdr{margin-top:2px;}
 .tc-pasal{break-inside:avoid;page-break-inside:avoid;}

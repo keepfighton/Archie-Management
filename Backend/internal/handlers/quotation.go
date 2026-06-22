@@ -657,7 +657,7 @@ table td.tr{text-align:right;}
 </div>
 <div class="header">
   <div class="doc-heading">
-    <h1>PURCHASE ORDER{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
+    <h1>Quotations{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
     <p>{{.QuoteNumber}}</p>
 
   </div>
@@ -753,7 +753,7 @@ table td.tr{text-align:right;}
 <div class="page-break terms-page">
   <div class="header">
     <div class="doc-heading">
-      <h1>PURCHASE ORDER{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
+      <h1>Quotations{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
       <p>{{.QuoteNumber}}</p>
     </div>
   </div>
@@ -780,7 +780,7 @@ table td.tr{text-align:right;}
 <div class="page-break terms-page">
   <div class="header">
     <div class="doc-heading">
-      <h1>PURCHASE ORDER{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
+      <h1>Quotations{{if gt .Revision 0}} (Revision {{.Revision}}){{end}}</h1>
       <p>{{.QuoteNumber}}</p>
     </div>
   </div>

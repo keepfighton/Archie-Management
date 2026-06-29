@@ -27,7 +27,7 @@ export default function ContractsPage() {
   const [form, setForm] = useState<any>({
     contract_number: '', title: '', client_id: '', project_id: '',
     contract_date: '', valid_until: '', amount: '', currency: 'IDR', status: 'draft',
-    prepared_by: '', prepared_by_title: '', file_url: '',
+    client_signatory: '', client_signatory_title: '', prepared_by: '', prepared_by_title: '', file_url: '',
   })
 
   const [projectsByContract, setProjectsByContract] = useState<Record<number, any[]>>({})
@@ -88,6 +88,8 @@ export default function ContractsPage() {
       amount: '',
       currency: 'IDR',
       status: 'draft',
+      client_signatory: '',
+      client_signatory_title: '',
       prepared_by: '',
       prepared_by_title: '',
       file_url: '',
@@ -97,11 +99,13 @@ export default function ContractsPage() {
 
   const openEdit = (c: any) => {
     setEditItem(c)
+    const legacyClientSignatory = !c.client_signatory && c.prepared_by_title ? c.prepared_by_title : ''
     setForm({
       contract_number: c.contract_number, title: c.title, client_id: c.client_id, project_id: c.project_id || '',
       contract_date: c.contract_date?.split('T')[0] || '', valid_until: c.valid_until?.split('T')[0] || '',
       amount: c.amount, currency: c.currency, status: c.status,
-      prepared_by: c.prepared_by || '', prepared_by_title: c.prepared_by_title || '',
+      client_signatory: c.client_signatory || legacyClientSignatory, client_signatory_title: c.client_signatory_title || '',
+      prepared_by: c.prepared_by || '', prepared_by_title: c.client_signatory ? (c.prepared_by_title || '') : '',
       file_url: c.file_url || '',
     })
     setShowModal(true)
@@ -279,12 +283,20 @@ export default function ContractsPage() {
               <option value="IDR">IDR</option><option value="USD">USD</option><option value="EUR">EUR</option>
             </select>
           </FormField>
-          <FormField label="Prepared By">
-            <input className="input" value={form.prepared_by} placeholder="Archie Consultant"
+          <FormField label="Client Signatory">
+            <input className="input" value={form.client_signatory} placeholder="Herry"
+              onChange={e => setForm({ ...form, client_signatory: e.target.value })} />
+          </FormField>
+          <FormField label="Client Signatory Title">
+            <input className="input" value={form.client_signatory_title} placeholder="Authorized Representative"
+              onChange={e => setForm({ ...form, client_signatory_title: e.target.value })} />
+          </FormField>
+          <FormField label="Archie Signatory">
+            <input className="input" value={form.prepared_by} placeholder="Alvian Adipratama"
               onChange={e => setForm({ ...form, prepared_by: e.target.value })} />
           </FormField>
-          <FormField label="Prepared By Title">
-            <input className="input" value={form.prepared_by_title} placeholder="Authorized Signatory"
+          <FormField label="Archie Signatory Title">
+            <input className="input" value={form.prepared_by_title} placeholder="Director"
               onChange={e => setForm({ ...form, prepared_by_title: e.target.value })} />
           </FormField>
         </div>

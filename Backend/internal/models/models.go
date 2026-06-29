@@ -460,21 +460,23 @@ type Payment struct {
 // ─── CONTRACT ────────────────────────────────────────
 type Contract struct {
 	Base
-	ContractNumber  string   `gorm:"uniqueIndex" json:"contract_number"`
-	Title           string   `gorm:"not null" json:"title"`
-	ClientID        uint     `json:"client_id"`
-	Client          *Client  `gorm:"foreignKey:ClientID" json:"client,omitempty"`
-	ProjectID       *uint    `json:"project_id"`
-	Project         *Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
-	ContractDate    FlexTime `json:"contract_date"`
-	ValidUntil      FlexTime `json:"valid_until"`
-	Amount          float64  `json:"amount"`
-	Currency        string   `gorm:"default:IDR" json:"currency"`
-	Status          string   `gorm:"default:draft" json:"status"`
-	PreparedBy      string   `json:"prepared_by"`
-	PreparedByTitle string   `json:"prepared_by_title"`
-	FileURL         string   `json:"file_url"`
-	FileName        string   `json:"file_name"`
+	ContractNumber       string   `gorm:"uniqueIndex" json:"contract_number"`
+	Title                string   `gorm:"not null" json:"title"`
+	ClientID             uint     `json:"client_id"`
+	Client               *Client  `gorm:"foreignKey:ClientID" json:"client,omitempty"`
+	ProjectID            *uint    `json:"project_id"`
+	Project              *Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+	ContractDate         FlexTime `json:"contract_date"`
+	ValidUntil           FlexTime `json:"valid_until"`
+	Amount               float64  `json:"amount"`
+	Currency             string   `gorm:"default:IDR" json:"currency"`
+	Status               string   `gorm:"default:draft" json:"status"`
+	ClientSignatory      string   `json:"client_signatory"`
+	ClientSignatoryTitle string   `json:"client_signatory_title"`
+	PreparedBy           string   `json:"prepared_by"`
+	PreparedByTitle      string   `json:"prepared_by_title"`
+	FileURL              string   `json:"file_url"`
+	FileName             string   `json:"file_name"`
 }
 
 // ─── ITEM (Product/Service) ───────────────────────────

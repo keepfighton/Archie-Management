@@ -2501,14 +2501,14 @@ table td.tr{text-align:right;}
   <div class="sign-box">
     <div class="sign-title">Client</div>
     <div class="sign-line"></div>
-    <div class="sign-name">{{if .Client}}{{.Client.Name}}{{else}}-{{end}}</div>
-    <div class="sign-role">Authorized Representative</div>
+    <div class="sign-name">{{if .ClientSignatory}}{{.ClientSignatory}}{{else if .PreparedByTitle}}{{.PreparedByTitle}}{{else if .Client}}{{.Client.Name}}{{else}}-{{end}}</div>
+    <div class="sign-role">{{if .ClientSignatoryTitle}}{{.ClientSignatoryTitle}}{{else if .Client}}{{.Client.Name}}{{else}}Authorized Representative{{end}}</div>
   </div>
   <div class="sign-box">
     <div class="sign-title">Archie Consultant</div>
     <div class="sign-line"></div>
     <div class="sign-name">{{if .PreparedBy}}{{.PreparedBy}}{{else}}Archie Consultant{{end}}</div>
-    <div class="sign-role">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
+    <div class="sign-role">{{if .ClientSignatory}}{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}{{else}}Authorized Signatory{{end}}</div>
   </div>
 </div>
 

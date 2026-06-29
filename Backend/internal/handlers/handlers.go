@@ -2365,6 +2365,33 @@ table td.tr{text-align:right;}
   font-size:12px;
   line-height:1.5;
 }
+.signatures{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:28px;
+  margin-top:22px;
+}
+.sign-box{
+  padding-top:8px;
+  border-top:2px solid #1a3c7a;
+}
+.sign-title{
+  font-size:12px;
+  font-weight:700;
+  margin-bottom:8px;
+}
+.sign-line{
+  height:56px;
+  border-bottom:1px solid #1a3c7a;
+  margin:6px 0 8px;
+}
+.sign-name{
+  font-size:12px;
+  font-weight:700;
+}
+.sign-role{
+  font-size:12px;
+}
 </style>
 </head>
 <body>
@@ -2439,6 +2466,21 @@ table td.tr{text-align:right;}
 </div>
 
 {{if .FileName}}<div class="note"><strong>Dokumen terlampir:</strong> {{.FileName}}</div>{{end}}
+
+<div class="signatures">
+  <div class="sign-box">
+    <div class="sign-title">Client</div>
+    <div class="sign-line"></div>
+    <div class="sign-name">{{if .Client}}{{.Client.Name}}{{else}}-{{end}}</div>
+    <div class="sign-role">Authorized Representative</div>
+  </div>
+  <div class="sign-box">
+    <div class="sign-title">Archie Consultant</div>
+    <div class="sign-line"></div>
+    <div class="sign-name">Archie Consultant</div>
+    <div class="sign-role">Authorized Signatory</div>
+  </div>
+</div>
 
 <div class="print-footer">
   <img src="data:image/png;base64,{{.FooterBase64}}" alt="Archie contract footer">

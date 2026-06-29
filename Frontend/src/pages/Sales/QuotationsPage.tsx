@@ -22,6 +22,7 @@ const STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted
 const PAGE_SIZE = 30
 
 const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString('id-ID')}`
+const roundCurrency = (value: number) => Math.round(Number(value || 0))
 
 const emptyForm = () => ({
   quote_number: '',
@@ -182,13 +183,14 @@ export default function QuotationsPage() {
   const subtotal = localItems.reduce((s, it) => s + (Number(it.quantity) * Number(it.unit_price)), 0)
   const discountAmt = form.discount_pct ? subtotal * Number(form.discount_pct) / 100 : 0
   const afterDiscount = subtotal - discountAmt
-  const taxAmt = form.tax_pct ? afterDiscount * Number(form.tax_pct) / 100 : 0
+  const taxAmt = form.tax_pct ? roundCurrency(afterDiscount * Number(form.tax_pct) / 100) : 0
   const taxType = String(form.tax_type || 'ppn')
-  const grandTotal = taxType === 'pph'
+  const rawGrandTotal = taxType === 'pph'
     ? Math.max(afterDiscount - taxAmt, 0)
     : taxType === 'none'
       ? afterDiscount
       : afterDiscount + taxAmt
+  const grandTotal = roundCurrency(rawGrandTotal)
 
   // Auto-fill terbilang saat grand total berubah
   useEffect(() => {
@@ -325,12 +327,13 @@ export default function QuotationsPage() {
       const discountAmount = (subtotal * discountPct) / 100
       const taxType = String(convertQuotation.tax_type || 'ppn')
       const afterDiscount = subtotal - discountAmount
-      const taxAmount = taxType === 'none' ? 0 : (afterDiscount * taxPct) / 100
+      const taxAmount = taxType === 'none' ? 0 : roundCurrency((afterDiscount * taxPct) / 100)
       const total = taxType === 'pph'
         ? Math.max(afterDiscount - taxAmount, 0)
         : taxType === 'none'
           ? afterDiscount
           : afterDiscount + taxAmount
+      const roundedTotal = roundCurrency(total)
 
       // FINANCE POLICY: Always create invoice as "not_paid"
       // Finance team must verify bank statement and record payment manually
@@ -347,9 +350,9 @@ export default function QuotationsPage() {
         subtotal_amount: subtotal,
         tax_amount: taxAmount,
         discount_amount: discountAmount,
-        total_amount: total,
+        total_amount: roundedTotal,
         paid_amount: 0,  // ALWAYS 0 - finance will record payment after bank verification
-        due_amount: total,  // Full amount due until finance verifies payment
+        due_amount: roundedTotal,  // Full amount due until finance verifies payment
         notes: convertForm.notes,
       }
 
@@ -823,15 +826,16 @@ export default function QuotationsPage() {
           const discountAmount = (subtotal * discountPct) / 100
           const taxType = String(convertQuotation.tax_type || 'ppn')
           const afterDiscount = subtotal - discountAmount
-          const taxAmount = taxType === 'none' ? 0 : (afterDiscount * taxPct) / 100
+          const taxAmount = taxType === 'none' ? 0 : roundCurrency((afterDiscount * taxPct) / 100)
           const total = taxType === 'pph'
             ? Math.max(afterDiscount - taxAmount, 0)
             : taxType === 'none'
               ? Math.max(afterDiscount, 0)
               : Math.max(afterDiscount + taxAmount, 0)
+          const roundedTotal = roundCurrency(total)
           const paidPct = convertForm.payment_method === 'fully_paid' ? 100 : Number(convertForm.paid_pct || 0)
-          const paidAmount = (total * paidPct) / 100
-          const dueAmount = total - paidAmount
+          const paidAmount = roundCurrency((roundedTotal * paidPct) / 100)
+          const dueAmount = roundedTotal - paidAmount
 
           return (
             <div className="space-y-4">
@@ -943,7 +947,7 @@ export default function QuotationsPage() {
                   )}
                   <div className="border-t border-blue-300 pt-2 flex justify-between">
                     <span className="font-semibold text-blue-900">Total Invoice:</span>
-                    <span className="font-bold text-blue-900">{fmt(total, convertQuotation.currency)}</span>
+                    <span className="font-bold text-blue-900">{fmt(roundedTotal, convertQuotation.currency)}</span>
                   </div>
                   <div className="flex justify-between text-green-700">
                     <span>Paid ({paidPct}%):</span>

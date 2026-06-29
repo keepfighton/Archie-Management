@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ func (h *QuotationHandler) applyQuotationTotals(q *models.Quotation) {
 	}
 	tax := 0.0
 	if q.TaxPct > 0 {
-		tax = afterDisc * q.TaxPct / 100
+		tax = math.Round(afterDisc * q.TaxPct / 100)
 	}
 	taxType := normalizeTaxType(q.TaxType)
 	switch taxType {
@@ -52,6 +53,7 @@ func (h *QuotationHandler) applyQuotationTotals(q *models.Quotation) {
 		q.TaxAmount = tax
 		q.TotalAmount = afterDisc + tax
 	}
+	q.TotalAmount = math.Round(q.TotalAmount)
 	if q.TotalAmount < 0 {
 		q.TotalAmount = 0
 	}

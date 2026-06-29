@@ -2149,7 +2149,7 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	data := struct {
 		models.Invoice
-		PrintedAt   string
+		PrintedAt    string
 		HeaderBase64 string
 		FooterBase64 string
 	}{
@@ -2477,8 +2477,8 @@ table td.tr{text-align:right;}
   <div class="sign-box">
     <div class="sign-title">Archie Consultant</div>
     <div class="sign-line"></div>
-    <div class="sign-name">Archie Consultant</div>
-    <div class="sign-role">Authorized Signatory</div>
+    <div class="sign-name">{{if .PreparedBy}}{{.PreparedBy}}{{else}}Archie Consultant{{end}}</div>
+    <div class="sign-role">{{if .PreparedByTitle}}{{.PreparedByTitle}}{{else}}Authorized Signatory{{end}}</div>
   </div>
 </div>
 

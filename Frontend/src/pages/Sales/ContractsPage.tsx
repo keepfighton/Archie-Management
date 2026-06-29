@@ -26,7 +26,8 @@ export default function ContractsPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>({
     contract_number: '', title: '', client_id: '', project_id: '',
-    contract_date: '', valid_until: '', amount: '', currency: 'IDR', status: 'draft', file_url: '',
+    contract_date: '', valid_until: '', amount: '', currency: 'IDR', status: 'draft',
+    prepared_by: '', prepared_by_title: '', file_url: '',
   })
 
   const [projectsByContract, setProjectsByContract] = useState<Record<number, any[]>>({})
@@ -71,12 +72,26 @@ export default function ContractsPage() {
     setPage(1)
   }, [search, contracts])
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const selectedClient = clients.find(c => String(c.id) === String(form.client_id))
 
   const genContractNumber = () => `CTR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
 
   const openAdd = () => {
     setEditItem(null)
-    setForm({ contract_number: genContractNumber(), title: '', client_id: '', project_id: '', contract_date: '', valid_until: '', amount: '', currency: 'IDR', status: 'draft', file_url: '' })
+    setForm({
+      contract_number: genContractNumber(),
+      title: '',
+      client_id: '',
+      project_id: '',
+      contract_date: '',
+      valid_until: '',
+      amount: '',
+      currency: 'IDR',
+      status: 'draft',
+      prepared_by: '',
+      prepared_by_title: '',
+      file_url: '',
+    })
     setShowModal(true)
   }
 
@@ -85,7 +100,9 @@ export default function ContractsPage() {
     setForm({
       contract_number: c.contract_number, title: c.title, client_id: c.client_id, project_id: c.project_id || '',
       contract_date: c.contract_date?.split('T')[0] || '', valid_until: c.valid_until?.split('T')[0] || '',
-      amount: c.amount, currency: c.currency, status: c.status, file_url: c.file_url || '',
+      amount: c.amount, currency: c.currency, status: c.status,
+      prepared_by: c.prepared_by || '', prepared_by_title: c.prepared_by_title || '',
+      file_url: c.file_url || '',
     })
     setShowModal(true)
   }
@@ -94,7 +111,14 @@ export default function ContractsPage() {
     if (!form.title.trim() || !form.client_id) { toast.error('Title and client are required'); return }
     setSaving(true)
     try {
-      const payload = { ...form, client_id: Number(form.client_id), project_id: form.project_id ? Number(form.project_id) : null, amount: Number(form.amount), contract_date: toISODate(form.contract_date), valid_until: toISODate(form.valid_until) }
+      const payload = {
+        ...form,
+        client_id: Number(form.client_id),
+        project_id: form.project_id ? Number(form.project_id) : null,
+        amount: Number(form.amount),
+        contract_date: toISODate(form.contract_date),
+        valid_until: toISODate(form.valid_until),
+      }
       if (editItem) {
         await contractService.update(editItem.id, payload)
         toast.success('Contract updated!')
@@ -205,6 +229,9 @@ export default function ContractsPage() {
               <option value="">Select client...</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            <div className="mt-1 text-xs text-gray-500">
+              {selectedClient ? `Selected: ${selectedClient.name}` : 'Choose a client to auto-fill the company name in PRF.'}
+            </div>
           </FormField>
           <FormField label="Project" hint={editItem?.project_id ? 'Linked from quotation - cannot change' : undefined}>
             {editItem?.project_id ? (
@@ -251,6 +278,14 @@ export default function ContractsPage() {
             <select className="input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>
               <option value="IDR">IDR</option><option value="USD">USD</option><option value="EUR">EUR</option>
             </select>
+          </FormField>
+          <FormField label="Prepared By">
+            <input className="input" value={form.prepared_by} placeholder="Archie Consultant"
+              onChange={e => setForm({ ...form, prepared_by: e.target.value })} />
+          </FormField>
+          <FormField label="Prepared By Title">
+            <input className="input" value={form.prepared_by_title} placeholder="Authorized Signatory"
+              onChange={e => setForm({ ...form, prepared_by_title: e.target.value })} />
           </FormField>
         </div>
       </Modal>

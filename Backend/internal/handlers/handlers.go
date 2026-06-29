@@ -2340,30 +2340,30 @@ const contractPRFTemplate = `<!DOCTYPE html>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{width:100%;}
-body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 72mm;}
+body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.3;color:#000;background:#fff;padding:38mm 24px 42mm;}
 body *{font-family:inherit;color:inherit;}
 strong,b{font-weight:700;}
 html,body,*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 @media print{
   @page{size:A4;margin:0;}
-  body{padding:42mm 15mm 72mm;}
+  body{padding:38mm 15mm 42mm;}
   .no-print{display:none!important;}
 }
 .print-header{position:fixed;left:0;right:0;top:0;z-index:2;pointer-events:none;}
 .print-header img{width:100%;display:block;margin:0;}
-.header{display:flex;justify-content:center;align-items:flex-start;margin-bottom:14px;}
+.header{display:flex;justify-content:center;align-items:flex-start;margin-bottom:10px;}
 .doc-heading{text-align:center;width:100%;}
 .doc-heading h1{font-size:14px;font-weight:700;line-height:1.2;letter-spacing:.3px;text-transform:uppercase;}
 .doc-heading p{font-size:12px;margin-top:2px;line-height:1.2;}
-.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:16px;}
-.meta-box{padding:8px 0;}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:10px;}
+.meta-box{padding:6px 0;}
 .meta-box h3{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:0 0 5px;}
 .meta-box p{font-size:12px;line-height:1.45;}
-.section-label{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:12px 0 5px;}
+.section-label{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:9px 0 4px;}
 table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.3;}
-table th{background:#fff;padding:7px 8px;text-align:center;border:1px solid #b8b8b8;font-size:12px;font-weight:700;}
+table th{background:#fff;padding:6px 8px;text-align:center;border:1px solid #b8b8b8;font-size:12px;font-weight:700;}
 table th.tl{text-align:left;}
-table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:12px;}
+table td{padding:5px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:12px;}
 table td.tc{text-align:center;}
 table td.tr{text-align:right;}
 .summary-table thead th{background:#1a3c7a;color:#fff;border-color:#1a3c7a;}
@@ -2373,14 +2373,14 @@ table td.tr{text-align:right;}
 .detail-label{min-width:112px;font-weight:700;}
 .detail-value{padding-left:10px;}
 .overview{
-  padding:12px 14px;
+  padding:9px 14px;
   border:1px solid #dbe7f7;
   border-radius:10px;
   background:#f8fbff;
 }
 .overview .title{font-size:13px;font-weight:700;margin-bottom:4px;}
-.overview .desc{font-size:12px;line-height:1.55;color:#1f2937;white-space:pre-wrap;}
-.totals{display:flex;justify-content:flex-end;margin-top:10px;margin-bottom:6px;}
+.overview .desc{font-size:12px;line-height:1.45;color:#1f2937;white-space:pre-wrap;}
+.totals{display:flex;justify-content:flex-end;margin-top:8px;margin-bottom:4px;}
 .totals table{width:320px;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #c9d8f0;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(26,60,122,.08);}
 .totals td{padding:6px 12px;}
 .totals .label{color:#374151;}
@@ -2399,7 +2399,9 @@ table td.tr{text-align:right;}
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:28px;
-  margin-top:22px;
+  margin-top:14px;
+  break-inside:avoid;
+  page-break-inside:avoid;
 }
 .sign-box{
   padding-top:8px;
@@ -2411,9 +2413,9 @@ table td.tr{text-align:right;}
   margin-bottom:8px;
 }
 .sign-line{
-  height:56px;
+  height:44px;
   border-bottom:1px solid #1a3c7a;
-  margin:6px 0 8px;
+  margin:5px 0 7px;
 }
 .sign-name{
   font-size:12px;

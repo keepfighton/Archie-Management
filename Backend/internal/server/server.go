@@ -271,6 +271,7 @@ func (s *Server) setupRoutes() {
 			contracts.GET("", contractH.List)
 			contracts.POST("", contractH.Create)
 			contracts.GET("/:id", contractH.Get)
+			contracts.GET("/:id/prf", contractH.PrintPRF)
 			contracts.PUT("/:id", contractH.Update)
 			contracts.DELETE("/:id", contractH.Delete)
 		}

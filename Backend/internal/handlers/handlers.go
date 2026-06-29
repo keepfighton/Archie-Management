@@ -2302,6 +2302,151 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 </body>
 </html>`
 
+const contractPRFTemplate = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>PRF {{.ContractNumber}}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;}
+body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 72mm;}
+body *{font-family:inherit;color:inherit;}
+strong,b{font-weight:700;}
+html,body,*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@media print{
+  @page{size:A4;margin:0;}
+  body{padding:42mm 15mm 72mm;}
+  .no-print{display:none!important;}
+}
+.print-header{position:fixed;left:0;right:0;top:0;z-index:2;pointer-events:none;}
+.print-header img{width:100%;display:block;margin:0;}
+.header{display:flex;justify-content:center;align-items:flex-start;margin-bottom:14px;}
+.doc-heading{text-align:center;width:100%;}
+.doc-heading h1{font-size:14px;font-weight:700;line-height:1.2;letter-spacing:.3px;text-transform:uppercase;}
+.doc-heading p{font-size:12px;margin-top:2px;line-height:1.2;}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:16px;}
+.meta-box{padding:8px 0;}
+.meta-box h3{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:0 0 5px;}
+.meta-box p{font-size:12px;line-height:1.45;}
+.section-label{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:12px 0 5px;}
+table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.3;}
+table th{background:#fff;padding:7px 8px;text-align:center;border:1px solid #b8b8b8;font-size:12px;font-weight:700;}
+table th.tl{text-align:left;}
+table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:12px;}
+table td.tc{text-align:center;}
+table td.tr{text-align:right;}
+.summary-table thead th{background:#1a3c7a;color:#fff;border-color:#1a3c7a;}
+.summary-table .desc-cell{white-space:pre-wrap;}
+.detail-table{margin-bottom:6px;}
+.detail-table td{border:none;padding:0 0 4px 0;vertical-align:top;}
+.detail-label{min-width:112px;font-weight:700;}
+.detail-value{padding-left:10px;}
+.overview{
+  padding:12px 14px;
+  border:1px solid #dbe7f7;
+  border-radius:10px;
+  background:#f8fbff;
+}
+.overview .title{font-size:13px;font-weight:700;margin-bottom:4px;}
+.overview .desc{font-size:12px;line-height:1.55;color:#1f2937;white-space:pre-wrap;}
+.totals{display:flex;justify-content:flex-end;margin-top:10px;margin-bottom:6px;}
+.totals table{width:320px;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #c9d8f0;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(26,60,122,.08);}
+.totals td{padding:6px 12px;}
+.totals .label{color:#374151;}
+.totals .total-row td{font-weight:700;background:#1a3c7a;color:#fff;padding:8px 12px;}
+.print-footer{position:fixed;left:0;right:0;bottom:0;z-index:2;pointer-events:none;}
+.print-footer img{display:block;width:100%;margin:0;}
+.note{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:8px;
+  background:#f8fafc;
+  font-size:12px;
+  line-height:1.5;
+}
+</style>
+</head>
+<body>
+<div class="print-header">
+  <img src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie contract header">
+</div>
+
+<div class="header">
+  <div class="doc-heading">
+    <h1>PROJECT REQUEST FORM (PRF)</h1>
+    <p>{{.ContractNumber}}</p>
+    <p style="margin-top:8px;font-weight:600;">{{if .Project}}{{.Project.Title}}{{else}}{{.Title}}{{end}}</p>
+  </div>
+</div>
+
+<div class="meta-grid">
+  <div class="meta-box">
+    <h3>Client Details</h3>
+    {{if .Client}}
+    <table class="detail-table">
+      <tr><td class="detail-label">Name</td><td class="detail-value">{{.Client.Name}}</td></tr>
+      <tr><td class="detail-label">Email</td><td class="detail-value">{{if .Client.Email}}{{.Client.Email}}{{else}}-{{end}}</td></tr>
+      <tr><td class="detail-label">Phone</td><td class="detail-value">{{if .Client.Phone}}{{.Client.Phone}}{{else}}-{{end}}</td></tr>
+      <tr><td class="detail-label">Address</td><td class="detail-value">{{if .Client.Address}}{{.Client.Address}}{{else}}-{{end}}</td></tr>
+    </table>
+    {{end}}
+  </div>
+  <div class="meta-box">
+    <h3>Contract Details</h3>
+    <table class="detail-table">
+      <tr><td class="detail-label">Contract Date</td><td class="detail-value">{{formatDate .ContractDate}}</td></tr>
+      <tr><td class="detail-label">Valid Until</td><td class="detail-value">{{formatDate .ValidUntil}}</td></tr>
+      <tr><td class="detail-label">Currency</td><td class="detail-value">{{.Currency}}</td></tr>
+      <tr><td class="detail-label">Status</td><td class="detail-value">{{if .Status}}{{.Status}}{{else}}-{{end}}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="section-label">PRF Overview</div>
+<div class="overview">
+  <div class="title">{{.Title}}</div>
+  <div class="desc">
+    {{if .Project}}Project: {{.Project.Title}}
+{{end}}{{if .FileName}}Attachment: {{.FileName}}
+{{end}}Contract number: {{.ContractNumber}}
+  </div>
+</div>
+
+<div class="section-label">Contract Summary</div>
+<table class="summary-table">
+  <thead>
+    <tr>
+      <th class="tl" style="width:60%">DESCRIPTION</th>
+      <th style="width:20%">AMOUNT</th>
+      <th style="width:20%">STATUS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="desc-cell">{{.Title}}</td>
+      <td class="tr">{{formatCurrency .Amount .Currency}}</td>
+      <td class="tc">{{if .Status}}{{.Status}}{{else}}-{{end}}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="totals">
+  <table>
+    <tr><td class="label">Contract Value</td><td style="text-align:right">{{formatCurrency .Amount .Currency}}</td></tr>
+    <tr class="total-row"><td>Total</td><td style="text-align:right">{{formatCurrency .Amount .Currency}}</td></tr>
+  </table>
+</div>
+
+{{if .FileName}}<div class="note"><strong>Dokumen terlampir:</strong> {{.FileName}}</div>{{end}}
+
+<div class="print-footer">
+  <img src="data:image/png;base64,{{.FooterBase64}}" alt="Archie contract footer">
+</div>
+<script>window.onload=function(){window.print()}</script>
+</body>
+</html>`
+
 func (h *InvoiceHandler) AddPayment(c *gin.Context) {
 	resetSequenceIfEmpty(h.db, "payments")
 	id, _ := getID(c)
@@ -2518,6 +2663,52 @@ func (h *ContractHandler) Delete(c *gin.Context) {
 	h.db.Delete(&models.Contract{}, id)
 	recordAudit(h.db, c, "delete", "contract", id, contract.Title)
 	c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+}
+
+func (h *ContractHandler) PrintPRF(c *gin.Context) {
+	id, _ := getID(c)
+	var contract models.Contract
+	if err := h.db.Preload("Client").Preload("Project").First(&contract, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
+	}
+
+	tmpl := template.Must(template.New("contract_prf").Funcs(template.FuncMap{
+		"formatCurrency": func(amount float64, currency string) string {
+			intPart := int64(amount)
+			frac := int(amount*100+0.5) % 100
+			s := fmt.Sprintf("%d", intPart)
+			n := len(s)
+			result := ""
+			for i, ch := range s {
+				if i > 0 && (n-i)%3 == 0 {
+					result += "."
+				}
+				result += string(ch)
+			}
+			return fmt.Sprintf("%s %s,%02d", currency, result, frac)
+		},
+		"formatDate": func(t models.FlexTime) string {
+			if t.IsZero() {
+				return "-"
+			}
+			return t.Format("02 January 2006")
+		},
+	}).Parse(contractPRFTemplate))
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	data := struct {
+		models.Contract
+		PrintedAt    string
+		HeaderBase64 string
+		FooterBase64 string
+	}{
+		Contract:     contract,
+		PrintedAt:    time.Now().Format("02 January 2006 15:04"),
+		HeaderBase64: base64.StdEncoding.EncodeToString(invoiceHeaderBytes),
+		FooterBase64: base64.StdEncoding.EncodeToString(invoiceFooterBytes),
+	}
+	_ = tmpl.Execute(c.Writer, data)
 }
 
 // ─── ITEM ────────────────────────────────────────────

@@ -279,6 +279,21 @@ export const contractService = {
   delete: (id: number) => api.delete(`/contracts/${id}`),
 }
 
+// ─── Contract PDF ────────────────────────────────────
+export const contractPrintService = {
+  openPrint: (id: number) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const baseURL = API_BASE_URL
+    return fetch(`${baseURL}/contracts/${id}/prf`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(async (res) => {
+      const html = await res.text()
+      const win = window.open('', '_blank')
+      if (win) { win.document.write(html); win.document.close() }
+    })
+  },
+}
+
 // ─── Items ───────────────────────────────────────────
 export const itemService = {
   list: () => api.get('/items'),

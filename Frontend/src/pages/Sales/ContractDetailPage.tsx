@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { contractService, expenseService, invoiceService, projectService, fileService } from '@/services/api'
+import { contractPrintService, contractService, expenseService, invoiceService, projectService, fileService } from '@/services/api'
 import { toast } from 'react-toastify'
 import {
   ArrowLeft, Building2, Calendar, DollarSign, FileText,
   Phone, MapPin, Mail, Receipt, TrendingUp, CheckCircle2,
   Clock, AlertCircle, Edit2, ExternalLink, FolderKanban,
-  Upload, FileCheck, Trash2
+  Upload, FileCheck, Trash2, Printer
 } from 'lucide-react'
 import { StatusBadge, Loading } from '@/components/common'
 
@@ -128,6 +128,14 @@ export default function ContractDetailPage() {
     } catch { toast.error('Gagal menghapus dokumen') }
   }
 
+  const handlePrintPRF = async () => {
+    try {
+      await contractPrintService.openPrint(Number(id))
+    } catch {
+      toast.error('Gagal membuka PRF')
+    }
+  }
+
   if (loading) return <div className="p-5"><Loading /></div>
   if (!contract) return <div className="p-5 text-gray-400">Contract not found.</div>
 
@@ -158,9 +166,14 @@ export default function ContractDetailPage() {
         <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
           <ArrowLeft size={15} /> Back to Contracts
         </button>
-        <button onClick={() => navigate(`/sales/contracts`)} className="btn btn-secondary text-xs py-1.5 px-3">
-          <Edit2 size={12} /> Edit Contract
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handlePrintPRF} className="btn btn-secondary text-xs py-1.5 px-3">
+            <Printer size={12} /> Print PRF
+          </button>
+          <button onClick={() => navigate(`/sales/contracts`)} className="btn btn-secondary text-xs py-1.5 px-3">
+            <Edit2 size={12} /> Edit Contract
+          </button>
+        </div>
       </div>
 
       {/* ── HEADER ── */}

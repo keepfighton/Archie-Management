@@ -2205,7 +2205,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   table td.tc{text-align:center;}
   table td.tr{text-align:right;}
   .items-table thead th{background:#1a3c7a;color:#fff;border-color:#1a3c7a;}
-  .items-table .empty-row td{background:#f8fafc;color:#64748b;font-style:italic;text-align:center;padding:14px 10px;}
+  .items-table .desc-cell{white-space:pre-wrap;}
   .totals{display:flex;justify-content:flex-end;margin-top:10px;margin-bottom:6px;}
   .totals table{width:320px;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #c9d8f0;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(26,60,122,.08);}
   .totals td{padding:6px 12px;}
@@ -2247,33 +2247,21 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   </div>
 </div>
 
-<div class="section-label">Invoice Items</div>
+<div class="section-label">Invoice Summary</div>
 <table class="items-table">
   <thead>
     <tr>
-      <th style="width:6%">NO</th>
-      <th class="tl" style="width:50%">DESKRIPSI</th>
-      <th style="width:15%">QTY</th>
+      <th class="tl" style="width:60%">DESKRIPSI</th>
       <th style="width:20%">HARGA SATUAN</th>
-      <th style="width:15%">TOTAL</th>
+      <th style="width:20%">TOTAL</th>
     </tr>
   </thead>
   <tbody>
-    {{if .Items}}
-    {{range $i, $item := .Items}}
     <tr>
-      <td class="tc">{{inc $i}}</td>
-      <td>{{$item.Description}}</td>
-      <td class="tc">{{printf "%.0f" $item.Quantity}}</td>
-      <td class="tr">{{formatCurrency $item.UnitPrice $.Currency}}</td>
-      <td class="tr">{{formatCurrency $item.Total $.Currency}}</td>
+      <td class="desc-cell">{{if .Notes}}{{.Notes}}{{else}}-{{end}}</td>
+      <td class="tr">{{formatCurrency .SubtotalAmount .Currency}}</td>
+      <td class="tr">{{formatCurrency .TotalAmount .Currency}}</td>
     </tr>
-    {{end}}
-    {{else}}
-    <tr class="empty-row">
-      <td colspan="5">Tidak ada item invoice. Pastikan item sudah diisi sebelum PDF dicetak.</td>
-    </tr>
-    {{end}}
   </tbody>
 </table>
 
@@ -2306,8 +2294,6 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   </table>
 </div>
 {{end}}
-
-{{if .Notes}}<div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;"><strong>Catatan:</strong> {{.Notes}}</div>{{end}}
 
 <div class="print-footer">
   <img src="data:image/png;base64,{{.FooterBase64}}" alt="Archie invoice footer">

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"crypto/rand"
+	_ "embed"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -1918,6 +1920,12 @@ func (h *LeadHandler) RollbackConversion(c *gin.Context) {
 
 type InvoiceHandler struct{ db *gorm.DB }
 
+//go:embed assets/quotations/quotations-header.png
+var invoiceHeaderBytes []byte
+
+//go:embed assets/quotations/quotations-footer.png
+var invoiceFooterBytes []byte
+
 func NewInvoiceHandler(db *gorm.DB) *InvoiceHandler { return &InvoiceHandler{db: db} }
 
 func startOfDay(t time.Time) time.Time {
@@ -2140,10 +2148,14 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	data := struct {
 		models.Invoice
-		PrintedAt string
+		PrintedAt   string
+		HeaderBase64 string
+		FooterBase64 string
 	}{
-		Invoice:   invoice,
-		PrintedAt: time.Now().Format("02 January 2006 15:04"),
+		Invoice:      invoice,
+		PrintedAt:    time.Now().Format("02 January 2006 15:04"),
+		HeaderBase64: base64.StdEncoding.EncodeToString(invoiceHeaderBytes),
+		FooterBase64: base64.StdEncoding.EncodeToString(invoiceFooterBytes),
 	}
 	tmpl.Execute(c.Writer, data)
 }
@@ -2154,45 +2166,59 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <title>Invoice {{.InvoiceNumber}}</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #fff; padding: 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 24px; }
-  .company { font-size: 24px; font-weight: 700; color: #2563eb; }
-  .invoice-title { text-align: right; }
-  .invoice-title h1 { font-size: 32px; font-weight: 800; color: #2563eb; letter-spacing: 2px; }
-  .invoice-title p { color: #64748b; margin-top: 4px; }
-  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px; }
-  .meta-box h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
-  .meta-box p { font-size: 13px; line-height: 1.6; }
-  .status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-  .status-draft { background: #f1f5f9; color: #64748b; }
-  .status-not_paid { background: #fef3c7; color: #92400e; }
-  .status-partially_paid { background: #dbeafe; color: #1e40af; }
-  .status-fully_paid { background: #dcfce7; color: #166534; }
-  .status-overdue { background: #fee2e2; color: #991b1b; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  thead th { background: #2563eb; color: #fff; padding: 10px 12px; text-align: left; font-size: 12px; }
-  thead th:last-child { text-align: right; }
-  tbody td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
-  tbody td:last-child { text-align: right; }
-  tbody tr:nth-child(even) { background: #f8fafc; }
-  .totals { display: flex; justify-content: flex-end; margin-bottom: 32px; }
-  .totals table { width: 300px; }
-  .totals td { padding: 6px 12px; }
-  .totals .label { color: #64748b; }
-  .totals .total-row td { font-weight: 700; font-size: 15px; border-top: 2px solid #2563eb; padding-top: 10px; color: #2563eb; }
-  .payments h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #374151; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
-  @media print {
-    body { padding: 20px; }
-    .no-print { display: none; }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;}
+  body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 72mm;}
+  body *{font-family:inherit;color:inherit;}
+  strong,b{font-weight:700;}
+  html,body,*{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
+  @media print{
+    @page{size:A4;margin:0;}
+    body{padding:42mm 15mm 72mm;}
+    .no-print{display:none!important;}
+  }
+  .print-header{position:fixed;left:0;right:0;top:0;z-index:2;pointer-events:none;}
+  .print-header img{width:100%;display:block;margin:0;}
+  .header{display:flex;justify-content:center;align-items:flex-start;margin-bottom:14px;}
+  .doc-heading{text-align:center;width:100%;}
+  .doc-heading h1{font-size:14px;font-weight:700;line-height:1.2;letter-spacing:.3px;text-transform:uppercase;}
+  .doc-heading p{font-size:12px;margin-top:2px;line-height:1.2;}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:16px;}
+  .meta-box{padding:8px 0;}
+  .meta-box h3{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:0 0 5px;}
+  .meta-box p{font-size:12px;line-height:1.45;}
+  .status{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase;}
+  .status-draft{background:#f1f5f9;color:#64748b;}
+  .status-not_paid{background:#fef3c7;color:#92400e;}
+  .status-partially_paid{background:#dbeafe;color:#1e40af;}
+  .status-fully_paid{background:#dcfce7;color:#166534;}
+  .status-overdue{background:#fee2e2;color:#991b1b;}
+  table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.3;}
+  table th{background:#fff;padding:7px 8px;text-align:center;border:1px solid #b8b8b8;font-size:12px;font-weight:700;}
+  table th.tl{text-align:left;}
+  table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:12px;}
+  table td.tc{text-align:center;}
+  table td.tr{text-align:right;}
+  .totals{display:flex;justify-content:flex-end;margin-top:10px;margin-bottom:6px;}
+  .totals table{width:320px;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #c9d8f0;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(26,60,122,.08);}
+  .totals td{padding:6px 12px;}
+  .totals .label{color:#374151;}
+  .totals .total-row td{font-weight:700;background:#1a3c7a;color:#fff;padding:8px 12px;}
+  .payments h3{font-size:12px;font-weight:600;margin-bottom:10px;color:#374151;}
+  .footer{margin-top:12px;color:#94a3b8;font-size:11px;}
+  .print-footer{position:fixed;left:0;right:0;bottom:0;z-index:2;pointer-events:none;}
+  .print-footer img{display:block;width:100%;margin:0;}
 </style>
 </head>
 <body>
+<div class="print-header">
+  <img src="data:image/png;base64,{{.HeaderBase64}}" alt="Archie invoice header">
+</div>
 <div class="header">
-  <div class="company">CBQA / OneTool</div>
-  <div class="invoice-title">
+  <div class="doc-heading">
     <h1>INVOICE</h1>
     <p>{{.InvoiceNumber}}</p>
     <p style="margin-top:8px"><span class="status status-{{.Status}}">{{.Status}}</span></p>
@@ -2220,19 +2246,19 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 <table>
   <thead>
     <tr>
-      <th style="width:50%">Deskripsi</th>
-      <th style="width:15%;text-align:right">Qty</th>
-      <th style="width:20%;text-align:right">Harga Satuan</th>
-      <th style="width:15%">Total</th>
+      <th class="tl" style="width:50%">DESKRIPSI</th>
+      <th style="width:15%">QTY</th>
+      <th style="width:20%">HARGA SATUAN</th>
+      <th style="width:15%">TOTAL</th>
     </tr>
   </thead>
   <tbody>
     {{range .Items}}
     <tr>
       <td>{{.Description}}</td>
-      <td style="text-align:right">{{.Quantity}}</td>
-      <td style="text-align:right">{{formatCurrency .UnitPrice $.Currency}}</td>
-      <td>{{formatCurrency .Total $.Currency}}</td>
+      <td class="tc">{{.Quantity}}</td>
+      <td class="tr">{{formatCurrency .UnitPrice $.Currency}}</td>
+      <td class="tr">{{formatCurrency .Total $.Currency}}</td>
     </tr>
     {{end}}
   </tbody>
@@ -2241,7 +2267,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 <div class="totals">
   <table>
     <tr><td class="label">Subtotal</td><td style="text-align:right">{{formatCurrency .SubtotalAmount .Currency}}</td></tr>
-    {{if .TaxAmount}}<tr><td class="label">Pajak</td><td style="text-align:right">{{formatCurrency .TaxAmount .Currency}}</td></tr>{{end}}
+    {{if .TaxAmount}}<tr><td class="label">PPN</td><td style="text-align:right">{{formatCurrency .TaxAmount .Currency}}</td></tr>{{end}}
     {{if .DiscountAmount}}<tr><td class="label">Diskon</td><td style="text-align:right">-{{formatCurrency .DiscountAmount .Currency}}</td></tr>{{end}}
     <tr class="total-row"><td>Total</td><td style="text-align:right">{{formatCurrency .TotalAmount .Currency}}</td></tr>
     <tr><td class="label">Dibayar</td><td style="text-align:right">{{formatCurrency .PaidAmount .Currency}}</td></tr>
@@ -2270,8 +2296,8 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 
 {{if .Notes}}<div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;"><strong>Catatan:</strong> {{.Notes}}</div>{{end}}
 
-<div class="footer">
-  <p>Dokumen ini digenerate otomatis oleh OneTool &bull; Dicetak pada: {{.PrintedAt}}</p>
+<div class="print-footer">
+  <img src="data:image/png;base64,{{.FooterBase64}}" alt="Archie invoice footer">
 </div>
 <script>window.onload=function(){window.print()}</script>
 </body>

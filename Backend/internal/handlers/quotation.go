@@ -540,7 +540,7 @@ const quotationPrintTemplate = `<!DOCTYPE html>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{width:100%;}
-body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 44mm;}
+body{font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.35;color:#000;background:#fff;padding:42mm 24px 72mm;}
 body *{font-family:inherit;color:inherit;}
 strong,b{font-weight:700;}
 html,body,*{
@@ -549,7 +549,7 @@ html,body,*{
 }
 @media print{
   @page{size:A4;margin:0;}
-  body{padding:42mm 15mm 44mm;}
+  body{padding:42mm 15mm 72mm;}
   .no-print{display:none!important;}
   .page-break{page-break-before:always;break-before:page;}
 }
@@ -620,6 +620,9 @@ table td.tr{text-align:right;}
   grid-template-columns:1fr 1fr;
   gap:28px;
   margin-top:18px;
+  margin-bottom:10mm;
+  break-inside:avoid;
+  page-break-inside:avoid;
 }
 .sig-sec > div,
 .tc-sign > div{
@@ -719,18 +722,6 @@ table td.tr{text-align:right;}
   </table>
 </div>
 
-{{if .ScopeSummary}}
-<!-- SCOPE SUMMARY -->
-<div class="section-label">SCOPE OF WORK</div>
-<div class="keter" style="margin-bottom:10px;">
-  <ul style="margin:4px 0 0 16px;padding:0;line-height:1.8;">{{nl2li .ScopeSummary}}</ul>
-</div>
-{{end}}
-
-{{if .PaymentTerms}}<div class="keter"><strong>Payment Terms:</strong> {{.PaymentTerms}}</div>{{end}}
-{{if .Notes}}<div class="keter"><strong>Keterangan:</strong><br>{{.Notes}}</div>{{end}}
-{{if .AcceptanceNotes}}<div class="keter"><strong>Acceptance:</strong> {{.AcceptanceNotes}}</div>{{end}}
-
 <!-- SIGNATURES -->
 <div class="sig-sec">
   <div>
@@ -748,6 +739,18 @@ table td.tr{text-align:right;}
     <div class="sig-ttl">{{if .ApprovedByTitle}}{{.ApprovedByTitle}}{{else}}Director{{end}}</div>
   </div>
 </div>
+
+{{if .ScopeSummary}}
+<!-- SCOPE SUMMARY -->
+<div class="section-label">SCOPE OF WORK</div>
+<div class="keter" style="margin-bottom:10px;">
+  <ul style="margin:4px 0 0 16px;padding:0;line-height:1.8;">{{nl2li .ScopeSummary}}</ul>
+</div>
+{{end}}
+
+{{if .PaymentTerms}}<div class="keter"><strong>Payment Terms:</strong> {{.PaymentTerms}}</div>{{end}}
+{{if .Notes}}<div class="keter"><strong>Keterangan:</strong><br>{{.Notes}}</div>{{end}}
+{{if .AcceptanceNotes}}<div class="keter"><strong>Acceptance:</strong> {{.AcceptanceNotes}}</div>{{end}}
 
 <!-- PAGE 2: TERMS & CONDITIONS -->
 <div class="page-break terms-page">

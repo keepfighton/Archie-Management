@@ -214,20 +214,19 @@ export default function QuotationsPage() {
       if (editItem) {
         await quotationService.update(editItem.id, payload)
         qid = editItem.id
-        // sync items: delete existing then re-add (parallel)
-        const deleteOps = (editItem.items || []).map((ex: any) =>
-          quotationService.deleteItem(qid, ex.id).catch(() => {})
-        )
-        await Promise.all(deleteOps)
+        // sync items sequentially so backend recalc stays deterministic
+        for (const ex of editItem.items || []) {
+          await quotationService.deleteItem(qid, ex.id).catch(() => {})
+        }
         toast.success('Quotation updated!')
       } else {
         const res = await quotationService.create(payload)
         qid = res.data.id
         toast.success('Quotation created!')
       }
-      // add all localItems (parallel)
-      const addOps = localItems.map((it: any) =>
-        quotationService.addItem(qid, {
+      // add all localItems sequentially so the last recalc sees the full set
+      for (const it of localItems) {
+        await quotationService.addItem(qid, {
           description: it.description,
           quantity: Number(it.quantity),
           unit_price: Number(it.unit_price),
@@ -235,8 +234,7 @@ export default function QuotationsPage() {
           duration_unit: it.duration_unit,
           total: Number(it.quantity) * Number(it.unit_price),
         })
-      )
-      await Promise.all(addOps)
+      }
       setShowModal(false)
       setPage(1)
       load(search, 1)

@@ -27,20 +27,20 @@ func NewQuotationHandler(db *gorm.DB) *QuotationHandler { return &QuotationHandl
 
 func (h *QuotationHandler) applyQuotationTotals(q *models.Quotation) {
 	sub := q.SubtotalAmount
-	disc := q.DiscountAmount
+	disc := 0.0
 	if q.DiscountPct > 0 {
 		disc = sub * q.DiscountPct / 100
-		q.DiscountAmount = disc
 	}
+	q.DiscountAmount = disc
 	afterDisc := sub - disc
 	if afterDisc < 0 {
 		afterDisc = 0
 	}
-	tax := q.TaxAmount
+	tax := 0.0
 	if q.TaxPct > 0 {
 		tax = afterDisc * q.TaxPct / 100
-		q.TaxAmount = tax
 	}
+	q.TaxAmount = tax
 	q.TotalAmount = afterDisc + tax
 }
 

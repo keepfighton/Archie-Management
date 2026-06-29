@@ -27,7 +27,7 @@ export default function ContractsPage() {
   const [form, setForm] = useState<any>({
     contract_number: '', title: '', client_id: '', project_id: '',
     contract_date: '', valid_until: '', amount: '', currency: 'IDR', status: 'draft',
-    client_signatory: '', client_signatory_title: '', prepared_by: '', prepared_by_title: '', file_url: '',
+    contract_terms: '', client_signatory: '', client_signatory_title: '', prepared_by: '', prepared_by_title: '', file_url: '',
   })
 
   const [projectsByContract, setProjectsByContract] = useState<Record<number, any[]>>({})
@@ -88,6 +88,7 @@ export default function ContractsPage() {
       amount: '',
       currency: 'IDR',
       status: 'draft',
+      contract_terms: '',
       client_signatory: '',
       client_signatory_title: '',
       prepared_by: '',
@@ -103,7 +104,7 @@ export default function ContractsPage() {
     setForm({
       contract_number: c.contract_number, title: c.title, client_id: c.client_id, project_id: c.project_id || '',
       contract_date: c.contract_date?.split('T')[0] || '', valid_until: c.valid_until?.split('T')[0] || '',
-      amount: c.amount, currency: c.currency, status: c.status,
+      amount: c.amount, currency: c.currency, status: c.status, contract_terms: c.contract_terms || '',
       client_signatory: c.client_signatory || legacyClientSignatory, client_signatory_title: c.client_signatory_title || '',
       prepared_by: c.prepared_by || '', prepared_by_title: c.client_signatory ? (c.prepared_by_title || '') : '',
       file_url: c.file_url || '',
@@ -283,6 +284,16 @@ export default function ContractsPage() {
               <option value="IDR">IDR</option><option value="USD">USD</option><option value="EUR">EUR</option>
             </select>
           </FormField>
+          <div className="md:col-span-2">
+            <FormField label="Contract Terms / Notes">
+              <textarea
+                className="input min-h-[96px]"
+                value={form.contract_terms}
+                placeholder="Contoh: Kontrak ini berlaku selama 1 tahun sejak tanggal kontrak ditandatangani."
+                onChange={e => setForm({ ...form, contract_terms: e.target.value })}
+              />
+            </FormField>
+          </div>
           <FormField label="Client Signatory">
             <input className="input" value={form.client_signatory} placeholder="Herry"
               onChange={e => setForm({ ...form, client_signatory: e.target.value })} />

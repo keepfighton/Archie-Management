@@ -471,6 +471,7 @@ type Contract struct {
 	Amount               float64  `json:"amount"`
 	Currency             string   `gorm:"default:IDR" json:"currency"`
 	Status               string   `gorm:"default:draft" json:"status"`
+	ContractTerms        string   `gorm:"type:text" json:"contract_terms"`
 	ClientSignatory      string   `json:"client_signatory"`
 	ClientSignatoryTitle string   `json:"client_signatory_title"`
 	PreparedBy           string   `json:"prepared_by"`

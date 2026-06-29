@@ -2470,6 +2470,13 @@ table td.tr{text-align:right;}
   </div>
 </div>
 
+{{if .ContractTerms}}
+<div class="section-label">Contract Terms / Notes</div>
+<div class="overview">
+  <div class="desc">{{.ContractTerms}}</div>
+</div>
+{{end}}
+
 <div class="section-label">Contract Summary</div>
 <table class="summary-table">
   <thead>

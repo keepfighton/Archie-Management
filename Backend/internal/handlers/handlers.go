@@ -2447,7 +2447,7 @@ table td.tr{text-align:right;}
       <tr><td class="detail-label">Name</td><td class="detail-value">{{.Client.Name}}</td></tr>
       <tr><td class="detail-label">Email</td><td class="detail-value">{{if .Client.Email}}{{.Client.Email}}{{else}}-{{end}}</td></tr>
       <tr><td class="detail-label">Phone</td><td class="detail-value">{{if .Client.Phone}}{{.Client.Phone}}{{else}}-{{end}}</td></tr>
-      <tr><td class="detail-label">Address</td><td class="detail-value">{{if .Client.Address}}{{.Client.Address}}{{else}}-{{end}}</td></tr>
+      <tr><td class="detail-label">Address</td><td class="detail-value">{{clientAddress .Client}}</td></tr>
     </table>
     {{end}}
   </div>
@@ -2774,6 +2774,22 @@ func (h *ContractHandler) PrintPRF(c *gin.Context) {
 				return "-"
 			}
 			return t.Format("02 January 2006")
+		},
+		"clientAddress": func(client *models.Client) string {
+			if client == nil {
+				return "-"
+			}
+			parts := []string{}
+			for _, part := range []string{client.Address, client.City, client.State, client.Zip, client.Country} {
+				part = strings.TrimSpace(part)
+				if part != "" {
+					parts = append(parts, part)
+				}
+			}
+			if len(parts) == 0 {
+				return "-"
+			}
+			return strings.Join(parts, ", ")
 		},
 	}).Parse(contractPRFTemplate))
 

@@ -2143,6 +2143,7 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 			}
 			return t.Format("02 January 2006")
 		},
+		"inc": func(i int) int { return i + 1 },
 	}).Parse(invoicePDFTemplate))
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -2196,12 +2197,15 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   .status-partially_paid{background:#dbeafe;color:#1e40af;}
   .status-fully_paid{background:#dcfce7;color:#166534;}
   .status-overdue{background:#fee2e2;color:#991b1b;}
+  .section-label{font-size:12px;font-style:italic;font-weight:400;letter-spacing:0;margin:12px 0 5px;}
   table{width:100%;border-collapse:collapse;font-size:12px;line-height:1.3;}
   table th{background:#fff;padding:7px 8px;text-align:center;border:1px solid #b8b8b8;font-size:12px;font-weight:700;}
   table th.tl{text-align:left;}
   table td{padding:6px 8px;border:1px solid #b8b8b8;vertical-align:top;font-size:12px;}
   table td.tc{text-align:center;}
   table td.tr{text-align:right;}
+  .items-table thead th{background:#1a3c7a;color:#fff;border-color:#1a3c7a;}
+  .items-table .empty-row td{background:#f8fafc;color:#64748b;font-style:italic;text-align:center;padding:14px 10px;}
   .totals{display:flex;justify-content:flex-end;margin-top:10px;margin-bottom:6px;}
   .totals table{width:320px;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #c9d8f0;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(26,60,122,.08);}
   .totals td{padding:6px 12px;}
@@ -2243,9 +2247,11 @@ const invoicePDFTemplate = `<!DOCTYPE html>
   </div>
 </div>
 
-<table>
+<div class="section-label">Invoice Items</div>
+<table class="items-table">
   <thead>
     <tr>
+      <th style="width:6%">NO</th>
       <th class="tl" style="width:50%">DESKRIPSI</th>
       <th style="width:15%">QTY</th>
       <th style="width:20%">HARGA SATUAN</th>
@@ -2253,12 +2259,19 @@ const invoicePDFTemplate = `<!DOCTYPE html>
     </tr>
   </thead>
   <tbody>
-    {{range .Items}}
+    {{if .Items}}
+    {{range $i, $item := .Items}}
     <tr>
-      <td>{{.Description}}</td>
-      <td class="tc">{{.Quantity}}</td>
-      <td class="tr">{{formatCurrency .UnitPrice $.Currency}}</td>
-      <td class="tr">{{formatCurrency .Total $.Currency}}</td>
+      <td class="tc">{{inc $i}}</td>
+      <td>{{$item.Description}}</td>
+      <td class="tc">{{printf "%.0f" $item.Quantity}}</td>
+      <td class="tr">{{formatCurrency $item.UnitPrice $.Currency}}</td>
+      <td class="tr">{{formatCurrency $item.Total $.Currency}}</td>
+    </tr>
+    {{end}}
+    {{else}}
+    <tr class="empty-row">
+      <td colspan="5">Tidak ada item invoice. Pastikan item sudah diisi sebelum PDF dicetak.</td>
     </tr>
     {{end}}
   </tbody>

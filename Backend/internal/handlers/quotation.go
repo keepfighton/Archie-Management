@@ -40,8 +40,21 @@ func (h *QuotationHandler) applyQuotationTotals(q *models.Quotation) {
 	if q.TaxPct > 0 {
 		tax = afterDisc * q.TaxPct / 100
 	}
-	q.TaxAmount = tax
-	q.TotalAmount = afterDisc + tax
+	taxType := normalizeTaxType(q.TaxType)
+	switch taxType {
+	case "pph":
+		q.TaxAmount = tax
+		q.TotalAmount = afterDisc - tax
+	case "none":
+		q.TaxAmount = 0
+		q.TotalAmount = afterDisc
+	default:
+		q.TaxAmount = tax
+		q.TotalAmount = afterDisc + tax
+	}
+	if q.TotalAmount < 0 {
+		q.TotalAmount = 0
+	}
 }
 
 func (h *QuotationHandler) recalcQuotation(id uint) {
@@ -242,8 +255,10 @@ func (h *QuotationHandler) Print(c *gin.Context) {
 			}
 			return "Rp " + result + ",-"
 		},
-		"inc": func(i int) int { return i + 1 },
-		"sub": func(a, b float64) float64 { return a - b },
+		"taxLabel":  taxLabel,
+		"taxPrefix": taxPrefix,
+		"inc":       func(i int) int { return i + 1 },
+		"sub":       func(a, b float64) float64 { return a - b },
 		"terbilang": func(n float64) string {
 			x := int64(n)
 			if x == 0 {
@@ -382,6 +397,7 @@ func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 		BillDate       models.FlexTime `json:"bill_date"`
 		DueDate        models.FlexTime `json:"due_date"`
 		Status         string          `json:"status"`
+		TaxType        string          `json:"tax_type"`
 		SubtotalAmount float64         `json:"subtotal_amount"`
 		TaxAmount      float64         `json:"tax_amount"`
 		DiscountAmount float64         `json:"discount_amount"`
@@ -400,6 +416,7 @@ func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 		DueDate:        quotation.ValidUntil,
 		Status:         "not_paid",
 		Currency:       quotation.Currency,
+		TaxType:        quotation.TaxType,
 		SubtotalAmount: quotation.SubtotalAmount,
 		TaxAmount:      quotation.TaxAmount,
 		DiscountAmount: quotation.DiscountAmount,
@@ -412,6 +429,9 @@ func (h *QuotationHandler) ConvertToInvoice(c *gin.Context) {
 		invoice.BillDate = payload.BillDate
 		invoice.DueDate = payload.DueDate
 		invoice.Status = payload.Status
+		if payload.TaxType != "" {
+			invoice.TaxType = payload.TaxType
+		}
 		invoice.SubtotalAmount = payload.SubtotalAmount
 		invoice.TaxAmount = payload.TaxAmount
 		invoice.DiscountAmount = payload.DiscountAmount
@@ -716,7 +736,7 @@ table td.tr{text-align:right;}
     <tr><td class="lbl">Subtotal</td><td>{{formatRp .SubtotalAmount}}</td></tr>
     {{if .DiscountAmount}}<tr><td class="lbl">Diskon{{if .DiscountPct}} ({{printf "%.0f" .DiscountPct}}%){{end}}</td><td>{{formatRp .DiscountAmount}}</td></tr>{{end}}
     {{if .DiscountAmount}}<tr><td class="lbl emph">Total Setelah Diskon</td><td class="emph">{{formatRp (sub .SubtotalAmount .DiscountAmount)}}</td></tr>{{end}}
-    {{if .TaxAmount}}<tr><td class="lbl">PPN {{if .TaxPct}}{{printf "%.0f" .TaxPct}}%{{else}}10%{{end}}</td><td>{{formatRp .TaxAmount}}</td></tr>{{end}}
+    {{if .TaxAmount}}<tr><td class="lbl">{{taxLabel .TaxType}} {{if .TaxPct}}{{printf "%.0f" .TaxPct}}%{{else}}10%{{end}}</td><td>{{taxPrefix .TaxType}}{{formatRp .TaxAmount}}</td></tr>{{end}}
     <tr class="grand"><td>GRAND TOTAL</td><td>{{formatRp .TotalAmount}}</td></tr>
     <tr><td class="terb-label">Terbilang</td><td class="terb-value">{{terbilang .TotalAmount}}</td></tr>
   </table>

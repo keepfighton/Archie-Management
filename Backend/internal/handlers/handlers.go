@@ -1939,8 +1939,21 @@ func applyInvoiceTotals(invoice *models.Invoice, subtotal, paidAmount float64) {
 	if paidAmount < 0 {
 		paidAmount = 0
 	}
+	taxType := normalizeTaxType(invoice.TaxType)
+	invoice.TaxType = taxType
+	if taxType == "none" {
+		invoice.TaxAmount = 0
+	}
 
-	totalAmount := subtotal + invoice.TaxAmount - invoice.DiscountAmount
+	totalAmount := subtotal - invoice.DiscountAmount
+	switch taxType {
+	case "pph":
+		totalAmount -= invoice.TaxAmount
+	case "none":
+		// no tax adjustment
+	default:
+		totalAmount += invoice.TaxAmount
+	}
 	if totalAmount < 0 {
 		totalAmount = 0
 	}
@@ -1998,7 +2011,12 @@ func (h *InvoiceHandler) hydrateInvoiceSubtotal(invoice *models.Invoice) {
 		return
 	}
 
-	subtotal := invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
+	subtotal := invoice.TotalAmount + invoice.DiscountAmount
+	if normalizeTaxType(invoice.TaxType) == "ppn" {
+		subtotal -= invoice.TaxAmount
+	} else if normalizeTaxType(invoice.TaxType) == "pph" {
+		subtotal += invoice.TaxAmount
+	}
 	if subtotal < 0 {
 		subtotal = 0
 	}
@@ -2040,7 +2058,12 @@ func (h *InvoiceHandler) Create(c *gin.Context) {
 	}
 	subtotal := invoice.SubtotalAmount
 	if subtotal == 0 {
-		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
+		subtotal = invoice.TotalAmount + invoice.DiscountAmount
+		if normalizeTaxType(invoice.TaxType) == "ppn" {
+			subtotal -= invoice.TaxAmount
+		} else if normalizeTaxType(invoice.TaxType) == "pph" {
+			subtotal += invoice.TaxAmount
+		}
 	}
 	applyInvoiceTotals(&invoice, subtotal, invoice.PaidAmount)
 	if err := h.db.Create(&invoice).Error; err != nil {
@@ -2095,7 +2118,12 @@ func (h *InvoiceHandler) Update(c *gin.Context) {
 	if itemTotals.Count > 0 {
 		subtotal = itemTotals.Subtotal
 	} else if subtotal == 0 {
-		subtotal = invoice.TotalAmount - invoice.TaxAmount + invoice.DiscountAmount
+		subtotal = invoice.TotalAmount + invoice.DiscountAmount
+		if normalizeTaxType(invoice.TaxType) == "ppn" {
+			subtotal -= invoice.TaxAmount
+		} else if normalizeTaxType(invoice.TaxType) == "pph" {
+			subtotal += invoice.TaxAmount
+		}
 	}
 
 	applyInvoiceTotals(&invoice, subtotal, paymentTotals.Total)
@@ -2143,7 +2171,9 @@ func (h *InvoiceHandler) ExportPDF(c *gin.Context) {
 			}
 			return t.Format("02 January 2006")
 		},
-		"inc": func(i int) int { return i + 1 },
+		"taxLabel":  taxLabel,
+		"taxPrefix": taxPrefix,
+		"inc":       func(i int) int { return i + 1 },
 	}).Parse(invoicePDFTemplate))
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -2268,7 +2298,7 @@ const invoicePDFTemplate = `<!DOCTYPE html>
 <div class="totals">
   <table>
     <tr><td class="label">Subtotal</td><td style="text-align:right">{{formatCurrency .SubtotalAmount .Currency}}</td></tr>
-    {{if .TaxAmount}}<tr><td class="label">PPN</td><td style="text-align:right">{{formatCurrency .TaxAmount .Currency}}</td></tr>{{end}}
+    {{if .TaxAmount}}<tr><td class="label">{{taxLabel .TaxType}}</td><td style="text-align:right">{{taxPrefix .TaxType}}{{formatCurrency .TaxAmount .Currency}}</td></tr>{{end}}
     {{if .DiscountAmount}}<tr><td class="label">Diskon</td><td style="text-align:right">-{{formatCurrency .DiscountAmount .Currency}}</td></tr>{{end}}
     <tr class="total-row"><td>Total</td><td style="text-align:right">{{formatCurrency .TotalAmount .Currency}}</td></tr>
     <tr><td class="label">Dibayar</td><td style="text-align:right">{{formatCurrency .PaidAmount .Currency}}</td></tr>

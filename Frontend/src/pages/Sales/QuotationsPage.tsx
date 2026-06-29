@@ -37,6 +37,7 @@ const emptyForm = () => ({
   currency: 'IDR',
   subtotal_amount: '' as string | number,
   discount_pct: 0,
+  tax_type: 'ppn',
   tax_pct: 10,
   payment_terms: '',
   scope_summary: '',
@@ -145,6 +146,7 @@ export default function QuotationsPage() {
         currency: detail.currency,
         subtotal_amount: detail.subtotal_amount,
         discount_pct: detail.discount_pct || 0,
+        tax_type: detail.tax_type || 'ppn',
         tax_pct: detail.tax_pct ?? 10,
         payment_terms: detail.payment_terms || '',
         scope_summary: detail.scope_summary || '',
@@ -181,7 +183,12 @@ export default function QuotationsPage() {
   const discountAmt = form.discount_pct ? subtotal * Number(form.discount_pct) / 100 : 0
   const afterDiscount = subtotal - discountAmt
   const taxAmt = form.tax_pct ? afterDiscount * Number(form.tax_pct) / 100 : 0
-  const grandTotal = afterDiscount + taxAmt
+  const taxType = String(form.tax_type || 'ppn')
+  const grandTotal = taxType === 'pph'
+    ? Math.max(afterDiscount - taxAmt, 0)
+    : taxType === 'none'
+      ? afterDiscount
+      : afterDiscount + taxAmt
 
   // Auto-fill terbilang saat grand total berubah
   useEffect(() => {
@@ -205,6 +212,7 @@ export default function QuotationsPage() {
         revision: Number(form.revision),
         subtotal_amount: subtotal,
         discount_pct: Number(form.discount_pct) || 0,
+        tax_type: taxType,
         tax_pct: Number(form.tax_pct) || 0,
         total_amount: grandTotal,
         issue_date: toISODate(form.issue_date),
@@ -313,10 +321,16 @@ export default function QuotationsPage() {
     try {
       const subtotal = convertQuotation.subtotal_amount || 0
       const taxPct = convertQuotation.tax_pct || 0
-      const taxAmount = (subtotal * taxPct) / 100
       const discountPct = convertQuotation.discount_pct || 0
       const discountAmount = (subtotal * discountPct) / 100
-      const total = subtotal + taxAmount - discountAmount
+      const taxType = String(convertQuotation.tax_type || 'ppn')
+      const afterDiscount = subtotal - discountAmount
+      const taxAmount = taxType === 'none' ? 0 : (afterDiscount * taxPct) / 100
+      const total = taxType === 'pph'
+        ? Math.max(afterDiscount - taxAmount, 0)
+        : taxType === 'none'
+          ? afterDiscount
+          : afterDiscount + taxAmount
 
       // FINANCE POLICY: Always create invoice as "not_paid"
       // Finance team must verify bank statement and record payment manually
@@ -329,6 +343,7 @@ export default function QuotationsPage() {
         due_date: convertForm.due_date ? toISODate(convertForm.due_date) : null,
         status: 'not_paid',  // ALWAYS not_paid - finance will verify & record payment
         currency: convertQuotation.currency,
+        tax_type: taxType,
         subtotal_amount: subtotal,
         tax_amount: taxAmount,
         discount_amount: discountAmount,
@@ -677,14 +692,21 @@ export default function QuotationsPage() {
               <input className="input" type="number" min={0} max={100} step={0.1} value={form.discount_pct}
                 onChange={(e) => setForm({ ...form, discount_pct: Number(e.target.value) })} />
             </FormField>
-            <FormField label="PPN / Tax (%)">
+            <FormField label="Jenis Pajak">
+              <select className="input" value={form.tax_type} onChange={(e) => setForm({ ...form, tax_type: e.target.value })}>
+                <option value="ppn">PPN</option>
+                <option value="pph">PPH</option>
+                <option value="none">None</option>
+              </select>
+            </FormField>
+            <FormField label={`${form.tax_type === 'pph' ? 'PPH' : form.tax_type === 'none' ? 'Pajak' : 'PPN'} (%)`}>
               <input className="input" type="number" min={0} max={100} step={0.1} value={form.tax_pct}
                 onChange={(e) => setForm({ ...form, tax_pct: Number(e.target.value) })} />
             </FormField>
             <div className="rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-xs space-y-1 self-end mb-0">
               <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{fmt(subtotal, form.currency)}</span></div>
               {discountAmt > 0 && <div className="flex justify-between text-gray-500"><span>Diskon</span><span>− {fmt(discountAmt, form.currency)}</span></div>}
-              {taxAmt > 0 && <div className="flex justify-between text-gray-500"><span>PPN {form.tax_pct}%</span><span>{fmt(taxAmt, form.currency)}</span></div>}
+              {taxAmt > 0 && form.tax_type !== 'none' && <div className="flex justify-between text-gray-500"><span>{form.tax_type === 'pph' ? 'PPH' : 'PPN'} {form.tax_pct}%</span><span>{form.tax_type === 'pph' ? '-' : ''}{fmt(taxAmt, form.currency)}</span></div>}
               <div className="flex justify-between font-bold text-gray-900 pt-1 border-t border-gray-300"><span>GRAND TOTAL</span><span>{fmt(grandTotal, form.currency)}</span></div>
             </div>
           </div>
@@ -797,10 +819,16 @@ export default function QuotationsPage() {
         {convertQuotation && (() => {
           const subtotal = convertQuotation.subtotal_amount || 0
           const taxPct = convertQuotation.tax_pct || 0
-          const taxAmount = (subtotal * taxPct) / 100
           const discountPct = convertQuotation.discount_pct || 0
           const discountAmount = (subtotal * discountPct) / 100
-          const total = subtotal + taxAmount - discountAmount
+          const taxType = String(convertQuotation.tax_type || 'ppn')
+          const afterDiscount = subtotal - discountAmount
+          const taxAmount = taxType === 'none' ? 0 : (afterDiscount * taxPct) / 100
+          const total = taxType === 'pph'
+            ? Math.max(afterDiscount - taxAmount, 0)
+            : taxType === 'none'
+              ? Math.max(afterDiscount, 0)
+              : Math.max(afterDiscount + taxAmount, 0)
           const paidPct = convertForm.payment_method === 'fully_paid' ? 100 : Number(convertForm.paid_pct || 0)
           const paidAmount = (total * paidPct) / 100
           const dueAmount = total - paidAmount
@@ -904,8 +932,8 @@ export default function QuotationsPage() {
                     <span className="font-medium">{fmt(subtotal, convertQuotation.currency)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">PPN / Tax ({taxPct}%):</span>
-                    <span className="font-medium">{fmt(taxAmount, convertQuotation.currency)}</span>
+                    <span className="text-gray-600">{taxType === 'pph' ? 'PPH' : taxType === 'none' ? 'Pajak' : 'PPN'} ({taxPct}%):</span>
+                    <span className="font-medium">{taxType === 'pph' ? '-' : ''}{fmt(taxAmount, convertQuotation.currency)}</span>
                   </div>
                   {discountPct > 0 && (
                     <div className="flex justify-between text-red-600">

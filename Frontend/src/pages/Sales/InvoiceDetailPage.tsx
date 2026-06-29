@@ -18,7 +18,11 @@ const fmt = (n: number, cur = 'IDR') =>
 const getInvoiceSubtotal = (invoice: any, items: any[] = []) => {
   if (typeof invoice?.subtotal_amount === 'number') return Math.max(Number(invoice.subtotal_amount), 0)
   if (items.length > 0) return items.reduce((sum: number, item: any) => sum + Number(item.total || 0), 0)
-  return Math.max(Number(invoice?.total_amount || 0) - Number(invoice?.tax_amount || 0) + Number(invoice?.discount_amount || 0), 0)
+  const fallback = Number(invoice?.total_amount || 0)
+    + Number(invoice?.discount_amount || 0)
+    + (invoice?.tax_type === 'pph' ? Number(invoice?.tax_amount || 0) : 0)
+    - (invoice?.tax_type === 'ppn' || !invoice?.tax_type ? Number(invoice?.tax_amount || 0) : 0)
+  return Math.max(fallback, 0)
 }
 
 export default function InvoiceDetailPage() {
@@ -78,6 +82,7 @@ export default function InvoiceDetailPage() {
       due_date: invoice.due_date ? invoice.due_date.substring(0, 10) : '',
       status: invoice.status,
       currency: invoice.currency,
+      tax_type: invoice.tax_type || 'ppn',
       subtotal_amount: subtotal,
       tax_amount: invoice.tax_amount,
       discount_amount: invoice.discount_amount,
@@ -97,6 +102,7 @@ export default function InvoiceDetailPage() {
         client_id: Number(editForm.client_id),
         project_id: editForm.project_id ? Number(editForm.project_id) : null,
         subtotal_amount: Number(editForm.subtotal_amount) || 0,
+        tax_type: editForm.tax_type || 'ppn',
         tax_amount: Number(editForm.tax_amount) || 0,
         discount_amount: Number(editForm.discount_amount) || 0,
         bill_date: toISODate(editForm.bill_date),
@@ -256,7 +262,7 @@ export default function InvoiceDetailPage() {
           </div>
           <div>
             <p className="text-xs text-gray-400">Tax</p>
-            <p className="text-sm">{fmt(invoice.tax_amount, invoice.currency)}</p>
+            <p className="text-sm">{(invoice.tax_type === 'pph' ? 'PPH' : invoice.tax_type === 'none' ? 'Pajak' : 'PPN')} {fmt(invoice.tax_amount, invoice.currency)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Discount</p>
@@ -419,6 +425,13 @@ export default function InvoiceDetailPage() {
           <FormField label="Currency">
             <select className="input" value={editForm.currency || 'IDR'} onChange={e => setEditForm({ ...editForm, currency: e.target.value })}>
               {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Tax Type">
+            <select className="input" value={editForm.tax_type || 'ppn'} onChange={e => setEditForm({ ...editForm, tax_type: e.target.value })}>
+              <option value="ppn">PPN</option>
+              <option value="pph">PPH</option>
+              <option value="none">None</option>
             </select>
           </FormField>
           <FormField label="Tax Amount">

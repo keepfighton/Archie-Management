@@ -423,6 +423,7 @@ type Invoice struct {
 	DueDate         FlexTime      `json:"due_date"`
 	Status          string        `gorm:"default:draft" json:"status"` // draft, not_paid, partially_paid, fully_paid, overdue
 	Currency        string        `gorm:"default:IDR" json:"currency"`
+	TaxType         string        `gorm:"default:ppn" json:"tax_type"`
 	SubtotalAmount  float64       `gorm:"column:subtotal_amount" json:"subtotal_amount"`
 	TotalAmount     float64       `gorm:"column:total_amount" json:"total_amount"`
 	TaxAmount       float64       `gorm:"column:tax_amount" json:"tax_amount"`
@@ -696,6 +697,7 @@ type Quotation struct {
 	DiscountPct     float64         `json:"discount_pct"`
 	DiscountAmount  float64         `json:"discount_amount"`
 	TaxPct          float64         `json:"tax_pct"`
+	TaxType         string          `gorm:"default:ppn" json:"tax_type"`
 	TaxAmount       float64         `json:"tax_amount"`
 	TotalAmount     float64         `json:"total_amount"`
 	PaymentTerms    string          `json:"payment_terms"`

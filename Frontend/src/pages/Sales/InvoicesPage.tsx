@@ -13,7 +13,11 @@ const STATUSES = ['draft', 'not_paid', 'partially_paid', 'fully_paid', 'overdue'
 const PAGE_SIZE = 30
 
 const getInvoiceSubtotal = (invoice: any) => {
-  const subtotal = Number(invoice?.subtotal_amount ?? (Number(invoice?.total_amount || 0) - Number(invoice?.tax_amount || 0) + Number(invoice?.discount_amount || 0)))
+  const fallback = Number(invoice?.total_amount || 0)
+    + Number(invoice?.discount_amount || 0)
+    + (invoice?.tax_type === 'pph' ? Number(invoice?.tax_amount || 0) : 0)
+    - (invoice?.tax_type === 'ppn' || !invoice?.tax_type ? Number(invoice?.tax_amount || 0) : 0)
+  const subtotal = Number(invoice?.subtotal_amount ?? fallback)
   return subtotal < 0 ? 0 : subtotal
 }
 
@@ -36,7 +40,7 @@ export default function InvoicesPage() {
   const [paying, setPaying] = useState(false)
   const [form, setForm] = useState<any>({
     invoice_number: '', client_id: '', project_id: '', parent_invoice_id: '', bill_date: '', due_date: '',
-    status: 'draft', currency: 'IDR', subtotal_amount: '', percentage: '', tax_pct: 11, discount_amount: '', notes: '',
+    status: 'draft', currency: 'IDR', subtotal_amount: '', percentage: '', tax_type: 'ppn', tax_pct: 11, discount_amount: '', notes: '',
   })
 
   // Create Remaining Invoice
@@ -113,7 +117,7 @@ export default function InvoicesPage() {
     setEditItem(null)
     setForm({
       invoice_number: genInvoiceNumber(), client_id: '', project_id: '', parent_invoice_id: '', bill_date: '', due_date: '',
-      status: 'draft', currency: 'IDR', subtotal_amount: '', percentage: '', tax_pct: 11, discount_amount: '0', notes: '',
+      status: 'draft', currency: 'IDR', subtotal_amount: '', percentage: '', tax_type: 'ppn', tax_pct: 11, discount_amount: '0', notes: '',
     })
     setShowModal(true)
   }
@@ -131,6 +135,7 @@ export default function InvoicesPage() {
       due_date: inv.due_date?.split('T')[0] || '',
       status: inv.status,
       currency: inv.currency,
+      tax_type: inv.tax_type || 'ppn',
       subtotal_amount: subtotal,
       percentage: '', // Don't pre-fill percentage in edit mode
       tax_pct: Number(taxPct.toFixed(2)),
@@ -145,15 +150,22 @@ export default function InvoicesPage() {
     setSaving(true)
     try {
       const subtotalAmount = Number(form.subtotal_amount) || 0
-      const taxPct = Number(form.tax_pct) || 0
-      const taxAmount = (subtotalAmount * taxPct) / 100
       const discountAmount = Number(form.discount_amount) || 0
-      const totalAmount = Math.max(subtotalAmount + taxAmount - discountAmount, 0)
+      const baseAmount = subtotalAmount - discountAmount
+      const taxType = String(form.tax_type || 'ppn')
+      const taxPct = Number(form.tax_pct) || 0
+      const taxAmount = taxType === 'none' ? 0 : (subtotalAmount * taxPct) / 100
+      const totalAmount = taxType === 'pph'
+        ? Math.max(baseAmount - taxAmount, 0)
+        : taxType === 'none'
+          ? Math.max(baseAmount, 0)
+          : Math.max(baseAmount + taxAmount, 0)
       const payload = {
         ...form,
         client_id: Number(form.client_id),
         project_id: form.project_id ? Number(form.project_id) : null,
         parent_invoice_id: form.parent_invoice_id ? Number(form.parent_invoice_id) : null,
+        tax_type: taxType,
         subtotal_amount: subtotalAmount,
         total_amount: totalAmount,
         tax_amount: taxAmount,
@@ -275,6 +287,7 @@ export default function InvoicesPage() {
         due_date: sourceInvoice.due_date,
         status: 'not_paid',
         currency: sourceInvoice.currency,
+        tax_type: sourceInvoice.tax_type || 'ppn',
         subtotal_amount: calculatedAmount,
         tax_amount: 0,
         discount_amount: 0,
@@ -297,10 +310,16 @@ export default function InvoicesPage() {
 
   const fmt = (n: number, cur = 'IDR') => `${cur} ${Number(n || 0).toLocaleString('id-ID')}`
   const subtotalAmount = Number(form.subtotal_amount) || 0
+  const taxType = String(form.tax_type || 'ppn')
   const taxPct = Number(form.tax_pct) || 0
-  const taxAmount = (subtotalAmount * taxPct) / 100
+  const taxAmount = taxType === 'none' ? 0 : (subtotalAmount * taxPct) / 100
   const discountAmount = Number(form.discount_amount) || 0
-  const computedTotal = Math.max(subtotalAmount + taxAmount - discountAmount, 0)
+  const baseAmount = subtotalAmount - discountAmount
+  const computedTotal = taxType === 'pph'
+    ? Math.max(baseAmount - taxAmount, 0)
+    : taxType === 'none'
+      ? Math.max(baseAmount, 0)
+      : Math.max(baseAmount + taxAmount, 0)
 
   return (
     <>
@@ -627,7 +646,14 @@ export default function InvoicesPage() {
           <FormField label="Subtotal" hint={!editItem && form.project_id && form.percentage ? `Auto-calculated: ${form.percentage}% × ${fmt(projects.find((p: any) => String(p.id) === form.project_id)?.price || 0, form.currency)}` : (!editItem && form.project_id ? 'Auto-filled from project price' : undefined)}>
             <PriceInput value={form.subtotal_amount} onChange={v => setForm({ ...form, subtotal_amount: v })} />
           </FormField>
-          <FormField label="PPN / Tax (%)" hint={`Tax amount: ${fmt(taxAmount, form.currency)}`}>
+          <FormField label="Jenis Pajak">
+            <select className="input" value={form.tax_type} onChange={e => setForm({ ...form, tax_type: e.target.value })}>
+              <option value="ppn">PPN</option>
+              <option value="pph">PPH</option>
+              <option value="none">None</option>
+            </select>
+          </FormField>
+          <FormField label={`${taxType === 'pph' ? 'PPH' : taxType === 'none' ? 'Pajak' : 'PPN'} (%)`} hint={`Tax amount: ${taxType === 'pph' ? '-' : ''}${fmt(taxAmount, form.currency)}`}>
             <input className="input" type="number" min={0} max={100} step={0.1} value={form.tax_pct}
               onChange={(e) => setForm({ ...form, tax_pct: Number(e.target.value) })} />
           </FormField>
